@@ -21,4 +21,8 @@ Input 2: Audio signal.
 
 Output 1: Audio output.
 
+The response is non-linear, so if you don't like the sound, try varying the amplitude of the input signal to your liking.
+
+Use the non-oversampled if you run engine sampling rate at higher than Audio-out rate. The oversampled module uses more CPU.
+
 As you increase samplerate, you might have to increase block size also to make it not produce noise.
