@@ -26,3 +26,7 @@ Low CPU usage.
 Nice and unique sound.
 
 The graphics are placeholders for now. I am focusing on the sound.
+
+## Download
+
+For now for Windows only: https://github.com/NikolaiVChr/Autinn/releases
