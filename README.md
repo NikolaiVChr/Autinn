@@ -15,7 +15,7 @@ Resonance CV and Resonance.
 
 Cutoff CV and Cutoff frequency. 20-20KHz.
 
-Voltage fine and coarse. This is the fraction of input voltage the circuit is running on.
+Voltage fine and coarse. Experiment with this to get the sound to your liking.
 
 As you increase samplerate, you might have to increase block size also to make it not produce noise.
 
