@@ -15,8 +15,6 @@ Resonance CV and Resonance. Notice that sometimes the resonance can diverge from
 
 Cutoff CV and Cutoff frequency. Up to 20KHz.
 
-Voltage fine and coarse. Experiment with this to get the sound to your liking, its just called voltage for lack of better description. I prefer to decrease it at least so much that the red light next to the output does not turn on.
-
 As you increase samplerate, you might have to increase block size also to make it not produce noise.
 
 ## Oxcart Oscillator
@@ -38,6 +36,10 @@ The graphics are placeholders as I am focusing on the sound for the time being.
 For now it is compiled for Windows only: https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+
+0.5.1.4
+* Removed voltage knobs from Retri to avoid output being too attenuated.
+* Reduced max resonance in Retri to 75% of what it was before.
 
 0.5.1.3
 * Anti-aliased the oscillator
