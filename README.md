@@ -1,7 +1,7 @@
 # Autinn
 Autinn VCV Rack plugin
 
-For now only 1 module, and for Windows only.
+For now only 2 modules, and for Windows only.
 
 ## Retri Transistor Lowpass Filter
 
@@ -18,6 +18,12 @@ Cutoff CV and Cutoff frequency. Up to 20KHz.
 Voltage fine and coarse. Experiment with this to get the sound to your liking, its just called voltage for lack of better description. I prefer to decrease it at least so much that the red light next to the output does not turn on.
 
 As you increase samplerate, you might have to increase block size also to make it not produce noise.
+
+## Oxcart Oscillator
+
+It has a frequency knob and a CV in. Very simple.
+
+Approx. +-5V output.
 
 ## Goals
 
