@@ -31,6 +31,22 @@ The graphics are placeholders as I am focusing on the sound for the time being.
 
 For now it is compiled for Windows only: https://github.com/NikolaiVChr/Autinn/releases
 
+## Changelog
+
+0.5.1.3
+* Anti-aliased the oscillator
+
+0.5.1.2
+* Added a Oxcart oscillator
+
+0.5.1.1 
+* Fixed filter saturation light.
+* Introduced half step delay, to help on phase shifting.
+* Added fine control knob of voltage.
+
+0.5.1.0
+* Made Retri filter
+
 ## Feedback and suggestions
 
 Post issues on the github page for that. :)
