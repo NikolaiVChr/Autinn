@@ -1,9 +1,9 @@
 # Autinn
 Autinn VCV Rack plugin
 
-For now only 2 modules, and for Windows only.
+For now only modules for Windows.
 
-## Retri Transistor Lowpass Filter
+## Retri
 
 A 4-pole transistor ladder lowpass filter.
 
@@ -17,17 +17,29 @@ Cutoff CV and Cutoff frequency. Up to 20KHz.
 
 As you increase samplerate, you might have to increase block size also to make it not produce noise.
 
-## Oxcart Oscillator
+## Oxcart
 
-It has a frequency knob and a CV in. Very simple.
+Oscillator with a frequency knob and a CV in. Very simple.
 
 Approx. +-5V output.
+
+## Dirt
+
+Just a very simple high-pass filter.
+
+## Flopper
+
+Takes the top part of the wave from input 1, and the lower part from input 2 to output 1.
+
+Does the opposite for output 2. The knob and CV determines which level determines where to switch from top to bottom.
+
+Not anti-aliased, so sometimes good idea to follow it with a low-pass.
 
 ## Goals
 
 Low CPU usage.
 
-It will never sound exactly like the real analog transistor ladder filter. But should sound nice and unique.
+Retri will never sound exactly like the real analog transistor ladder filter. But should sound nice and unique.
 
 The graphics are placeholders as I am focusing on the sound for the time being.
 
@@ -37,15 +49,21 @@ For now it is compiled for Windows only: https://github.com/NikolaiVChr/Autinn/r
 
 ## Changelog
 
+0.5.1.6
+* Added Flopper.
+
+0.5.1.5
+* Added Dirt.
+
 0.5.1.4
 * Removed voltage knobs from Retri to avoid output being too attenuated.
 * Reduced max resonance in Retri to 75% of what it was before.
 
 0.5.1.3
-* Anti-aliased the oscillator
+* Anti-aliased the oscillator.
 
 0.5.1.2
-* Added a Oxcart oscillator
+* Added a Oxcart oscillator.
 
 0.5.1.1 
 * Fixed filter saturation light.
@@ -53,7 +71,7 @@ For now it is compiled for Windows only: https://github.com/NikolaiVChr/Autinn/r
 * Added fine control knob of voltage.
 
 0.5.1.0
-* Made Retri filter
+* Made Retri filter.
 
 ## Feedback and suggestions
 
