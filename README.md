@@ -9,11 +9,13 @@ A 4-pole transistor ladder lowpass filter.
 
 Knobs from top to bottom:
 
-Temperature of the circuit. 10-60 degrees celcius.
+Temperature of the circuit. 5-120 degrees celcius.
 
 Resonance CV and Resonance. Notice that sometimes the resonance can diverge from the cutoff frequency.
 
-Cutoff CV and Cutoff frequency. Up to 20KHz.
+Cutoff CV and Cutoff frequency.
+
+Drive. (sort of)
 
 As you increase samplerate, you might have to increase block size also to make it not produce noise.
 
@@ -48,6 +50,11 @@ The graphics are placeholders as I am focusing on the sound for the time being.
 For now it is compiled for Windows only: https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+
+0.5.1.7
+* Fixed a bug in the Retri output algorithm.
+* Added drive knob to Retri.
+* Increased temperature range on Retri.
 
 0.5.1.6
 * Added Flopper.
