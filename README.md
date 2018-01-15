@@ -33,7 +33,7 @@ Just a very simple high-pass filter.
 
 Takes the top part of the wave from input 1, and the lower part from input 2 to output 1.
 
-Does the opposite for output 2. The knob and CV determines which level determines where to switch from top to bottom.
+Does the opposite for output 2. The knob and CV determines which voltage to switch from top to bottom.
 
 Not anti-aliased, so sometimes good idea to follow it with a low-pass.
 
@@ -50,6 +50,9 @@ The graphics are placeholders as I am focusing on the sound for the time being.
 For now it is compiled for Windows only: https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+
+0.5.1.8
+* Realigned all graphics and added some color to the backgrounds.
 
 0.5.1.7
 * Fixed a bug in the Retri output algorithm.
