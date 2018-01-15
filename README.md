@@ -24,7 +24,7 @@ As you increase samplerate, you might have to increase block size also to make i
 
 ## Oxcart
 
-Oscillator with a frequency knob and a CV in. Very simple.
+Oscillator with a frequency knob and a CV in.
 
 Approx. +-5V output.
 
@@ -38,7 +38,7 @@ Takes the top part of the wave from input 1, and the lower part from input 2 to 
 
 Does the opposite for output 2. The knob and CV determines which voltage to switch from top to bottom.
 
-Not anti-aliased, so sometimes good idea to follow it with a low-pass.
+Not anti-aliased.
 
 ## Amp
 
