@@ -40,6 +40,7 @@ Not anti-aliased, so sometimes good idea to follow it with a low-pass.
 ## Amp
 
 Simple Amplifier/attenuator. The red light will turn on when output signal amplitude peaks above +-10V.
+Max 6dB amplification.
 
 ## Goals
 
