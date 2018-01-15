@@ -37,6 +37,10 @@ Does the opposite for output 2. The knob and CV determines which voltage to swit
 
 Not anti-aliased, so sometimes good idea to follow it with a low-pass.
 
+## Amp
+
+Simple Amplifier/attenuator. The red light will turn on when output signal amplitude peaks above +-10V.
+
 ## Goals
 
 Low CPU usage.
@@ -50,6 +54,10 @@ The graphics are placeholders as I am focusing on the sound for the time being.
 For now it is compiled for Windows only: https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+
+0.5.1.9
+* Changed graphics to make color less look like wires.
+* Added Amp module.
 
 0.5.1.8
 * Realigned all graphics and added some color to the backgrounds.
