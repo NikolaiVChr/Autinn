@@ -63,6 +63,9 @@ For now it is compiled for Windows and Linux only: https://github.com/NikolaiVCh
 
 ## Changelog
 
+0.5.1.15
+* Optimized some code.
+
 0.5.1.14
 * Compiled binaries for Linux also.
 * Small graphical change.
