@@ -45,6 +45,10 @@ Not anti-aliased.
 Simple Amplifier/attenuator. The yellow light will turn on when output signal amplitude peaks above +-10V.
 Max 6dB amplification. Middle setting of knob is 0dB. No clipping.
 
+## Rails
+
+Mono to stereo converter. Can sound subtle to some ears. Plan on adding knob to adjust the amount.
+
 ## Goals
 
 Low CPU usage as much as possible.
