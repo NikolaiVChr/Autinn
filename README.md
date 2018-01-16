@@ -36,14 +36,19 @@ Just a very simple high-pass filter.
 
 Takes the top part of the wave from input 1, and the lower part from input 2 to output 1.
 
-Does the opposite for output 2. The knob and CV determines which voltage to switch from top to bottom.
+Does the opposite for output 2.
+
+The knob and CV determines which voltage to switch from top to bottom.
 
 Not anti-aliased.
 
 ## Amp
 
 Simple Amplifier/attenuator. The yellow light will turn on when output signal amplitude peaks above +-10V.
-Max 6dB amplification. Middle setting of knob is 0dB. No clipping.
+
+Max 6dB amplification. Middle setting of knob is 0dB.
+
+No clipping.
 
 ## Rails
 
