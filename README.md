@@ -1,6 +1,6 @@
 # Autinn VCV Rack plugin
 
-For now only modules for Windows.
+For now only modules for Windows and Linux.
 
 ## Retri
 
@@ -47,7 +47,7 @@ Max 6dB amplification. Middle setting of knob is 0dB. No clipping.
 
 ## Rails
 
-Mono to stereo converter. Its not panning. Can sound subtle to some ears. The knob is the amount.
+Mono to stereo converter. It doesn't pan, the output power is still the same in both channels, the knob is the amount.
 
 ## Goals
 
@@ -59,9 +59,19 @@ The graphics are placeholders as I am focusing on the sound for the time being.
 
 ## Download
 
-For now it is compiled for Windows only: https://github.com/NikolaiVChr/Autinn/releases
+For now it is compiled for Windows and Linux only: https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+
+0.5.1.14
+* Compiled binaries for Linux also.
+* Small graphical change.
+
+0.5.1.12
+* Added knob to Rails.
+
+0.5.1.11
+* Added Rails mono to stereo module.
 
 0.5.1.10
 * The Retri cutoff frequency is now constantly auto-tuned to match desired cutoff as a function of sampling rate.
