@@ -47,7 +47,7 @@ Max 6dB amplification. Middle setting of knob is 0dB. No clipping.
 
 ## Rails
 
-Mono to stereo converter. Can sound subtle to some ears. Plan on adding knob to adjust the amount.
+Mono to stereo converter. Its not panning. Can sound subtle to some ears. The knob is the amount.
 
 ## Goals
 
