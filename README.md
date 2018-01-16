@@ -28,10 +28,6 @@ Oscillator with a frequency knob and a CV in.
 
 Approx. +-5V output.
 
-## Dirt
-
-Just a very simple high-pass filter.
-
 ## Flopper
 
 Takes the top part of the wave from input 1, and the lower part from input 2 to output 1.
@@ -39,8 +35,6 @@ Takes the top part of the wave from input 1, and the lower part from input 2 to 
 Does the opposite for output 2.
 
 The knob and CV determines which voltage to switch from top to bottom.
-
-Not anti-aliased.
 
 ## Amp
 
@@ -53,6 +47,12 @@ No clipping.
 ## Rails
 
 Mono to stereo converter. It doesn't pan, the output power is still the same in both channels, the knob is the amount.
+
+## Dirt
+
+Might remove it soon, as haven't found a any use for it and don't feel like improving it.
+
+Just a very simple high-pass filter.
 
 ## Goals
 
