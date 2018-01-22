@@ -1,32 +1,26 @@
 # Autinn VCV Rack plugin
 
-For now only modules for Windows and Linux.
-
 ## Retri
 
 A 4-pole transistor ladder lowpass filter behavior.
 
-Knobs from top to bottom:
-
-Temperature of the circuit. 5-120 degrees celcius.
-
-Resonance CV and Resonance. Notice that sometimes the resonance can diverge a bit from the cutoff frequency.
-
-Cutoff CV and Cutoff frequency.
-
-Drive (sort of).
+Notice that sometimes the resonance can diverge a bit from the cutoff frequency.
 
 When input is unplugged or go silent at very high resonance setting it can self-oscillate, if resonance is dialed too low again, it will stop and the procedure have to be repeated to get it going again.
 
+The linearity knob is to adjust for how strong the input signal is. The stronger it is the more you want to increase the knob, which in turn makes the filter act more linear. It just adjust the voltage going into the filter, and opposite for the signal going out. Best I can recommend is to experiment and find out what sounds the best.
+
 It attenuate around 24dB/octave. The cutoff attenuation is in the 12dB range.
 
-As you increase samplerate, you might have to increase block size also to make it not produce noise.
+## Jette
+
+Oscillator. Control the fundamental and its harmonics amplitudes with the sliders.
+
+The button selects waveform.
 
 ## Oxcart
 
 Oscillator with a frequency knob and a CV in.
-
-Approx. +-5V output.
 
 ## Flopper
 
@@ -34,7 +28,9 @@ Takes the top part of the wave from input 1, and the lower part from input 2 to 
 
 Does the opposite for output 2.
 
-The knob and CV determines which voltage to switch from top to bottom.
+The knob and CV determines which voltage the switch from top to bottom will take place.
+
+Be careful with higher frequencies as it is not anti-aliased.
 
 ## Amp
 
@@ -44,9 +40,23 @@ Max 6dB amplification. Middle setting of knob is 0dB.
 
 No clipping.
 
+## Sjip
+
+An oscillator.
+
+Approx. +-5V output.
+
+## Aura
+
+It uses ITD and IID to make stereo panning for headphones.
+
+Use CV to control which pitch is the main freq in the input signal.
+
+You have to press the apply button each time you change the source listening angle with the knob.
+
 ## Rails
 
-Mono to stereo converter. It doesn't pan, the output power is still the same in both channels, the knob is the amount.
+Mono to stereo converter. It doesn't pan, the output power is still the same in both channels.
 
 ## Dirt
 
@@ -54,19 +64,30 @@ Might remove it soon, as haven't found a any use for it and don't feel like impr
 
 Just a very simple high-pass filter.
 
-## Goals
-
-Low CPU usage as much as possible.
-
-Retri will never sound exactly like the real analog transistor ladder filter. But should sound nice and unique.
-
-The graphics are placeholders as I am focusing on the sound for the time being.
-
 ## Download
 
 For now it is compiled for Windows and Linux only: https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+
+0.5.1.18
+* Updated graphics some more.
+* Renamed Retri drive to linearity, is more accurate.
+
+0.5.1.17
+* Removed temperature knob and light from Retri. And rearranged knobs. Due to the way Rack indexes ports/knobs, this will probably mess up any patches with Retri, and it will have to be tuned/replugged again.
+* Removed DC offset from Oxcart, except for a very tiny part.
+* Made Jette anti-aliasing a little faster.
+* Added Sjip oscillator. A little softer on the ears than a sine wave, IMO.
+* Made initialize work on shape in Jette.
+* Updated graphics a little.
+
+0.5.1.16
+* Removed the knob from Rails.
+* Set default freq on Oxcart to be C instead of A. If this change will mess up your patch and it really matters to you, please complain in issues and I might change it back.
+* Added Jette Oscillator module.
+* Added Aura, another mono to stereo module.
+* Added some color to the knobs.
 
 0.5.1.15
 * Optimized some code.
