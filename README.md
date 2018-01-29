@@ -2,7 +2,7 @@
 
 ## Bass
 
-A bass synth.
+A bass synth. (v0.5.1.20 or later)
 
 Send the tone into OSC input. Send the note gate into GATE input. Send accent gate into ACCENT input, it should be either on or off. Changing accent gate in middle of a note wont affect anything.
 
