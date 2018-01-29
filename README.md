@@ -1,14 +1,38 @@
 # Autinn VCV Rack plugin
 
+## Bass
+
+A bass synth.
+
+Send the tone into OSC input. Send the note gate into GATE input. Send accent gate into ACCENT input, it should be either on or off. Changing accent gate in middle of a note wont affect anything.
+
+Use accent knob to adjust how much accented notes are emphasized (higher volume and if in quick succesion, also higher pitch).
+
+Use env mod knob to adjust the range of the envelope that controls the filter sweep.
+
+Use cutoff and resonance to adjust the filter. Resonance turned more clockwise will also increase attack time on filter sweep envelope.
+
+Accented notes in quick succesion will soften the attack a bit. I don't recommend more than 3 of them in quick succesion, as that will saturate the output and also the filter sweep if env mod is high.
+
+The length of the volume envelope is fixed. But since the accented filter sweep envelope is almost added to that, it might become longer.
+
+Decay for accented notes are very short and cannot be adjusted with the decay knob.
+
+I opted for no built in oscillator as people probably have their favorites. So its recommended to experiment with waveforms, frequencies, and gate lenghts.
+
+Although the filter is a 4-pole it works more like a 18dB/octave, as the last pole has a higher cutoff.
+
+PS. With decay is really meant release.
+
+PPS. Might add some CV inputs to the knobs if people ask for it.
+
 ## Retri
 
 A 4-pole transistor ladder lowpass filter behavior.
 
-Notice that sometimes the resonance can diverge a bit from the cutoff frequency.
-
 When input is unplugged or go silent at very high resonance setting it can self-oscillate, if resonance is dialed too low again, it will stop and the procedure have to be repeated to get it going again.
 
-The linearity knob is to adjust for how strong the input signal is. The stronger it is the more you want to increase the knob, which in turn makes the filter act more linear. It just adjust the voltage going into the filter, and opposite for the signal going out. Best I can recommend is to experiment and find out what sounds the best.
+The linearity knob is to adjust for how strong the input signal is. The stronger it is the more you want to increase the knob, which in turn makes the filter act more linear. It just adjust the voltage going into the filter, and opposite for the signal going out. Best I can recommend is to experiment and find out what sounds the best. The default value (in v0.5.1.19) should work good with +-5V audio input.
 
 It attenuate around 24dB/octave. The cutoff attenuation is in the 12dB range.
 
@@ -18,9 +42,26 @@ Oscillator. Control the fundamental and its harmonics amplitudes with the slider
 
 The button selects waveform.
 
+Approx up to -5.9V to 5.9V output.
+
 ## Oxcart
 
 Oscillator with a frequency knob and a CV in.
+
+It is a very aggresive sound.
+
+Approx -1V to +5V output. (in v0.5.1.20)
+
+## DC
+
+AC to DC module. (v0.5.1.20 or later)
+
+A typical use for this is to just measure DC offset of audio. Just connect the output to RJModules Display or Fundamentals Scope, and you get a readout of the value.
+In theory you could also invert the polarity and add it to the audio, and then you have a DC blocker, this I haven't tested though.
+
+The light will be green if DC is low, become more blue for negative DC and more red for positive DC.
+
+Is meant for audio, not CV signals.
 
 ## Flopper
 
@@ -29,8 +70,6 @@ Takes the top part of the wave from input 1, and the lower part from input 2 to 
 Does the opposite for output 2.
 
 The knob and CV determines which voltage the switch from top to bottom will take place.
-
-Be careful with higher frequencies as it is not anti-aliased.
 
 ## Amp
 
@@ -42,7 +81,7 @@ No clipping.
 
 ## Sjip
 
-An oscillator.
+An oscillator with a very rounded waveform.
 
 Approx. +-5V output.
 
@@ -69,6 +108,19 @@ Just a very simple high-pass filter.
 For now it is compiled for Windows and Linux only: https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+0.5.1.20
+* Added a bass synth
+
+0.5.1.19
+* Jette shape now works with randomize context menu.
+* Flopper aliasing is now damped at lower sampling rates. I need to use better algorithm for anti-aliasing it, but won't be this release.
+* Retri cutoff upper range limited, it did not behave well at the max positions anyway.
+* Default position of linearity knob in Retri increased a bit to better match standard +-5V PP input.
+* Upsampling in Retri is now better algorithm.
+* Added DC, an AC to DC module.
+* Removed high frequency DC offset (for real this time) from Oxcart by improving anti-aliasing. This also fixed amplitude changing with pitch.
+* Made all oscillator lights blink speed dependent on frequency.
+* Decreased the voltage of Oxcart to better conform with VCV standards.
 
 0.5.1.18
 * Updated graphics some more.
