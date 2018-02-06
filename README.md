@@ -4,6 +4,8 @@
 
 A bass synth emulating a classic hardware synth.
 
+![Autinn Bass](https://s13.postimg.org/egk1654w7/bass.png)
+
 Send the tone into OSC input. Send the note trigger into GATE input. Send accent gate into ACCENT input, it should be either on or off. Changing accent gate in middle of a note wont affect anything.
 
 Use accent knob to adjust how much accented notes are emphasized (higher volume and higher pitch).
@@ -30,13 +32,19 @@ There is no sustain, so the gate is now really just a trigger.
 
 A special saw oscillator. Goes well with Bass module.
 
+![Autinn Saw](https://s13.postimg.org/w6lpr887b/saw.png)
+
 ## Square
 
 A special square oscillator. Goes well with Bass module.
 
+![Autinn Square](https://s13.postimg.org/6b1z81e3b/square.png)
+
 ## Flora
 
 A lowpass filter emulating a 4-pole transistor ladder.
+
+![Autinn Flora](https://s13.postimg.org/58rsph84n/flora.png)
 
 When input is unplugged or go silent at very high resonance setting it can self-oscillate, if resonance is dialed too low again, it will stop and the procedure have to be repeated to get it going again.
 
@@ -48,6 +56,8 @@ It attenuate around 24dB/octave. The cutoff attenuation is in the 12dB range.
 
 Oscillator. Control the fundamental and its harmonics amplitudes with the sliders.
 
+![Autinn Jette](https://s13.postimg.org/6ntde71hz/jette.png)
+
 The button selects waveform.
 
 Approx up to -5.9V to 5.9V output.
@@ -56,6 +66,8 @@ Approx up to -5.9V to 5.9V output.
 
 Oscillator with a frequency knob and a CV in.
 
+![Autinn Oxcart](https://s13.postimg.org/g8d012bef/oxcart.png)
+
 It is a very aggresive sound.
 
 Approx -1V to +5V output.
@@ -63,6 +75,8 @@ Approx -1V to +5V output.
 ## DC
 
 AC to DC module.
+
+![Autinn DC](https://s13.postimg.org/fiu7oofzr/image.png)
 
 A typical use for this is to just measure DC offset of audio. Just connect the output to RJModules Display or Fundamentals Scope, and you get a readout of the value.
 In theory you could also invert the polarity and add it to the audio, and then you have a DC blocker, this I haven't tested though.
@@ -77,11 +91,15 @@ Takes the top part of the wave from input 1, and the lower part from input 2 to 
 
 Does the opposite for output 2.
 
+![Autinn Flopper](https://s13.postimg.org/e3smzz21z/flopper.png)
+
 The knob and CV determines which voltage the switch from top to bottom will take place.
 
 ## Amp
 
 Simple Amplifier/attenuator. The yellow light will turn on when output signal amplitude peaks above +-10V.
+
+![Autinn Amp](https://s13.postimg.org/urk52fu8n/amp.png)
 
 Max 6dB amplification. Middle setting of knob is 0dB.
 
@@ -93,9 +111,13 @@ An oscillator with a very rounded waveform.
 
 Approx. +-5V output.
 
+![Autinn Sjip](https://s13.postimg.org/w6lpr80hj/sjip.png)
+
 ## Aura
 
 It uses ITD and IID to make stereo panning for headphones.
+
+![Autinn Aura](https://s13.postimg.org/6b1z7z17r/aura.png)
 
 Use CV to control which pitch is the main freq in the input signal.
 
@@ -105,11 +127,15 @@ You have to press the apply button each time you change the source listening ang
 
 Mono to fake stereo converter. It doesn't pan, the output power is still the same in both channels, but a delay in one channel.
 
+![Autinn Rails](https://s13.postimg.org/tcikdrb5z/rails.png)
+
 ## Dirt
 
 Might remove it soon, as haven't found a any use for it and don't feel like improving it.
 
 Just a very simple high-pass filter.
+
+![Autinn Dirt](https://s13.postimg.org/q5o0u43kn/dirt.png)
 
 ## Download
 
