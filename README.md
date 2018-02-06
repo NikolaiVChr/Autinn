@@ -122,7 +122,7 @@ https://github.com/NikolaiVChr/Autinn/releases
 * Increased the softening of accented notes at high resonance in Bass.
 * Slightly increased range of cutoff knob in Bass.
 * Changed the Bass filter to be pure 24dB.
-* Added CV inputs to Bass module.
+* Added CV inputs to Bass module. So the module is a bit wider now.
 * Removed description from Rack plugin module list. And sorted the list.
 * Renamed Retri to Flora.
 * Added Saw and Square oscillator modules.
