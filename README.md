@@ -2,37 +2,45 @@
 
 ## Bass
 
-A bass synth. (v0.5.1.20 or later)
+A bass synth emulating a classic hardware synth.
 
-Send the tone into OSC input. Send the note gate into GATE input. Send accent gate into ACCENT input, it should be either on or off. Changing accent gate in middle of a note wont affect anything.
+Send the tone into OSC input. Send the note trigger into GATE input. Send accent gate into ACCENT input, it should be either on or off. Changing accent gate in middle of a note wont affect anything.
 
-Use accent knob to adjust how much accented notes are emphasized (higher volume and if in quick succesion, also higher pitch).
+Use accent knob to adjust how much accented notes are emphasized (higher volume and higher pitch).
 
 Use env mod knob to adjust the range of the envelope that controls the filter sweep.
 
+Attack are fixed and extremely short for non accent notes, both for the vca and filter sweep.
+
 Use cutoff and resonance to adjust the filter. Resonance turned more clockwise will also increase attack time on filter sweep envelope.
 
-Accented notes in quick succesion will soften the attack a bit. I don't recommend more than 3 of them in quick succesion, as that will saturate the output and also the filter sweep if env mod is high.
+The higher env mod is, the less accented notes will be pitch emphasized.
 
-The length of the volume envelope is fixed. But since the accented filter sweep envelope is almost added to that, it might become longer.
+The decay of the volume envelope is fixed. But the accented filter sweep envelope is almost added to that.
 
-Decay for accented notes are very short and cannot be adjusted with the decay knob.
+Use decay knob to adjust the amount of filter sweep envelope decay. Filter sweep decay for accented notes are very short and cannot be adjusted with the decay knob.
 
-I opted for no built in oscillator as people probably have their favorites. So its recommended to experiment with waveforms, frequencies, and gate lenghts.
+If accented notes are sent in very quick succession the filter will open more up on each note to a certain degree.
 
-Although the filter is a 4-pole it works more like a 18dB/octave, as the last pole has a higher cutoff.
+I opted for no built in oscillator as people probably have their favorites. So its recommended to experiment with waveforms, slide, accent and frequencies. I mostly used Autinn Saw and Square to test with.
 
-PS. With decay is really meant release.
+There is no sustain, so the gate is now really just a trigger.
 
-PPS. Might add some CV inputs to the knobs if people ask for it.
+## Saw
 
-## Retri
+A special saw oscillator. Goes well with Bass module.
 
-A 4-pole transistor ladder lowpass filter behavior.
+## Square
+
+A special square oscillator. Goes well with Bass module.
+
+## Flora
+
+A lowpass filter emulating a 4-pole transistor ladder.
 
 When input is unplugged or go silent at very high resonance setting it can self-oscillate, if resonance is dialed too low again, it will stop and the procedure have to be repeated to get it going again.
 
-The linearity knob is to adjust for how strong the input signal is. The stronger it is the more you want to increase the knob, which in turn makes the filter act more linear. It just adjust the voltage going into the filter, and opposite for the signal going out. Best I can recommend is to experiment and find out what sounds the best. The default value (in v0.5.1.19) should work good with +-5V audio input.
+The linearity knob is to adjust for how strong the input signal is. The stronger it is the more you want to increase the knob, which in turn makes the filter act more linear. It just adjust the voltage going into the filter, and opposite for the signal going out. Best I can recommend is to experiment and find out what sounds the best. The default value should work good with +-5V audio input.
 
 It attenuate around 24dB/octave. The cutoff attenuation is in the 12dB range.
 
@@ -50,11 +58,11 @@ Oscillator with a frequency knob and a CV in.
 
 It is a very aggresive sound.
 
-Approx -1V to +5V output. (in v0.5.1.20)
+Approx -1V to +5V output.
 
 ## DC
 
-AC to DC module. (v0.5.1.20 or later)
+AC to DC module.
 
 A typical use for this is to just measure DC offset of audio. Just connect the output to RJModules Display or Fundamentals Scope, and you get a readout of the value.
 In theory you could also invert the polarity and add it to the audio, and then you have a DC blocker, this I haven't tested though.
@@ -95,7 +103,7 @@ You have to press the apply button each time you change the source listening ang
 
 ## Rails
 
-Mono to stereo converter. It doesn't pan, the output power is still the same in both channels.
+Mono to fake stereo converter. It doesn't pan, the output power is still the same in both channels, but a delay in one channel.
 
 ## Dirt
 
@@ -105,9 +113,27 @@ Just a very simple high-pass filter.
 
 ## Download
 
-For now it is compiled for Windows and Linux only: https://github.com/NikolaiVChr/Autinn/releases
+https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+0.5.21
+* Autodafe compiled a mac binary, thank you!
+* Fixed in Bass that accented notes were not attack softened when resonance was high.
+* Increased the softening of accented notes at high resonance in Bass.
+* Slightly increased range of cutoff knob in Bass.
+* Changed the Bass filter to be pure 24dB.
+* Added CV inputs to Bass module.
+* Removed description from Rack plugin module list. And sorted the list.
+* Renamed Retri to Flora.
+* Added Saw and Square oscillator modules.
+* Removed sustain from Bass.
+* Made Bass VCA envelope have linear attack, as its a declicker only anyway.
+* Removed saturation at output, too expensive.
+* Some more envelope changes to Bass.
+* Removed clicky retrigger in Bass vca envelope.
+* Made increased env mod decrease amount of extra pitch on accented notes in Bass.
+* Declicked vca from filter envelope also.
+
 0.5.1.20
 * Added a bass synth
 
