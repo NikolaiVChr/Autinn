@@ -4,7 +4,7 @@
 
 A bass synth emulating a classic hardware synth.
 
-![Autinn Bass](https://s13.postimg.org/egk1654w7/bass.png)
+![Autinn Bass](https://s19.postimg.cc/ws6uamjb7/bass.png)
 
 Send the tone into OSC input. Send the note trigger into GATE input. Send accent gate into ACCENT input, it should be either on or off. Changing accent gate in middle of a note wont affect anything.
 
@@ -32,19 +32,19 @@ There is no sustain, so the gate is now really just a trigger.
 
 A special saw oscillator. Goes well with Bass module.
 
-![Autinn Saw](https://s13.postimg.org/w6lpr887b/saw.png)
+![Autinn Saw](https://s19.postimg.cc/ag91h9uhv/saw.png)
 
 ## Square
 
 A special square oscillator. Goes well with Bass module.
 
-![Autinn Square](https://s13.postimg.org/6b1z81e3b/square.png)
+![Autinn Square](https://s19.postimg.cc/9qq94x1o3/square.png)
 
 ## Flora
 
 A lowpass filter emulating a 4-pole transistor ladder.
 
-![Autinn Flora](https://s13.postimg.org/58rsph84n/flora.png)
+![Autinn Flora](https://s19.postimg.cc/4fbck6d0j/flora.png)
 
 When input is unplugged or go silent at very high resonance setting it can self-oscillate, if resonance is dialed too low again, it will stop and the procedure have to be repeated to get it going again.
 
@@ -56,7 +56,7 @@ It attenuate around 24dB/octave. The cutoff attenuation is in the 12dB range.
 
 Oscillator. Control the fundamental and its harmonics amplitudes with the sliders.
 
-![Autinn Jette](https://s13.postimg.org/6ntde71hz/jette.png)
+![Autinn Jette](https://s19.postimg.cc/at0fnen1f/jette.png)
 
 The button selects waveform.
 
@@ -66,7 +66,7 @@ Approx up to -5.9V to 5.9V output.
 
 Oscillator with a frequency knob and a CV in.
 
-![Autinn Oxcart](https://s13.postimg.org/g8d012bef/oxcart.png)
+![Autinn Oxcart](https://s19.postimg.cc/917gsj69f/oxcart.png)
 
 It is a very aggresive sound.
 
@@ -76,7 +76,7 @@ Approx -1V to +5V output.
 
 AC to DC module.
 
-![Autinn DC](https://s13.postimg.org/fiu7oofzr/image.png)
+![Autinn DC](https://s13.postimg.cc/fiu7oofzr/image.png)
 
 A typical use for this is to just measure DC offset of audio. Just connect the output to RJModules Display or Fundamentals Scope, and you get a readout of the value.
 In theory you could also invert the polarity and add it to the audio, and then you have a DC blocker, this I haven't tested though.
@@ -91,7 +91,7 @@ Takes the top part of the wave from input 1, and the lower part from input 2 to 
 
 Does the opposite for output 2.
 
-![Autinn Flopper](https://s13.postimg.org/e3smzz21z/flopper.png)
+![Autinn Flopper](https://s13.postimg.cc/e3smzz21z/flopper.png)
 
 The knob and CV determines which voltage the switch from top to bottom will take place.
 
@@ -99,7 +99,7 @@ The knob and CV determines which voltage the switch from top to bottom will take
 
 Simple Amplifier/attenuator. The yellow light will turn on when output signal amplitude peaks above +-10V.
 
-![Autinn Amp](https://s13.postimg.org/urk52fu8n/amp.png)
+![Autinn Amp](https://s19.postimg.cc/ws6ualgqb/amp.png)
 
 Max 6dB amplification. Middle setting of knob is 0dB.
 
@@ -111,13 +111,13 @@ An oscillator with a very rounded waveform.
 
 Approx. +-5V output.
 
-![Autinn Sjip](https://s13.postimg.org/w6lpr80hj/sjip.png)
+![Autinn Sjip](https://s13.postimg.cc/w6lpr80hj/sjip.png)
 
 ## Aura
 
 It uses ITD and IID to make stereo panning for headphones.
 
-![Autinn Aura](https://s13.postimg.org/6b1z7z17r/aura.png)
+![Autinn Aura](https://s13.postimg.cc/6b1z7z17r/aura.png)
 
 Use CV to control which pitch is the main freq in the input signal.
 
@@ -127,7 +127,7 @@ You have to press the apply button each time you change the source listening ang
 
 Mono to fake stereo converter. It doesn't pan, the output power is still the same in both channels, but a delay in one channel.
 
-![Autinn Rails](https://s13.postimg.org/tcikdrb5z/rails.png)
+![Autinn Rails](https://s13.postimg.cc/tcikdrb5z/rails.png)
 
 ## Dirt
 
@@ -135,7 +135,7 @@ Might remove it soon, as haven't found a any use for it and don't feel like impr
 
 Just a very simple high-pass filter.
 
-![Autinn Dirt](https://s13.postimg.org/q5o0u43kn/dirt.png)
+![Autinn Dirt](https://s19.postimg.cc/omoscg7wz/dirt.png)
 
 ## Download
 
