@@ -142,6 +142,9 @@ Just a very simple high-pass filter.
 https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+0.6.0
+* Ported Autinn modules to Rack v0.6. (consider this a beta build for now)
+
 0.5.21
 * Autodafe compiled a mac binary, thank you!
 * Fixed in Bass that accented notes were not attack softened when resonance was high.
