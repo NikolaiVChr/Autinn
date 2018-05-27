@@ -142,6 +142,9 @@ Just a very simple high-pass filter.
 https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+0.6.1
+* Made the Rails delay lower.
+
 0.6.0
 * Ported Autinn modules to Rack v0.6. (consider this a beta build for now)
 
