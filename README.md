@@ -105,6 +105,16 @@ Max 6dB amplification. Middle setting of knob is 0dB.
 
 No clipping.
 
+## Mera (coming soon)
+
+Module that amplifies/attenuates before some other module, then after the module it applies the opposite gain.
+
+Use pre in/out into another module, then from that module use post in/out.
+
+![Autinn Mera](https://s19.postimg.cc/4jykgh203/mera.png)
+
+No clipping.
+
 ## Sjip
 
 An oscillator with a very rounded waveform.
