@@ -115,6 +115,14 @@ Use pre in/out into another module, then from that module use post in/out.
 
 No clipping.
 
+## Vibr (coming soon)
+
+Basic vibrato effect.
+
+![Autinn Vibr](https://s19.postimg.cc/bjrtutkkz/vibrato.png)
+
+No clipping.
+
 ## Sjip
 
 An oscillator with a very rounded waveform.
