@@ -119,7 +119,7 @@ No clipping.
 
 Basic vibrato effect.
 
-![Autinn Vibr](https://s19.postimg.cc/bjrtutkkz/vibrato.png)
+![Autinn Vibr](https://s19.postimg.cc/fvgfjnc0j/vibrato.png)
 
 No clipping.
 
