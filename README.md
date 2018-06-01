@@ -14,7 +14,7 @@ Use env mod knob to adjust the range of the envelope that controls the filter sw
 
 Attack are fixed and extremely short for non accent notes, both for the vca and filter sweep.
 
-Use cutoff and resonance to adjust the filter. Resonance turned more clockwise will also increase attack time on filter sweep envelope.
+Use cutoff and resonance to adjust the filter. Resonance turned more clockwise will also increase attack time on filter sweep envelope for accented notes.
 
 The higher env mod is, the less accented notes will be pitch emphasized.
 
@@ -105,7 +105,7 @@ Max 6dB amplification. Middle setting of knob is 0dB.
 
 No clipping.
 
-## Mera (coming soon)
+## Mera
 
 Module that amplifies/attenuates before some other module, then after the module it applies the opposite gain.
 
@@ -115,11 +115,11 @@ Use pre in/out into another module, then from that module use post in/out.
 
 No clipping.
 
-## Vibr (coming soon)
+## Vibrato
 
-Basic vibrato effect.
+Vibrato effect with optional Flanger.
 
-![Autinn Vibr](https://s19.postimg.cc/fvgfjnc0j/vibrato.png)
+![Autinn Vibrato](https://s19.postimg.cc/x8rn1guz7/vibrato.png)
 
 No clipping.
 
@@ -160,6 +160,16 @@ Just a very simple high-pass filter.
 https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+0.6.2
+* Saw and Square module now morph between wave forms at lower frequencies than before.
+* Made Flora and Bass passband gain not decrease too much when turning up resonance.
+* Made some minor adjustments to accented envelopes in Bass module.
+* Decreased MOD ENV range from 0-7500 to 0-4500 in Bass module.
+* Increased VCA envelope decay in Bass module.
+* Added Vibrato module.
+* Added Mera module.
+* Fixed missing screws on all panels.
+
 0.6.1
 * Made the Rails delay lower.
 
