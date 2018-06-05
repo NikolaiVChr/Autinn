@@ -4,29 +4,27 @@
 
 A bass synth emulating a classic hardware synth.
 
-![Autinn Bass](https://s19.postimg.cc/ws6uamjb7/bass.png)
+![Autinn Bass](https://s19.postimg.cc/gsv4h6jtf/bass.png)
 
-Send the tone into OSC input. Send the note trigger into GATE input. Send accent gate into ACCENT input, it should be either on or off. Changing accent gate in middle of a note wont affect anything.
+Send the tone into OSC input. Send the note gate/trigger into GATE input, and click the white button to select gate or trigger. Send accent gate into ACCENT input, it should be either on or off. Changing accent gate in middle of a note wont affect anything.
 
-Use accent knob to adjust how much accented notes are emphasized (higher volume and higher pitch).
+Use accent knob to adjust how much accented notes are emphasized (higher volume and higher pitch if in fast succesion).
 
 Use env mod knob to adjust the range of the envelope that controls the filter sweep.
 
 Attack are fixed and extremely short for non accent notes, both for the vca and filter sweep.
 
-Use cutoff and resonance to adjust the filter. Resonance turned more clockwise will also increase attack time on filter sweep envelope for accented notes.
+Use cutoff and resonance to adjust the filter. Resonance turned more clockwise will also increase attack time on filter sweep envelope for accented notes and slightly on volume envelope.
 
-The higher env mod is, the less accented notes will be pitch emphasized.
-
-The decay of the volume envelope is fixed. But the accented filter sweep envelope is almost added to that.
+The decay of the volume envelope is fixed.
 
 Use decay knob to adjust the amount of filter sweep envelope decay. Filter sweep decay for accented notes are very short and cannot be adjusted with the decay knob.
 
 If accented notes are sent in very quick succession the filter will open more up on each note to a certain degree.
 
-I opted for no built in oscillator as people probably have their favorites. So its recommended to experiment with waveforms, slide, accent and frequencies. I mostly used Autinn Saw and Square to test with.
+I opted for no built in oscillator as people probably have their favorites. So its recommended to experiment with waveforms, slide, accent and frequencies. I mostly used Autinn Saw and Square to test with. The red light next to OSC input will indicate oscillator volume is so high its stressing the filter and might be soft clipped too much. Also beware that OSC input of more than +-7.5V might result in hard clipping on accented notes.
 
-There is no sustain, so the gate is now really just a trigger.
+If the GATE input is set to gate the note output will end when the GATE is off. Is it set to trigger, the note will play out until next note. Do not mistake this for sustain, there is no sustain.
 
 ## Saw
 
@@ -48,7 +46,7 @@ A lowpass filter emulating a 4-pole transistor ladder.
 
 When input is unplugged or go silent at very high resonance setting it can self-oscillate, if resonance is dialed too low again, it will stop and the procedure have to be repeated to get it going again.
 
-The linearity knob is to adjust for how strong the input signal is. The stronger it is the more you want to increase the knob, which in turn makes the filter act more linear. It just adjust the voltage going into the filter, and opposite for the signal going out. Best I can recommend is to experiment and find out what sounds the best. The default value should work good with +-5V audio input.
+The linearity knob is to adjust for how strong the input signal is. The stronger it is the more you want to increase the knob, which in turn makes the filter act more linear. It just adjust the voltage going into the filter, and opposite for the signal going out. Best I can recommend is to experiment and find out what sounds the best. The default value should work good with +-5V peak audio input.
 
 It attenuate around 24dB/octave. The cutoff attenuation is in the 12dB range.
 
@@ -111,6 +109,8 @@ Module that amplifies/attenuates before some other module, then after the module
 
 Use pre in/out into another module, then from that module use post in/out.
 
+Suggested usage: For non-linear DSP modules without drive or linearity knobs.
+
 ![Autinn Mera](https://s19.postimg.cc/4jykgh203/mera.png)
 
 No clipping.
@@ -118,6 +118,8 @@ No clipping.
 ## Vibrato
 
 Vibrato effect with optional Flanger.
+
+The vibrato is not modulation of volume or pitch, its a real vibrato effect.
 
 ![Autinn Vibrato](https://s19.postimg.cc/x8rn1guz7/vibrato.png)
 
@@ -130,6 +132,18 @@ An oscillator with a very rounded waveform.
 Approx. +-5V output.
 
 ![Autinn Sjip](https://s13.postimg.cc/w6lpr80hj/sjip.png)
+
+## Vxy
+
+This simulates a x-y coordinate field. Imagine the current point having a velocity vector that is turning with some random speed. That will move the point around in the field. When it hit a boundary (+-5V) it will stay there until the velocity vector directs it away from the boundary again. For this reason the outputs tend to spend around half their time at the extremes.
+
+The speed knob sets the speed the point is moving with.
+
+Suggested usage: For modulating other modules CV inputs in a smooth semi-random way.
+
++-5V output.
+
+![Autinn Vxy](https://s19.postimg.cc/3jqwfjnv7/vxy.png)
 
 ## Aura
 
@@ -160,6 +174,15 @@ Just a very simple high-pass filter.
 https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+0.6.3
+* Added 2 missing screws in Vibrato module.
+* In Bass module accented notes filter sweep now has faster attack to make fast notes sound better. Slow notes will sound slightly less wauwy, but the tradeoff had to be made.
+* Increased max value for resonance knob in Bass module.
+* Many filter sweep envelope and volume envelope changes in Bass module.
+* Added button to Bass that can switch input from gate to trigger.
+* Added red light on Bass that will indicate oscillator gain is stressing the filter and might be soft clipped too much.
+* Added Vxy module.
+
 0.6.2
 * Saw and Square module now morph between wave forms at lower frequencies than before.
 * Made Flora and Bass passband gain not decrease too much when turning up resonance.
