@@ -60,6 +60,28 @@ The button selects waveform.
 
 Approx up to -5.9V to 5.9V output.
 
+## Digi
+
+Digitizes a voltage, into discrete steps. Steps can be from 0V (smooth) to 1V (very jagged).
+
+Can be used for audio rate as well as CV voltages.
+
+![Autinn Digi](https://s19.postimg.cc/qbazz8wdf/digi.png)
+
+## Deadband
+
+This is a deadband. The width is how much the deadband zone should be on each side of origin of input.
+Width can be from 0V to 5V.
+Optionally the gap can be specified from 0% to 100%. Having a gap means the output will not start from 0V when it passes the width, at 100% gap everything within width will be 0V and everything outside will just as input.
+
+![Autinn Digi](https://s19.postimg.cc/5eerukiwz/deadband.png)
+
+## Conv
+
+Converts to and from uni/bi CV voltages.
+
+![Autinn Digi](https://s19.postimg.cc/wc8owbb9v/conv.png)
+
 ## Oxcart
 
 Oscillator with a frequency knob and a CV in.
@@ -174,6 +196,11 @@ Just a very simple high-pass filter.
 https://github.com/NikolaiVChr/Autinn/releases
 
 ## Changelog
+0.6.4
+* Added Conv module.
+* Added Digi module.
+* Added Deadband module.
+
 0.6.3
 * Added 2 missing screws in Vibrato module.
 * In Bass module accented notes filter sweep now has faster attack to make fast notes sound better. Slow notes will sound slightly less wauwy, but the tradeoff had to be made.
