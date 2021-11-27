@@ -241,11 +241,12 @@ Make more params for a Bass+ module:
 - vca decay
 - attacks
 - accent decay
-Make first poles cutoff be 1 octave higher (use the float g2) Maybe means increasing the max resonance again. https://www.kvraudio.com/forum/viewtopic.php?f=33&t=257220
+Make first filter pole's cutoff be 1 octave higher like in the TB-303 (use the float g2) Maybe means increasing the max resonance again. https://www.kvraudio.com/forum/viewtopic.php?f=33&t=257220
+- Tried it, did not sound good, this needs to be done proper if done, and all filter tunings redone.
 Gimmick for VCF lowering
 
 
-From devilfish manual:
+From devilfish manual:  (devilfish was a modified TB-303 that has more knobs and greater range on the knobs)
 ======================
 slide: 60 ms   (df 60-360 ms)
 attack non-accent: 3ms with 4ms delay (df 0.3-30 ms, 0.5ms delay)
@@ -261,6 +262,12 @@ Was there any sustain on VCA or VCF? What happens when the note gate closes? [cl
 What was VCF attack for accent? And was it linear, exp or something else? [soft, not linear]
 What was ENV MOD range? Was it absolute or a fraction of current cutoff setting.
 Was the slide really at beginning of next note and 60ms?
+
+Some of the sources used:
+- Devilfish manual and webpage
+- Various online webpages and forums
+- x0xb0x info from http://www.ladyada.net
+- Manuals from various TB-303 clones
 
 **/
 
