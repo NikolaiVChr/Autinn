@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="14.999999"
+   height="14.9989"
+   viewBox="0 0 3.9687497 3.9684593"
+   version="1.1"
+   id="svg18800"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)"
+   sodipodi:docname="ScrewStarAutinn.svg">
+  <title
+     id="title5649">Autinn Screw</title>
+  <defs
+     id="defs18794">
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient827">
+      <stop
+         style="stop-color:#483e37;stop-opacity:1;"
+         offset="0"
+         id="stop823" />
+      <stop
+         style="stop-color:#000000;stop-opacity:1"
+         offset="1"
+         id="stop825" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient827"
+       id="linearGradient829"
+       x1="31.93796"
+       y1="69.222267"
+       x2="32.737617"
+       y2="68.440735"
+       gradientUnits="userSpaceOnUse" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="56.537478"
+     inkscape:cx="4.3958639"
+     inkscape:cy="7.4994502"
+     inkscape:document-units="mm"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     units="px"
+     inkscape:snap-page="true" />
+  <metadata
+     id="metadata18797">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title>Autinn Screw</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-30.138143,-67.088277)">
+    <ellipse
+       style="fill:#808080;fill-opacity:1;stroke-width:0.36485332"
+       id="path5641"
+       cx="32.122517"
+       cy="69.07251"
+       rx="1.7156098"
+       ry="1.7176378" />
+    <path
+       sodipodi:type="star"
+       style="fill:url(#linearGradient829);fill-opacity:1;stroke-width:0.26458332"
+       id="path5647"
+       sodipodi:sides="5"
+       sodipodi:cx="32.128066"
+       sodipodi:cy="69.139328"
+       sodipodi:r1="0.75522071"
+       sodipodi:r2="0.37761036"
+       sodipodi:arg1="0.91870252"
+       sodipodi:arg2="1.547021"
+       inkscape:flatsided="false"
+       inkscape:rounded="0"
+       inkscape:randomized="0"
+       d="m 32.586374,69.739589 -0.44933,-0.222757 -0.438234,0.243863 0.073,-0.496174 -0.36735,-0.341428 0.494449,-0.08389 0.2112,-0.454877 0.232583,0.444324 0.497878,0.0603 -0.350706,0.358502 z"
+       inkscape:transform-center-x="0.0055480791"
+       inkscape:transform-center-y="-0.066820287" />
+  </g>
+</svg>

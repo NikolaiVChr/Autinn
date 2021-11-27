@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:ns="https://github.com/NikolaiVChr/Autinn/blob/master/LICENSE"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="15"
+   height="15"
+   viewBox="0 0 3.9687502 3.9687501"
+   version="1.1"
+   id="svg49872"
+   inkscape:version="0.92.2 (5c3e80d, 2017-08-06)"
+   sodipodi:docname="RoundButtonSmallAutinn.svg">
+  <title
+     id="title1292">Autinn ButtonSmall</title>
+  <defs
+     id="defs49866">
+    <clipPath
+       id="clip12">
+      <path
+         d="m 143,129.75 h 3 V 158 h -3 z m 0,0"
+         id="path28860"
+         inkscape:connector-curvature="0" />
+    </clipPath>
+    <clipPath
+       id="clip11">
+      <path
+         d="m 117.39453,129.75 h 54 v 54.00391 h -54 z m 0,0"
+         id="path28857"
+         inkscape:connector-curvature="0" />
+    </clipPath>
+    <clipPath
+       id="clip150">
+      <path
+         d="m 176,208.92578 h 2 V 228 h -2 z m 0,0"
+         id="path29465"
+         inkscape:connector-curvature="0" />
+    </clipPath>
+    <clipPath
+       id="clip149">
+      <path
+         d="m 159.27734,208.92578 h 36 v 36 h -36 z m 0,0"
+         id="path29462"
+         inkscape:connector-curvature="0" />
+    </clipPath>
+    <clipPath
+       id="clip142">
+      <path
+         d="m 110,208.92578 h 3 V 228 h -3 z m 0,0"
+         id="path29320"
+         inkscape:connector-curvature="0" />
+    </clipPath>
+    <clipPath
+       id="clip141">
+      <path
+         d="m 93.511719,208.92578 h 36.000001 v 36 H 93.511719 Z m 0,0"
+         id="path29317"
+         inkscape:connector-curvature="0" />
+    </clipPath>
+    <filter
+       inkscape:menu="Color"
+       inkscape:menu-tooltip="Like Duochrome but with three colors"
+       inkscape:label="Trichrome"
+       style="color-interpolation-filters:sRGB"
+       id="filter6576">
+      <feColorMatrix
+         values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.21 -0.72 -0.07 1 0 "
+         result="result1"
+         id="feColorMatrix6544" />
+      <feColorMatrix
+         result="result3"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 2 -1 "
+         id="feColorMatrix6546" />
+      <feColorMatrix
+         values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.21 0.72 0.07 0 0 "
+         in="SourceGraphic"
+         result="result2"
+         id="feColorMatrix6548" />
+      <feColorMatrix
+         result="result9"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1.5 -0.5 "
+         id="feColorMatrix6550" />
+      <feMerge
+         result="result11"
+         id="feMerge6556">
+        <feMergeNode
+           in="result3"
+           id="feMergeNode6552" />
+        <feMergeNode
+           in="result9"
+           id="feMergeNode6554" />
+      </feMerge>
+      <feFlood
+         flood-opacity="1"
+         flood-color="rgb(186,22,91)"
+         result="result10"
+         id="feFlood6558" />
+      <feComposite
+         in2="result11"
+         result="result12"
+         operator="out"
+         id="feComposite6560" />
+      <feFlood
+         flood-opacity="1"
+         result="result13"
+         flood-color="rgb(1,171,171)"
+         id="feFlood6562" />
+      <feComposite
+         in2="result3"
+         result="result14"
+         operator="in"
+         id="feComposite6564" />
+      <feComposite
+         in2="result12"
+         result="result17"
+         k3="1"
+         k2="1"
+         operator="arithmetic"
+         id="feComposite6566"
+         k1="0"
+         k4="0" />
+      <feFlood
+         flood-opacity="1"
+         result="result15"
+         flood-color="rgb(255,255,0)"
+         id="feFlood6568" />
+      <feComposite
+         in2="result9"
+         result="result16"
+         operator="in"
+         id="feComposite6570" />
+      <feComposite
+         in2="result17"
+         result="result18"
+         k3="1"
+         k2="1"
+         operator="arithmetic"
+         id="feComposite6572"
+         k1="0"
+         k4="0" />
+      <feComposite
+         in2="SourceGraphic"
+         operator="in"
+         id="feComposite6574" />
+    </filter>
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="55.807842"
+     inkscape:cx="7.4239037"
+     inkscape:cy="7.4453422"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     units="px"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:snap-global="true"
+     inkscape:snap-bbox="true"
+     inkscape:snap-bbox-midpoints="true"
+     inkscape:snap-object-midpoints="false"
+     inkscape:snap-bbox-edge-midpoints="true"
+     inkscape:object-paths="false"
+     inkscape:pagecheckerboard="true"
+     inkscape:snap-page="true"
+     inkscape:snap-grids="false"
+     inkscape:snap-to-guides="false"
+     inkscape:object-nodes="false" />
+  <metadata
+     id="metadata49869">
+    <rdf:RDF>
+      <ns:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </ns:Work>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title>Autinn ButtonSmall</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-74.555601,-83.839162)">
+    <rect
+       style="fill:#939393;fill-opacity:1;stroke:#7e7e7e;stroke-width:0.06548146;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="rect8513"
+       width="3.9032722"
+       height="3.9032667"
+       x="74.588341"
+       y="83.871902"
+       ry="1.552439" />
+    <rect
+       style="fill:#e7e7e7;fill-opacity:1;stroke:#c0c0c0;stroke-width:0.06123589;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="rect8513-5"
+       width="3.6501975"
+       height="3.6501927"
+       x="74.71492"
+       y="83.998474"
+       ry="1.4517847" />
+  </g>
+</svg>
