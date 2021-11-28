@@ -140,6 +140,24 @@ struct Zod : Module {
 		configParam(Zod::RATIO_COMPRESSOR_PARAM, 0.0, 1.0, 0.0, "Compressor ratio", ":1", COMPRESSOR_RATIO_MAX / 1.0f, 1.0f);
 		configParam(Zod::KNEE_PARAM, 0.0, KNEE_MAX_DB, KNEE_DEFAULT_DB, "Knee softness", " dB", 0.0f, 1.0f);
 		configParam(Zod::OUT_GAIN_PARAM, 0.0, 1.0, 0.0, "Makeup gain", " dB", 0.0f, 20.0f);
+
+		configLight(A, "Noise gate");
+		configLight(B, "Full expander");
+		configLight(C, "Semi expander");
+		configLight(DD, "Full compressor");
+		configLight(E, "Limiter");
+
+		configInput(LEFT_INPUT, "Left audio");
+		configInput(RIGHT_INPUT, "Right audio");
+		configOutput(LEFT_OUTPUT, "Left audio");
+		configOutput(RIGHT_OUTPUT, "Right audio");
+
+		configInput(SIDE_LEFT_INPUT, "Left");
+		configInput(SIDE_RIGHT_INPUT, "Right");
+		configInput(N_INPUT, "Noise gate");
+		configInput(E_INPUT, "Expander");
+		configInput(C_INPUT, "Compressor");
+		configInput(L_INPUT, "Limiter");
 	}
 
 	double toDB(double volt);
