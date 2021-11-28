@@ -523,7 +523,7 @@ struct ZodWidget : ModuleWidget {
 		addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.48 - HALF_KNOB_MED, 200), module, Zod::RATIO_COMPRESSOR_PARAM));
 		addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.725 - HALF_KNOB_MED, 200), module, Zod::KNEE_PARAM));
 
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.6025 - HALF_KNOB_MED, 250), module, Zod::OUT_GAIN_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.6025 - HALF_KNOB_MED, 255), module, Zod::OUT_GAIN_PARAM));
 
 		addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH * 0.15 - HALF_PORT, 245), module, Zod::LEFT_INPUT));
 		addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH * 0.30 - HALF_PORT, 245), module, Zod::RIGHT_INPUT));
