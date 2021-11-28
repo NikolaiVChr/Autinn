@@ -99,7 +99,7 @@ void Deadband::process(const ProcessArgs &args) {
 struct DeadbandWidget : ModuleWidget {
 	DeadbandWidget(Deadband *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DeadbandModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/DeadbandModule.svg")));
 		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

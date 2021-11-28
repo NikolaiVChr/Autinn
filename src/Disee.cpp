@@ -92,7 +92,7 @@ void Disee::process(const ProcessArgs &args) {
 struct DiseeWidget : ModuleWidget {
 	DiseeWidget(Disee *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DiseeModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/DiseeModule.svg")));
 		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

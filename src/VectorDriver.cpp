@@ -91,7 +91,7 @@ void VectorDriver::process(const ProcessArgs &args) {
 struct VectorDriverWidget : ModuleWidget {
 	VectorDriverWidget(VectorDriver *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/VxyModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/VxyModule.svg")));
 		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

@@ -337,7 +337,7 @@ void Saw::process(const ProcessArgs &args) {
 struct SawWidget : ModuleWidget {
 	SawWidget(Saw *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SawModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/SawModule.svg")));
 		//box.size = Vec(5 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

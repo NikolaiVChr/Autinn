@@ -90,7 +90,7 @@ void Amp::process(const ProcessArgs &args) {
 struct AmpWidget : ModuleWidget {
 	AmpWidget(Amp *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/AmpModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/AmpModule.svg")));
 		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

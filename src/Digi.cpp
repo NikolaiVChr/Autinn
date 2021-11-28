@@ -95,7 +95,7 @@ void Digi::process(const ProcessArgs &args) {
 struct DigiWidget : ModuleWidget {
 	DigiWidget(Digi *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/DigiModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/DigiModule.svg")));
 		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

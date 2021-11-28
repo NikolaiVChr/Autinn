@@ -690,7 +690,7 @@ float Bass::acid_filter(float in, float r, float F_c) {// from diagram of resona
 struct BassWidget : ModuleWidget {
 	BassWidget(Bass *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/BassModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/BassModule.svg")));
 		//box.size = Vec(16 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

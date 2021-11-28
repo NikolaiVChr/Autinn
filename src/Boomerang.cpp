@@ -72,7 +72,7 @@ void Boomerang::process(const ProcessArgs &args) {
 struct BoomerangWidget : ModuleWidget {
 	BoomerangWidget(Boomerang *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/MeraModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/MeraModule.svg")));
 		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

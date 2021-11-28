@@ -270,7 +270,7 @@ void Square::process(const ProcessArgs &args) {
 struct SquareWidget : ModuleWidget {
 	SquareWidget(Square *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SquareModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/SquareModule.svg")));
 		//box.size = Vec(5 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 

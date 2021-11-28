@@ -163,7 +163,7 @@ void Oxcart::process(const ProcessArgs &args) {
 struct OxcartWidget : ModuleWidget {
 	OxcartWidget(Oxcart *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/OxcartModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/OxcartModule.svg")));
 		//box.size = Vec(5 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

@@ -418,7 +418,7 @@ struct FloraWidget : ModuleWidget {
 	FloraWidget(Flora *module) {
 //		if (module) {
 			setModule(module);
-			setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/RetriModule.svg")));
+			setPanel(createPanel(asset::plugin(pluginInstance, "res/RetriModule.svg")));
 			//box.size = Vec(9 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 			addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

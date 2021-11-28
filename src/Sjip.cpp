@@ -128,7 +128,7 @@ void Sjip::process(const ProcessArgs &args) {
 struct SjipWidget : ModuleWidget {
 	SjipWidget(Sjip *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SjipModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/SjipModule.svg")));
 		//box.size = Vec(5 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

@@ -207,7 +207,7 @@ void Jette::process(const ProcessArgs &args) {
 struct JetteWidget : ModuleWidget {
 	JetteWidget(Jette *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/JetteModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/JetteModule.svg")));
 		//box.size = Vec(16 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);//????????????????????????? why remove this?
 
 		

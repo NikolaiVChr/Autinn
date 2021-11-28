@@ -103,7 +103,7 @@ void Flopper::process(const ProcessArgs &args) {
 struct FlopperWidget : ModuleWidget {
 	FlopperWidget(Flopper *module) {
 		setModule(module);
-		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/FlopperModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/FlopperModule.svg")));
 		//box.size = Vec(5 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
