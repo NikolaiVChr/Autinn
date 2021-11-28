@@ -71,28 +71,28 @@ struct AutinnSliderShort : app::SvgSlider {
 
 struct RoundMediumAutinnKnob : RoundKnob {
 	RoundMediumAutinnKnob() {
-		setSVG(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobLargeAutinn.svg")));
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobLargeAutinn.svg")));
 		//box.size = Vec(38, 38);
 	}
 };
 
 struct RoundSmallAutinnKnob : RoundKnob {
 	RoundSmallAutinnKnob() {
-		setSVG(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinn.svg")));
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinn.svg")));
 		//box.size = Vec(28, 28);
 	}
 };
 
 struct RoundTinyAutinnKnob : RoundKnob {
 	RoundTinyAutinnKnob() {
-		setSVG(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundTinyAutinn.svg")));
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundTinyAutinn.svg")));
 		//box.size = Vec(18, 18);
 	}
 }; 
 
 struct ScrewStarAutinn : SVGScrew {
 	ScrewStarAutinn() {
-		//setSVG(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
+		//setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
 		sw->svg = APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg"));
 		sw->wrap();
 		box.size = sw->box.size;
@@ -101,7 +101,7 @@ struct ScrewStarAutinn : SVGScrew {
 
 struct OutPortAutinn : SVGPort {
 	OutPortAutinn() {
-		setSVG(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg")));
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg")));
 		shadow->opacity = 0.0;
 		//background->svg = APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg"));
 		//background->wrap();
@@ -111,7 +111,7 @@ struct OutPortAutinn : SVGPort {
 
 struct InPortAutinn : SVGPort {
 	InPortAutinn() {
-		setSVG(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg")));
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg")));
 		shadow->opacity = 0.0;
 		//background->svg = APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg"));
 		//background->wrap();
