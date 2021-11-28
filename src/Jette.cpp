@@ -83,11 +83,13 @@ struct Jette : Module {
 			shape = json_integer_value(ext);
 	}
 
-	void onReset() override {
+	void onReset(const ResetEvent& e) override {
 		shape = 0;
+		Module::onReset(e);
 	}
 
-	void onRandomize() override {
+	void onRandomize(const RandomizeEvent& e) override {
+		Module::onRandomize(e);
 		shape = rand() % static_cast<int>(3);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
 	}
 

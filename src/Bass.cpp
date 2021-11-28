@@ -187,6 +187,33 @@ struct Bass : Module {
 		configParam(Bass::BUTTON_PARAM, 0, 1, 0, "Toggle Gate or Trigger");
 		//configParam(Bass::DECAY2_PARAM, 0.003, 0.050, 0.003, "");
 		//configParam(Bass::DECAY3_PARAM, 0.200, 0.500, 0.350, "");
+
+		//configSwitch(Bass::BUTTON_PARAM, 0, 1, 0, "Toggle Gate or Trigger", {"Gate", "Trigger"});
+
+		configBypass(Bass::OSC_INPUT, Bass::BASS_OUTPUT);
+
+		configInput(Bass::NOTE_GATE_INPUT, "Gate/Trigger");
+		configInput(Bass::ACCENT_GATE_INPUT, "Accent Gate");
+		configInput(Bass::OSC_INPUT, "Oscillator tone");
+		configInput(Bass::CV_CUTOFF_INPUT, "Cutoff CV");
+		configInput(Bass::CV_RESONANCE_INPUT, "Resonance CV");
+		configInput(Bass::CV_DECAY_INPUT, "Decay CV");
+		configInput(Bass::CV_ENVMOD_INPUT, "ENVMOD CV");
+
+		configOutput(Bass::BASS_OUTPUT, "Audio output");
+
+		configLight(Bass::A_LIGHT, "VCA ENV Attack Phase");
+		configLight(Bass::B_LIGHT, "VCA ENV Sustain Phase (not used)");
+		configLight(Bass::C_LIGHT, "VCA ENV Decay Phase");
+		configLight(Bass::D_LIGHT, "VCA ENV Ended Phase");
+		configLight(Bass::E_LIGHT, "Accent active");
+		configLight(Bass::A2_LIGHT, "Filter ENV Attack Phase");
+		configLight(Bass::B2_LIGHT, "Filter ENV Sustain Phase (not used)");
+		configLight(Bass::C2_LIGHT, "Filter ENV Decay Phase");
+		configLight(Bass::D2_LIGHT, "Filter ENV Ended Phase");
+		configLight(Bass::GATE_LIGHT, "Input function as gate");
+		configLight(Bass::TRIG_LIGHT, "Input function as trigger");
+		configLight(Bass::GAIN_LIGHT, "Warning that oscillator input has too big magnitude (7+ Voltage)");
 	}
 
 	float vca_env(bool gate,float note, float resonance,float knob_accent,float cutoff_env);
@@ -214,12 +241,14 @@ struct Bass : Module {
 			priority = (float) json_number_value(ext2);
 	}
 
-	void onReset() override {
+	void onReset(const ResetEvent& e) override {
 		priority = 1.0f;
 		gateInput = true;
+		Module::onReset(e);
 	}
 
-	void onRandomize() override {
+	void onRandomize(const RandomizeEvent& e) override {
+		Module::onRandomize(e);
 		gateInput = bool(rand() % static_cast<int>(2));// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
 	}
 };

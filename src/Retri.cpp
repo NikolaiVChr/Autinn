@@ -174,10 +174,11 @@ struct Flora : Module {
 		}
 	}
 
-	void onReset() override {
+	void onReset(const ResetEvent& e) override {
 		gComp = 0.0f;
 		autoLevel = false;
 		current_oversample = 2;
+		Module::onReset(e);
 	}
 };
 
