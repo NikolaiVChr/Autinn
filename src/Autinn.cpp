@@ -33,7 +33,7 @@ float non_lin_func(float parm) {
 	if (parm < -4.97f) {
 		return -1.0f;
 	}
-	double x2 = parm * parm;
+	double x2 = double(parm) * double(parm);
 	double a = double(parm) * (135135.0 + x2 * (17325.0 + x2 * (378.0 + x2)));
 	double b = 135135.0 + x2 * (62370.0 + x2 * (3150.0 + x2 * 28.0));
 	return a / b;
