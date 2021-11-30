@@ -408,16 +408,16 @@ void Zod::process(const ProcessArgs &args) {
 
 
 	// VU meters
-	dsp::VUMeter vuMeterIn;
+	dsp::VuMeter vuMeterIn;
 	vuMeterIn.dBInterval = 1.5f;
 	vuMeterIn.setValue(pastL * 0.1f);
-	dsp::VUMeter vuMeterIn2;
+	dsp::VuMeter vuMeterIn2;
 	vuMeterIn2.dBInterval = 1.5f;
 	vuMeterIn2.setValue(pastR * 0.1f);
-	dsp::VUMeter vuMeterOut;
+	dsp::VuMeter vuMeterOut;
 	vuMeterOut.dBInterval = 1.5f;
 	vuMeterOut.setValue(outL * 0.1f);
-	dsp::VUMeter vuMeterOut2;
+	dsp::VuMeter vuMeterOut2;
 	vuMeterOut2.dBInterval = 1.5f;
 	vuMeterOut2.setValue(outR * 0.1f);
 	for (int v = 0; v < 15; v++) {
