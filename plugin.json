@@ -11,6 +11,7 @@
   "manualUrl": "https://github.com/NikolaiVChr/Autinn/wiki",
   "sourceUrl": "https://github.com/NikolaiVChr/Autinn",
   "donateUrl": "https://www.paypal.me/autinn",
+  "changelogUrl": "https://github.com/NikolaiVChr/Autinn/wiki/Changelog",
   "modules": [
     {
       "slug": "Amp",
