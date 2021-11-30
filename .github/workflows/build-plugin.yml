@@ -30,6 +30,7 @@ jobs:
             os: windows-latest,
             prepare-os: export CC=gcc
           }
+        language: [ 'cpp' ]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -52,9 +53,9 @@ jobs:
           echo "Set plugin version from $pluginversion to $pluginversion-$gitrev"
           cat <<< `jq --arg VERSION "$pluginversion-$gitrev" '.version=$VERSION' plugin.json` > plugin.json
       - name: Initialize CodeQL
-          uses: github/codeql-action/init@v1
-          with:
-            languages: ${{ matrix.language }}
+        uses: github/codeql-action/init@v1
+        with:
+          languages: ${{ matrix.language }}
       - name: Build plugin
         run: |
           ${{ matrix.config.prepare-os }}
