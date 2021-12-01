@@ -55,7 +55,8 @@
 #define VCV_TO_MOOG 0.18f
 #define EXPECTED_PEAK_INPUT 7.0f // Do not input larger OSC tones, or accented notes might start hard clipping.
 
-static const int oversample = 2;
+static const int oversample2 = 2;
+static const int oversample4 = 4;
 
 struct Bass : Module {
 	enum ParamIds {
@@ -128,8 +129,12 @@ struct Bass : Module {
 	float W_b_prev = 0.0f;
 	float W_c_prev = 0.0f;
 
-	dsp::Upsampler<oversample, 8> upsampler = dsp::Upsampler<oversample, 8>(0.9f);
-	dsp::Decimator<oversample, 8> decimator = dsp::Decimator<oversample, 8>(0.9f);
+	//dsp::Upsampler<oversample, 8> upsampler = dsp::Upsampler<oversample, 8>(0.9f);
+	//dsp::Decimator<oversample, 8> decimator = dsp::Decimator<oversample, 8>(0.9f);
+	dsp::Upsampler<oversample2, 10> upsampler2;
+	dsp::Decimator<oversample2, 10> decimator2;
+	dsp::Upsampler<oversample4, 10> upsampler4;
+	dsp::Decimator<oversample4, 10> decimator4;
 
 	bool gate_prev = false;
 	float minimum = 0.0001f;
@@ -156,7 +161,11 @@ struct Bass : Module {
 	bool gateInput = true;
 	bool button_prev = false;
 	
+	// Json saved
 	float priority = 1.0f;
+	int current_oversample = 2;
+	bool tunedResonance = false;
+	bool firstPoleOneOctHigher = false;
 	
 	float accentAttackBase = 0.0f;
 	float accentAttackPeak = 0.0f;
@@ -217,7 +226,7 @@ struct Bass : Module {
 	float vca_env(bool gate,float note, float resonance,float knob_accent);
 	float vca_env_acc(bool gate,float note, float resonance,float knob_accent);
 	float filter_env(bool gate,float note,float decay_cutoff_time, float accent, float r, float knob_accent);
-	float acid_filter(float in, float r, float cutoff);
+	float acid_filter(float in, float r, float cutoff, int oversample_protected);
 	float attackCurve(float x, unsigned target);
 	float accentAttackCurve(float x);
 	float accentAttackCurveInverse(float y);
@@ -316,6 +325,7 @@ void Bass::process(const ProcessArgs &args) {
 	if (!outputs[BASS_OUTPUT].isConnected()) {
 		return;
 	}
+	int oversample_protected = current_oversample;// to be sure its not modified from another thread inside step.
 
 	if (params[BUTTON_PARAM].getValue() > 0.0f and !button_prev) {
 		gateInput = !gateInput;
@@ -376,7 +386,7 @@ void Bass::process(const ProcessArgs &args) {
 
 	cutoff_hz = clamp(cutoff_hz, CUTOFF_MIN, CUTOFF_MAX);
 
-	float out = this->acid_filter(osc, resonance, cutoff_hz);
+	float out = this->acid_filter(osc, resonance, cutoff_hz, oversample_protected);
 	outputs[BASS_OUTPUT].setVoltage(vca_env*out, 0);    //this->non_lin_func(vca*out/SATURATION_VOLT)*SATURATION_VOLT;
 	outputs[BASS_OUTPUT].setVoltage(vca_env, 1);
 	outputs[BASS_OUTPUT].setVoltage(cutoff_env_norm-CUTOFF_ENVELOPE_BIAS, 2);
@@ -728,28 +738,42 @@ void Bass::vcf_lights(float attack, float sustain, float decay, float end) {
 	lights[D2_LIGHT].value = clamp(end, 0.0f, 1.0f);
 }
 
-float Bass::acid_filter(float in, float r, float F_c) {// from diagram of resonance of TB-303
+float Bass::acid_filter(float in, float r, float F_c, int oversample_protected) {// from diagram of resonance of TB-303
 	float voltage_drive = VCV_TO_MOOG*INPUT_TO_CAPACITOR;// 0.18 to convert from VCV audio rate voltages. 0.035 to convert from input to voltage over first capacitor.
 	in *= voltage_drive;
-	F_s   = APP->engine->getSampleRate()*oversample;
+	F_s   = APP->engine->getSampleRate()*oversample_protected;
 
 	double w_c = double(2.0f*M_PI*F_c/F_s);// cutoff in radians per sample.
 	g = V_t * (0.0008116984 + 0.9724111*w_c - 0.5077766*w_c*w_c + 0.1534058*w_c*w_c*w_c);// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
-	Gres = 1.15f;//1.037174 + 3.606925*w_c + 7.074555*w_c*w_c - 18.14674*w_c*w_c*w_c + 9.364587*w_c*w_c*w_c*w_c;//auto tuned resonance power for resonance <= 1.0
+
+	if (tunedResonance) {
+		Gres = 1.037174 + 3.606925*w_c + 7.074555*w_c*w_c - 18.14674*w_c*w_c*w_c + 9.364587*w_c*w_c*w_c*w_c;//auto tuned resonance power for resonance <= 1.0
+	} else {
+		Gres = 1.15f;
+	}
 	
-	// For more accurate physical sim of TB-303 filter; uncomment these 2 lines and change 'g' in 1st transistor stage to 'g2'.
-	//double w_c2 = 2.0f*w_c;
-	//float g2 = V_t * (0.0008116984 + 0.9724111*w_c2 - 0.5077766*w_c2*w_c2 + 0.1534058*w_c2*w_c2*w_c2);
+	// For more accurate physical sim of TB-303 filter; set firstPoleOneOctHigher to true.
+	float g2;
+	if (firstPoleOneOctHigher) {
+		double w_c2 = 2.0f*w_c;
+		g2 = V_t * (0.0008116984 + 0.9724111*w_c2 - 0.5077766*w_c2*w_c2 + 0.1534058*w_c2*w_c2*w_c2);
+	} else {
+		g2 = g;
+	}
 
-	float inInter [oversample];
-	float outBuf  [oversample];
-	upsampler.process(in, inInter);
+	float inInter [oversample_protected];
+	float outBuf  [oversample_protected];
+	if (oversample_protected == oversample2) {
+		upsampler2.process(in, inInter);
+	} else {
+		upsampler4.process(in, inInter);
+	}
 
-	for (int i = 0; i < oversample; i++) {
+	for (int i = 0; i < oversample_protected; i++) {
 		x   = inInter[i] - 2.0f*Gres*r*(y_d_prev+y_d_prev_prev-priority*inInter[i]);//unit and a half feedback delay. -inInter[i] is Gcomp, to make passband gain not decrease too much when turning up resonance.
 
 		// 1st transistor stage:
-		y_a = y_a_prev+g*(non_lin_func( x/V_t )-W_a_prev);
+		y_a = y_a_prev+g2*(non_lin_func( x/V_t )-W_a_prev);
 		W_a = non_lin_func( y_a/V_t );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
@@ -773,31 +797,72 @@ float Bass::acid_filter(float in, float r, float F_c) {// from diagram of resona
 		
 		outBuf[i] = y_d;
 	}
-	float out = decimator.process(outBuf)/voltage_drive;
+	float out;
+	if (oversample_protected == oversample2) {
+		out = decimator2.process(outBuf);
+	} else {
+		out = decimator4.process(outBuf);
+	}
 	if(!std::isfinite(out)) {
 		out = 0.0f;
 	}
-	return out;
+	return out/voltage_drive;
 }
 
-/*struct PrioMenuItem : MenuItem {
+struct OversampleBassMenuItem : MenuItem {
 	Bass* _module;
-	float _priority;
+	int _os;
 
-	PrioMenuItem(Bass* module, const char* label, float prio)
-	: _module(module), _priority(prio)
+	OversampleBassMenuItem(Bass* module, const char* label, int os)
+	: _module(module), _os(os)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->current_oversample = _os;
+	}
+
+	void step() override {
+		rightText = _module->current_oversample == _os ? "✔" : "";
+	}
+};
+
+struct PoleMenuItem : MenuItem {
+	Bass* _module;
+
+	PrioMenuItem(Bass* module, const char* label)
+	: _module(module)
 	{
 		this->text = label;
 	}
 
 	void onAction(EventAction &e) override {
-		_module->priority = _priority;
+		_module->firstPoleOneOctHigher = !_module->firstPoleOneOctHigher;
 	}
 
 	void process(const ProcessArgs &args) override {
-		rightText = _module->priority == _priority ? "✔" : "";
+		rightText = _module->firstPoleOneOctHigher == true ? "✔" : "";
 	}
-};*/
+};
+
+struct ResTuneMenuItem : MenuItem {
+	Bass* _module;
+
+	PrioMenuItem(Bass* module, const char* label)
+	: _module(module)
+	{
+		this->text = label;
+	}
+
+	void onAction(EventAction &e) override {
+		_module->tunedResonance = !_module->tunedResonance;
+	}
+
+	void process(const ProcessArgs &args) override {
+		rightText = _module->tunedResonance == true ? "✔" : "";
+	}
+};
 
 struct BassWidget : ModuleWidget {
 	BassWidget(Bass *module) {
@@ -851,16 +916,19 @@ struct BassWidget : ModuleWidget {
 	//	addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.5-HALF_KNOB_SMALL, 2.5*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::DECAY2_PARAM));
 	//	addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.5-HALF_KNOB_SMALL, 3.5*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::DECAY3_PARAM));
 	}
-	
-	/*void appendContextMenu(Menu* menu) override {
+
+	void appendContextMenu(Menu* menu) override {
 		Bass* a = dynamic_cast<Bass*>(module);
 		assert(a);
 
 		menu->addChild(new MenuLabel());
-		menu->addChild(new PrioMenuItem(a, "Prioritize passband",  1.0f));
-		menu->addChild(new PrioMenuItem(a, "Balanced gain",  0.5f));
-		menu->addChild(new PrioMenuItem(a, "Full resonance gain", 0.0f));
-	}*/
+		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x2", 2));
+		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x4", 4));
+		menu->addChild(new MenuLabel());
+		menu->addChild(new ResTuneMenuItem(a, "Tuned Resonance"));
+		menu->addChild(new MenuLabel());
+		menu->addChild(new PoleMenuItem(a, "1st Pole Oct Up"));
+	}
 };
 
 Model *modelBass = createModel<Bass, BassWidget>("Bass");
