@@ -137,16 +137,6 @@
       ]
     },
     {
-      "slug": "Vector",
-      "name": "Vxy",
-      "description": "Random x-y generator",
-      "tags": [
-        "Controller",
-        "Utility",
-        "Random"
-      ]
-    },
-    {
       "slug": "Vibrato",
       "name": "Vibrato",
       "description": "Vibrato effect with optional Flanger",
