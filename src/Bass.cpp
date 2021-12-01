@@ -922,8 +922,8 @@ struct BassWidget : ModuleWidget {
 		assert(a);
 
 		menu->addChild(new MenuLabel());
-		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x2", 2));
-		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x4", 4));
+		menu->addChild(new OversampleBassMenuItem(a, "Oversample x2", 2));
+		menu->addChild(new OversampleBassMenuItem(a, "Oversample x4", 4));
 		menu->addChild(new MenuLabel());
 		menu->addChild(new ResTuneMenuItem(a, "Tuned Resonance"));
 		menu->addChild(new MenuLabel());
