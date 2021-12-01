@@ -57,6 +57,8 @@ struct Oxcart : Module {
 		//oxMinBLEP.minblep = minblep_16_32;
 		//oxMinBLEP.oversample = 32;
 		configParam(Oxcart::PITCH_PARAM, -3.0f, 3.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
+		
+		configOutput(BUZZ_OUTPUT, "Audio");
 	}
 
 	void process(const ProcessArgs &args) override;

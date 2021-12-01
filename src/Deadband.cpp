@@ -55,6 +55,9 @@ struct Deadband : Module {
 		configParam(Deadband::CV_PARAM, 0.0f, 1.0f, 0.0f, "Width CV", "%", 0.0f, 100.0f);
 		configParam(Deadband::GAP_PARAM, 1.0f, 0.0f, 1.0f, "Gap");
 		configParam(Deadband::CV_GAP_PARAM, 0.0f, 0.2f, 0.0f, "Gap CV", "%", 0.0f, 500.0f);
+		configBypass(DEADBAND_INPUT, DEADBAND_OUTPUT);
+		configInput(DEADBAND_INPUT, "");
+		configOutput(DEADBAND_OUTPUT, "");
 	}
 
 	void process(const ProcessArgs &args) override;

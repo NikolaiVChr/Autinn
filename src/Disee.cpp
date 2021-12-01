@@ -48,7 +48,11 @@ struct Disee : Module {
 	queue <float> buffer;
 
 	Disee() {
-		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);}
+		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+		configBypass(AC_INPUT, DC_OUTPUT);
+		configInput(AC_INPUT, "AC");
+		configOutput(DC_OUTPUT, "DC");
+	}
 
 	void process(const ProcessArgs &args) override;
 };
@@ -59,7 +63,7 @@ void Disee::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 
-	// This is probably the module I am least proud of. Its kinda of a hacky way to do it.
+	// TODO: Make buffer size depend on bitrate
 	
 	float in = inputs[AC_INPUT].getVoltage()/size;
 	buffer.push(in);

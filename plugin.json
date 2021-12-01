@@ -140,6 +140,7 @@
       "slug": "Vector",
       "name": "Vxy",
       "description": "Random x-y generator",
+      "deprecated": true,
       "tags": [
         "Controller",
         "Utility",

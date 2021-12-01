@@ -45,6 +45,8 @@ struct Sjip : Module {
 	Sjip() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Sjip::PITCH_PARAM,  -4.0f, 4.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
+		
+		configOutput(OSC_OUTPUT, "Audio");
 	}
 
 	void process(const ProcessArgs &args) override;

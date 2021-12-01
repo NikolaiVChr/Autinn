@@ -50,6 +50,8 @@ struct VectorDriver : Module {
 	VectorDriver() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(VectorDriver::SPEED_PARAM, 2.0f, 5.0f, 3.5f, "");
+		//configInput(FLORA_INPUT2, "Right");
+		//configOutput(BUZZ_OUTPUT, "Audio");
 	}
 
 	void process(const ProcessArgs &args) override;

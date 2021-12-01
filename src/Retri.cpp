@@ -143,6 +143,12 @@ struct Flora : Module {
 		configParam(Flora::RESONANCE_INFL_PARAM, 0.0f, RESONANCE_MAX/5.0f, 0.0f, "Resonance CV", "%", 0.0f, 500.0f);
 		configParam(Flora::DRIVE_INFL_PARAM, 0.0f, DRIVE_MAX/5.0f, 0.0f, "Drive CV", "%", 0.0f, 125.0f);
 		configParam(Flora::DRIVE_PARAM, 0.0f, DRIVE_MAX, 1.00f, "Drive", " dB", -10, 20);
+		configBypass(FLORA_INPUT, FLORA_OUTPUT);
+		configBypass(FLORA_INPUT2, FLORA_OUTPUT2);
+		configInput(FLORA_INPUT, "Left");
+		configInput(FLORA_INPUT2, "Right");
+		configOutput(FLORA_OUTPUT, "Left");
+		configOutput(FLORA_OUTPUT2, "Right");
 	}
 
 	void process(const ProcessArgs &args) override;

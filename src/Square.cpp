@@ -190,6 +190,8 @@ struct Square : Module {
 	Square() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Square::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
+		
+		configOutput(BUZZ_OUTPUT, "Audio");
 	}
 
 	float lut (int size, float in [], float out [], float test);
