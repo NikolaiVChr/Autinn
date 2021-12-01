@@ -164,7 +164,7 @@ struct Bass : Module {
 	// Json saved
 	float priority = 1.0f;
 	int current_oversample = 2;
-	bool tunedResonance = false;
+	bool tunedResonance = true;
 	bool firstPoleOneOctHigher = false;
 	
 	float accentAttackBase = 0.0f;
@@ -864,6 +864,28 @@ struct ResTuneMenuItem : MenuItem {
 	}
 };
 
+struct PrioMenuItem : MenuItem {
+	Bass* _module;
+
+	PrioMenuItem(Bass* module, const char* label)
+	: _module(module)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		if (_module->priority > 0.0f) {
+			_module->priority = 0.0f;
+		} else {
+			_module->priority = 1.0f;
+		}
+	}
+
+	void step() override {
+		rightText = _module->priority > 0.0f ? "✔" : "";
+	}
+};
+
 struct BassWidget : ModuleWidget {
 	BassWidget(Bass *module) {
 		setModule(module);
@@ -928,6 +950,8 @@ struct BassWidget : ModuleWidget {
 		menu->addChild(new ResTuneMenuItem(a, "Tuned Resonance"));
 		menu->addChild(new MenuLabel());
 		menu->addChild(new PoleMenuItem(a, "1st Pole Oct Up"));
+		menu->addChild(new MenuLabel());
+		menu->addChild(new PrioMenuItem(a, "Compensate Passband"));
 	}
 };
 
