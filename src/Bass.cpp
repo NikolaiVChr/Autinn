@@ -831,17 +831,17 @@ struct OversampleBassMenuItem : MenuItem {
 struct PoleMenuItem : MenuItem {
 	Bass* _module;
 
-	PrioMenuItem(Bass* module, const char* label)
+	PoleMenuItem(Bass* module, const char* label)
 	: _module(module)
 	{
 		this->text = label;
 	}
 
-	void onAction(EventAction &e) override {
+	void onAction(const event::Action &e) override {
 		_module->firstPoleOneOctHigher = !_module->firstPoleOneOctHigher;
 	}
 
-	void process(const ProcessArgs &args) override {
+	void step() override {
 		rightText = _module->firstPoleOneOctHigher == true ? "✔" : "";
 	}
 };
@@ -849,17 +849,17 @@ struct PoleMenuItem : MenuItem {
 struct ResTuneMenuItem : MenuItem {
 	Bass* _module;
 
-	PrioMenuItem(Bass* module, const char* label)
+	ResTuneMenuItem(Bass* module, const char* label)
 	: _module(module)
 	{
 		this->text = label;
 	}
 
-	void onAction(EventAction &e) override {
+	void onAction(const event::Action &e) override {
 		_module->tunedResonance = !_module->tunedResonance;
 	}
 
-	void process(const ProcessArgs &args) override {
+	void step() override {
 		rightText = _module->tunedResonance == true ? "✔" : "";
 	}
 };
