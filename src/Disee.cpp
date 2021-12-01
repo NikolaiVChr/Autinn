@@ -63,7 +63,7 @@ void Disee::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 
-	// This is probably the module I am least proud of. Its kinda of a hacky way to do it.
+	// TODO: Make buffer size depend on bitrate
 	
 	float in = inputs[AC_INPUT].getVoltage()/size;
 	buffer.push(in);
