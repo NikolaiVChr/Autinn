@@ -161,11 +161,12 @@ struct Bass : Module {
 	bool gateInput = true;
 	bool button_prev = false;
 	
-	// Json saved
-	float priority = 1.0f;
-	int current_oversample = 2;
-	bool tunedResonance = true;
-	bool firstPoleOneOctHigher = false;
+	// Json saved options ==============
+	float priority = 1.0f;// If 1.0f then will compensate for passband lowering at high resonances. If 0.0f then its just the raw filter.
+	int current_oversample = 2;// 2 for minimal anti-aliasing or 4 for better if you can spare the CPU time.
+	bool tunedResonance = false;// If true then resonance power will be tuned to equal power no matter the cutoff. However for this module it sounds best to have this false.
+	bool firstPoleOneOctHigher = false;// For more accurate physical sim of TB-303 filter. However a 24dB transistor filter sounds better than what 303 had, so keeping it at false.
+	// =================================
 	
 	float accentAttackBase = 0.0f;
 	float accentAttackPeak = 0.0f;
@@ -207,7 +208,7 @@ struct Bass : Module {
 		configInput(Bass::CV_DECAY_INPUT, "Decay CV");
 		configInput(Bass::CV_ENVMOD_INPUT, "ENVMOD CV");
 
-		configOutput(Bass::BASS_OUTPUT, "Audio output");
+		configOutput(Bass::BASS_OUTPUT, "Audio");
 
 		configLight(Bass::A_LIGHT, "VCA ENV Attack Phase");
 		configLight(Bass::B_LIGHT, "VCA ENV Sustain Phase (not used)");
@@ -240,6 +241,7 @@ struct Bass : Module {
 	json_t *dataToJson() override {
 		json_t *root = json_object();
 		json_object_set_new(root, "gateInput", json_boolean(gateInput));
+		json_object_set_new(root, "oversample", json_integer(current_oversample));
 		//json_object_set_new(root, "Gcomp", json_real((double) priority));
 		return root;
 	}
@@ -248,6 +250,13 @@ struct Bass : Module {
 		json_t *ext = json_object_get(rootJ, "gateInput");
 		if (ext)
 			gateInput = json_boolean_value(ext);
+		json_t *ext3 = json_object_get(rootJ, "oversample");
+		if (ext3) {
+			current_oversample = json_integer_value(ext3);
+			if (current_oversample != 2 and current_oversample != 4) {
+				current_oversample = 4;
+			}
+		}
 		//json_t *ext2 = json_object_get(rootJ, "Gcomp");
 		//if (ext2)
 		//	priority = (float) json_number_value(ext2);
@@ -752,7 +761,6 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected) 
 		Gres = 1.15f;
 	}
 	
-	// For more accurate physical sim of TB-303 filter; set firstPoleOneOctHigher to true.
 	float g2;
 	if (firstPoleOneOctHigher) {
 		double w_c2 = 2.0f*w_c;
@@ -946,12 +954,12 @@ struct BassWidget : ModuleWidget {
 		menu->addChild(new MenuLabel());
 		menu->addChild(new OversampleBassMenuItem(a, "Oversample x2", 2));
 		menu->addChild(new OversampleBassMenuItem(a, "Oversample x4", 4));
-		menu->addChild(new MenuLabel());
-		menu->addChild(new ResTuneMenuItem(a, "Tuned Resonance"));
-		menu->addChild(new MenuLabel());
-		menu->addChild(new PoleMenuItem(a, "1st Pole Oct Up"));
-		menu->addChild(new MenuLabel());
-		menu->addChild(new PrioMenuItem(a, "Compensate Passband"));
+		//menu->addChild(new MenuLabel());
+		//menu->addChild(new ResTuneMenuItem(a, "Tuned Resonance"));
+		//menu->addChild(new MenuLabel());
+		//menu->addChild(new PoleMenuItem(a, "1st Pole Oct Up"));
+		//menu->addChild(new MenuLabel());
+		//menu->addChild(new PrioMenuItem(a, "Compensate Passband"));
 	}
 };
 
