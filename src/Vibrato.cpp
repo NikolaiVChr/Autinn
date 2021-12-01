@@ -57,6 +57,9 @@ struct Vibrato : Module {
 		configParam(Vibrato::CV_FREQ_PARAM, 0.0f, 0.2f, 0.0f, "Frequency CV", "%", 0.0f, 500.0f);
 		configParam(Vibrato::CV_WIDTH_PARAM, 0.0f, 0.2f, 0.0f, "Width CV", "%", 0.0f, 500.0f);
 		configParam(Vibrato::CV_FLANGER_PARAM, 0.0f, 0.2f, 0.0f, "Flanger CV", "%", 0.0f, 500.0f);
+		configBypass(VIBRATO_INPUT, VIBRATO_OUTPUT);
+		configInput(VIBRATO_INPUT, "Audio");
+		configOutput(VIBRATO_OUTPUT, "Audio");
 	}
 
 	float phase = 0.0f;

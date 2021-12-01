@@ -158,6 +158,9 @@ struct Zod : Module {
 		configInput(E_INPUT, "Expander");
 		configInput(C_INPUT, "Compressor");
 		configInput(L_INPUT, "Limiter");
+
+		configBypass(LEFT_INPUT, LEFT_OUTPUT);
+		configBypass(RIGHT_INPUT, RIGHT_OUTPUT);
 	}
 
 	double toDB(double volt);

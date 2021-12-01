@@ -55,6 +55,12 @@ struct Flopper : Module {
 	Flopper() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Flopper::DIAL_PARAM, -10.0f, 10.0f, 0.0f, "Flop", " Volt",0.0f,1.0f);
+		configBypass(ONE_INPUT, ONE_OUTPUT);
+		configBypass(TWO_INPUT, TWO_OUTPUT);
+		configInput(ONE_INPUT, "First");
+		configInput(TWO_INPUT, "Second");
+		configOutput(ONE_OUTPUT, "First");
+		configOutput(TWO_OUTPUT, "Second");
 	}
 
 	void process(const ProcessArgs &args) override;

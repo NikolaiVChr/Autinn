@@ -68,6 +68,7 @@ struct Jette : Module {
 		configParam(Jette::F_PARAM, 0.0f, 1.0f, 1.0f, "");
 		configParam(Jette::G_PARAM, 0.0f, 1.0f, 1.0f, "");
 		configParam(Jette::H_PARAM, 0.0f, 1.0f, 1.0f, "");
+		configOutput(BUZZ_OUTPUT, "Audio");
 	}
 	void process(const ProcessArgs &args) override;
 

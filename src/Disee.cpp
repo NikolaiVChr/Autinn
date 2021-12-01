@@ -48,7 +48,11 @@ struct Disee : Module {
 	queue <float> buffer;
 
 	Disee() {
-		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);}
+		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+		configBypass(AC_INPUT, DC_OUTPUT);
+		configInput(AC_INPUT, "AC");
+		configOutput(DC_OUTPUT, "DC");
+	}
 
 	void process(const ProcessArgs &args) override;
 };
