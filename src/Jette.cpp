@@ -185,7 +185,7 @@ void Jette::process(const ProcessArgs &args) {
 	float buzz = 0.0f;
 	if (shape == 0) {
 		// square
-		buzz = a*std::sin(phase) + b*sin(3.0f*phase)/3.0f + c*sin(5.0f*phase)/5.0f + d*sin(7.0f*phase)/7.0f + e*sin(9.0f*phase)/9.0f + f*sin(11.0f*phase)/11.0f + g*sin(13.0f*phase)/13.0f + h*sin(15.0f*phase)/15.0f;
+		buzz = a*sin(phase) + b*sin(3.0f*phase)/3.0f + c*sin(5.0f*phase)/5.0f + d*sin(7.0f*phase)/7.0f + e*sin(9.0f*phase)/9.0f + f*sin(11.0f*phase)/11.0f + g*sin(13.0f*phase)/13.0f + h*sin(15.0f*phase)/15.0f;
 		buzz *= 20.0f/M_PI;
 	} else if (shape == 1 ) {
 		// triangle
