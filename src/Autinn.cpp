@@ -24,9 +24,7 @@
 Plugin *pluginInstance;
 
 float non_lin_func(float parm) {
-	// 7 divisions in continued fraction series expansion to closely approxiate hyperbolic tangent in a very fast fashion.
-	// If ever open-source the plugin, consider to rename it.
-	// This function is what make real-time full model of Moog filter possible.
+	// 7 divisions in continued fraction series expansion
 	if (parm > 4.97f) {
 		return 1.0f;
 	}
@@ -72,4 +70,5 @@ void init(rack::Plugin *p) {
 	p->addModel(modelVibrato);
 	p->addModel(modelVectorDriver);
 	p->addModel(modelZod);
+	p->addModel(modelTriBand);
 }

@@ -173,6 +173,7 @@ extern Model *modelSquare;
 extern Model *modelSaw;
 extern Model *modelBoomerang;
 extern Model *modelVibrato;
-extern Model *modelVectorDriver;
+extern Model *modelVectorDriver; //deprecated
 extern Model *modelCVConverter;
 extern Model *modelZod;
+extern Model *modelTriBand;

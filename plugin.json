@@ -168,6 +168,14 @@
         "Expander",
         "Dual"
       ]
+    },
+    {
+      "slug": "TriBand",
+      "name": "Imp",
+      "description": "Simple Triple Band Equalizer",
+      "tags": [
+        "Equalizer"
+      ]
     }
   ]
 }
