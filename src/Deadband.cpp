@@ -1,6 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-//#include "dsp/resampler.hpp"
 
 /*
 
@@ -56,6 +55,8 @@ struct Deadband : Module {
 		configParam(Deadband::GAP_PARAM, 1.0f, 0.0f, 1.0f, "Gap");
 		configParam(Deadband::CV_GAP_PARAM, 0.0f, 0.2f, 0.0f, "Gap CV", "%", 0.0f, 500.0f);
 		configBypass(DEADBAND_INPUT, DEADBAND_OUTPUT);
+		configInput(CV_INPUT, "Width CV");
+		configInput(CV_GAP_INPUT, "Gap CV");
 		configInput(DEADBAND_INPUT, "");
 		configOutput(DEADBAND_OUTPUT, "");
 	}
@@ -103,7 +104,6 @@ struct DeadbandWidget : ModuleWidget {
 	DeadbandWidget(Deadband *module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/DeadbandModule.svg")));
-		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));

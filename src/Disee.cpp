@@ -50,6 +50,9 @@ struct Disee : Module {
 	Disee() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configBypass(AC_INPUT, DC_OUTPUT);
+		configLight(DC_RED_LIGHT, "Positive DC");
+		configLight(DC_GREEN_LIGHT, "DC near zero");
+		configLight(DC_BLUE_LIGHT, "Negative DC");
 		configInput(AC_INPUT, "AC");
 		configOutput(DC_OUTPUT, "DC");
 	}
@@ -63,7 +66,9 @@ void Disee::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 
-	// TODO: Make buffer size depend on bitrate
+	// TODO: Make buffer size depend on bitrate and review the time it should average over.
+	//       Right now its 1.13 seconds for 44.1KHz
+	//       Right now its 1.04 seconds for 48.0KHz
 	
 	float in = inputs[AC_INPUT].getVoltage()/size;
 	buffer.push(in);
@@ -97,7 +102,6 @@ struct DiseeWidget : ModuleWidget {
 	DiseeWidget(Disee *module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/DiseeModule.svg")));
-		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));

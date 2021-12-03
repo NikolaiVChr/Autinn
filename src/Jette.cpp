@@ -68,6 +68,11 @@ struct Jette : Module {
 		configParam(Jette::F_PARAM, 0.0f, 1.0f, 1.0f, "");
 		configParam(Jette::G_PARAM, 0.0f, 1.0f, 1.0f, "");
 		configParam(Jette::H_PARAM, 0.0f, 1.0f, 1.0f, "");
+		configInput(PITCH_INPUT, "1V/Oct CV");
+		configLight(BLINK_LIGHT, "Activity");
+		configLight(SQUARE_LIGHT, "Square Waveform");
+		configLight(TRIANGLE_LIGHT, "Triangle Waveform");
+		configLight(SAW_LIGHT, "Saw Waveform");
 		configOutput(BUZZ_OUTPUT, "Audio");
 	}
 	void process(const ProcessArgs &args) override;

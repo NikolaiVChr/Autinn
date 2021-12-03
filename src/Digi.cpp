@@ -1,6 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-//#include "dsp/resampler.hpp"
 
 /*
 
@@ -51,6 +50,7 @@ struct Digi : Module {
 		configParam(Digi::STEP_PARAM, 0.0f, 1.0f, 0.0f, "Quantization", " Volt",0.0f,1.0f);
 		configParam(Digi::CV_PARAM, 0.0f, 0.2f, 0.0f, "CV", "%",0.0f,500.0f);
 		configBypass(ANALOG_INPUT, DIGITAL_OUTPUT);
+		configInput(CV_INPUT, "CV");
 		configInput(ANALOG_INPUT, "Analog");
 		configOutput(DIGITAL_OUTPUT, "Digital");
 	}
@@ -99,7 +99,6 @@ struct DigiWidget : ModuleWidget {
 	DigiWidget(Digi *module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/DigiModule.svg")));
-		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));

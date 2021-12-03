@@ -43,10 +43,10 @@ struct CVConverter : Module {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configBypass(FIVE_INPUT, FIVE_OUTPUT);
 		configBypass(TEN_INPUT, TEN_OUTPUT);
-		configInput(FIVE_INPUT, "+/- 5V");
-		configInput(TEN_INPUT, "10V");
-		configOutput(FIVE_OUTPUT, "+/- 5V");
-		configOutput(TEN_OUTPUT, "10V");
+		configInput(FIVE_INPUT, "+/- 5V CV");
+		configInput(TEN_INPUT, "0V to 10V CV");
+		configOutput(FIVE_OUTPUT, "+/- 5V CV");
+		configOutput(TEN_OUTPUT, "0V to 10V CV");
 	}
 
 	float range(float value, float valueRangeL, float valueRangeH, float rangeL, float rangeH);

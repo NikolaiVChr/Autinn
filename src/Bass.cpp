@@ -331,14 +331,20 @@ void Bass::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 
+	// We put this before connection check so the button and light works even when module not connected.
+	if (params[BUTTON_PARAM].getValue() > 0.0f and !button_prev) {
+		gateInput = !gateInput;
+	}
+	button_prev = bool(params[BUTTON_PARAM].getValue());
+	lights[GATE_LIGHT].value = gateInput;
+	lights[TRIG_LIGHT].value = !gateInput;
+
 	if (!outputs[BASS_OUTPUT].isConnected()) {
 		return;
 	}
 	int oversample_protected = current_oversample;// to be sure its not modified from another thread inside step.
 
-	if (params[BUTTON_PARAM].getValue() > 0.0f and !button_prev) {
-		gateInput = !gateInput;
-	}
+	
 
 	float osc = inputs[OSC_INPUT].getVoltage();
 	float resonance = clamp(params[RESONANCE_PARAM].getValue()+inputs[CV_RESONANCE_INPUT].getVoltage()*params[CV_RESONANCE_PARAM].getValue(),0.0f,RESONANCE_MAX);
@@ -427,9 +433,8 @@ void Bass::process(const ProcessArgs &args) {
 	fast_counter += 1;**/
 	gate_prev = gate;
 	note_prev = note;
-	button_prev = params[BUTTON_PARAM].getValue();
-	lights[GATE_LIGHT].value = gateInput;
-	lights[TRIG_LIGHT].value = !gateInput;
+	
+	
 	lights[GAIN_LIGHT].value = clamp(fabs(osc)-EXPECTED_PEAK_INPUT,0.0f,1.0f)*1.0f;//OSC input has too much gain. (7V+)
 }
 

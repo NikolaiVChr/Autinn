@@ -50,8 +50,8 @@ struct VectorDriver : Module {
 	VectorDriver() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(VectorDriver::SPEED_PARAM, 2.0f, 5.0f, 3.5f, "");
-		//configInput(FLORA_INPUT2, "Right");
-		//configOutput(BUZZ_OUTPUT, "Audio");
+		configOutput(X_OUTPUT, "+/-5V X CV");
+		configOutput(Y_OUTPUT, "+/-5V Y CV");
 	}
 
 	void process(const ProcessArgs &args) override;
@@ -94,7 +94,6 @@ struct VectorDriverWidget : ModuleWidget {
 	VectorDriverWidget(VectorDriver *module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/VxyModule.svg")));
-		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));

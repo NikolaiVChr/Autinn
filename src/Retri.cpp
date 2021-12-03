@@ -1,6 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-//#include "dsp/resampler.hpp"
 
 /*
 
@@ -60,11 +59,6 @@ struct Flora : Module {
 		NUM_LIGHTS
 	};
 
-	// Comment added 2021 Nov 27:
-	// To whomever is reading this, sorry for the abbreviated variable names.
-	// I did them like that to adhere to standards in literature. (especially the Finnish paper about full model for Moog filter)
-	// I did not plan, when I wrote it, that it should one day be open-sourced.
-
 	//float Boltzman = 0.000086173303f;// eV/K
 	//float t = 30.0f + 273.15f; // 30 celcius
 	//float V_t = 2.0f * t * Boltzman; // thermal voltage * 2 (should be divided by q also). Thermal V should be around 0.026V, times 2 its 0.052. Something divided by that gets multiplied by 19.23.
@@ -78,7 +72,7 @@ struct Flora : Module {
 	float g = 0.0f; // tuning parameter
 	int current_oversample = 2;
 	float gComp = 0.0f;
-	bool autoLevel = false;
+	bool autoLevel = false;// This adjusts the output gain to compensate for drive.
 	float F_c_prev = 0.0f;
 	float F_s_prev = 0.0f;
 
@@ -103,7 +97,7 @@ struct Flora : Module {
 	float W_b_prev = 0.0f;
 	float W_c_prev = 0.0f;
 	
-	dsp::Upsampler<oversample2, 10> upsampler2;// = dsp::Upsampler<oversample2, 10>(0.9f);
+	dsp::Upsampler<oversample2, 10> upsampler2;
 	dsp::Decimator<oversample2, 10> decimator2;
 	dsp::Upsampler<oversample4, 10> upsampler4;
 	dsp::Decimator<oversample4, 10> decimator4;
@@ -128,7 +122,7 @@ struct Flora : Module {
 	float W_b_prev_right = 0.0f;
 	float W_c_prev_right = 0.0f;
 	
-	dsp::Upsampler<oversample2, 10> upsampler2_right;// = dsp::Upsampler<oversample2, 10>(0.9f);
+	dsp::Upsampler<oversample2, 10> upsampler2_right;
 	dsp::Decimator<oversample2, 10> decimator2_right;
 	dsp::Upsampler<oversample4, 10> upsampler4_right;
 	dsp::Decimator<oversample4, 10> decimator4_right;
@@ -145,6 +139,11 @@ struct Flora : Module {
 		configParam(Flora::DRIVE_PARAM, 0.0f, DRIVE_MAX, 1.00f, "Drive", " dB", -10, 20);
 		configBypass(FLORA_INPUT, FLORA_OUTPUT);
 		configBypass(FLORA_INPUT2, FLORA_OUTPUT2);
+
+		configInput(CUTOFF_INPUT, "1V/Oct Cutoff CV");
+		configInput(RESONANCE_INPUT, "Resonance CV");
+		configInput(DRIVE_INPUT, "Drive CV");
+
 		configInput(FLORA_INPUT, "Left");
 		configInput(FLORA_INPUT2, "Right");
 		configOutput(FLORA_OUTPUT, "Left");
@@ -245,7 +244,7 @@ void Flora::process(const ProcessArgs &args) {
 		Gres = 1.037174 + 3.606925*w_c + 7.074555*w_c*w_c - 18.14674*w_c*w_c*w_c + 9.364587*w_c*w_c*w_c*w_c;
 	}
 	
-	float inv_drive = VCV_TO_MOOG*INPUT_TO_CAPACITOR*((autoLevel and drive != 0.0f)?clamp(drive,0.10f,DRIVE_MAX):1.0f);
+	float inv_drive = VCV_TO_MOOG*INPUT_TO_CAPACITOR*((autoLevel && drive != 0.0f)?clamp(drive,0.10f,DRIVE_MAX):1.0f);
 	
 	if (outputs[FLORA_OUTPUT].isConnected()) {
 		this->process_left(args, oversample_protected, drive, inv_drive);
@@ -422,35 +421,32 @@ struct OversampleFloraMenuItem : MenuItem {
 
 struct FloraWidget : ModuleWidget {
 	FloraWidget(Flora *module) {
-//		if (module) {
-			setModule(module);
-			setPanel(createPanel(asset::plugin(pluginInstance, "res/RetriModule.svg")));
-			//box.size = Vec(9 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
+		setModule(module);
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/RetriModule.svg")));
 
-			addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
-			addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
-			addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-			addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-			addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-275-HALF_KNOB_MED), module, Flora::CUTOFF_PARAM));
-			addParam(createParam<RoundSmallAutinnKnob>(Vec(40, RACK_GRID_HEIGHT-275-HALF_KNOB_SMALL), module, Flora::CUTOFF_INFL_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-275-HALF_KNOB_MED), module, Flora::CUTOFF_PARAM));
+		addParam(createParam<RoundSmallAutinnKnob>(Vec(40, RACK_GRID_HEIGHT-275-HALF_KNOB_SMALL), module, Flora::CUTOFF_INFL_PARAM));
 
-			addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-205-HALF_KNOB_MED), module, Flora::RESONANCE_PARAM));
-			addParam(createParam<RoundSmallAutinnKnob>(Vec(40, RACK_GRID_HEIGHT-205-HALF_KNOB_SMALL), module, Flora::RESONANCE_INFL_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-205-HALF_KNOB_MED), module, Flora::RESONANCE_PARAM));
+		addParam(createParam<RoundSmallAutinnKnob>(Vec(40, RACK_GRID_HEIGHT-205-HALF_KNOB_SMALL), module, Flora::RESONANCE_INFL_PARAM));
 
-			addParam(createParam<RoundSmallAutinnKnob>(Vec(40, RACK_GRID_HEIGHT-135-HALF_KNOB_SMALL), module, Flora::DRIVE_INFL_PARAM));
-			addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-135-HALF_KNOB_MED), module, Flora::DRIVE_PARAM));
+		addParam(createParam<RoundSmallAutinnKnob>(Vec(40, RACK_GRID_HEIGHT-135-HALF_KNOB_SMALL), module, Flora::DRIVE_INFL_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-135-HALF_KNOB_MED), module, Flora::DRIVE_PARAM));
 
-			addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-275-HALF_PORT), module, Flora::CUTOFF_INPUT));
-			addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-205-HALF_PORT), module, Flora::RESONANCE_INPUT));
-			addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-135-HALF_PORT), module, Flora::DRIVE_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-275-HALF_PORT), module, Flora::CUTOFF_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-205-HALF_PORT), module, Flora::RESONANCE_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-135-HALF_PORT), module, Flora::DRIVE_INPUT));
 
-			addInput(createInput<InPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.15-HALF_PORT, 300), module, Flora::FLORA_INPUT));
-			addInput(createInput<InPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.35-HALF_PORT, 300), module, Flora::FLORA_INPUT2));
-			addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.60-HALF_PORT, 300), module, Flora::FLORA_OUTPUT));
-			addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.85-HALF_PORT, 300), module, Flora::FLORA_OUTPUT2));
-			//addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Flora::OUTPUT_W));
-//		}
+		addInput(createInput<InPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.15-HALF_PORT, 300), module, Flora::FLORA_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.35-HALF_PORT, 300), module, Flora::FLORA_INPUT2));
+		addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.60-HALF_PORT, 300), module, Flora::FLORA_OUTPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.85-HALF_PORT, 300), module, Flora::FLORA_OUTPUT2));
+		//addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Flora::OUTPUT_W));
 	}
 	
 	void appendContextMenu(Menu* menu) override {

@@ -1,6 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-//#include "dsp/resampler.hpp"
 
 /*
 
@@ -190,7 +189,7 @@ struct Square : Module {
 	Square() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Square::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
-		
+		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
 	}
 
@@ -273,7 +272,6 @@ struct SquareWidget : ModuleWidget {
 	SquareWidget(Square *module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/SquareModule.svg")));
-		//box.size = Vec(5 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));

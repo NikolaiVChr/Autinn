@@ -1,6 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-//#include "dsp/resampler.hpp"
 
 /*
 
@@ -247,7 +246,7 @@ struct Saw : Module {
 	Saw() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Saw::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
-
+		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
 	}
 
@@ -340,7 +339,6 @@ struct SawWidget : ModuleWidget {
 	SawWidget(Saw *module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/SawModule.svg")));
-		//box.size = Vec(5 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));

@@ -44,6 +44,7 @@ struct Amp : Module {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Amp::DIAL_PARAM, 0.0f, 2.0f, 1.0f, "Gain", " dB", -10, 20);
 		configBypass(AMP_INPUT, AMP_OUTPUT);
+		configInput(CV_INPUT, "CV");
 		configInput(AMP_INPUT, "Audio");
 		configOutput(AMP_OUTPUT, "Audio");
 	}

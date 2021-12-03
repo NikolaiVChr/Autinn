@@ -58,6 +58,9 @@ struct Vibrato : Module {
 		configParam(Vibrato::CV_WIDTH_PARAM, 0.0f, 0.2f, 0.0f, "Width CV", "%", 0.0f, 500.0f);
 		configParam(Vibrato::CV_FLANGER_PARAM, 0.0f, 0.2f, 0.0f, "Flanger CV", "%", 0.0f, 500.0f);
 		configBypass(VIBRATO_INPUT, VIBRATO_OUTPUT);
+		configInput(WIDTH_INPUT, "Width CV");
+		configInput(FREQ_INPUT, "Frequency CV");
+		configInput(FLANGER_INPUT, "Flanger CV");
 		configInput(VIBRATO_INPUT, "Audio");
 		configOutput(VIBRATO_OUTPUT, "Audio");
 	}
@@ -179,7 +182,6 @@ struct VibratoWidget : ModuleWidget {
 	VibratoWidget(Vibrato *module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/VibratoModule.svg")));
-		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
