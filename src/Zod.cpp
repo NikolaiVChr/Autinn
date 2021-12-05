@@ -150,9 +150,9 @@ struct Zod : Module {
 		configParam(Zod::OUT_GAIN_PARAM, 0.0, 1.0, 0.0, "Makeup gain", " dB", 0.0f, 20.0f);
 
 		configLight(A, "Noise gate");
-		configLight(B, "Full expander");
-		configLight(C, "Semi expander");
-		configLight(DD, "Full compressor");
+		configLight(B, "Expander");
+		configLight(C, "Unity");
+		configLight(DD, "Compressor");
 		configLight(E, "Limiter");
 
 		configInput(LEFT_INPUT, "Left audio");
@@ -160,12 +160,12 @@ struct Zod : Module {
 		configOutput(LEFT_OUTPUT, "Left audio");
 		configOutput(RIGHT_OUTPUT, "Right audio");
 
-		configInput(SIDE_LEFT_INPUT, "Left");
-		configInput(SIDE_RIGHT_INPUT, "Right");
-		configInput(N_INPUT, "Noise gate");
-		configInput(E_INPUT, "Expander");
-		configInput(C_INPUT, "Compressor");
-		configInput(L_INPUT, "Limiter");
+		configInput(SIDE_LEFT_INPUT, "Sidechain audio left");
+		configInput(SIDE_RIGHT_INPUT, "Sidechain audio right");
+		configInput(N_INPUT, "Noise gate threshold CV");
+		configInput(E_INPUT, "Expander threshold CV");
+		configInput(C_INPUT, "Compressor threshold CV");
+		configInput(L_INPUT, "Limiter threshold CV");
 
 		configBypass(LEFT_INPUT, LEFT_OUTPUT);
 		configBypass(RIGHT_INPUT, RIGHT_OUTPUT);
@@ -288,18 +288,22 @@ void Zod::process(const ProcessArgs &args) {
 	if (inputs[N_INPUT].isConnected()) {
 		if (inputs[N_INPUT].getVoltage() == 0.0f) NT = -70.0;
 		else NT = this->toDB(abs(inputs[N_INPUT].getVoltage()));
+		params[T_NOISEGATE_PARAM].setValue(NT);
 	}
 	if (inputs[E_INPUT].isConnected()) {
 		if (inputs[E_INPUT].getVoltage() == 0.0f) ET = -70.0;
 		else ET = this->toDB(abs(inputs[E_INPUT].getVoltage()));
+		params[T_EXPANDER_PARAM].setValue(ET);
 	}
 	if (inputs[C_INPUT].isConnected()) {
 		if (inputs[C_INPUT].getVoltage() == 0.0f) CT = -70.0;
 		else CT = this->toDB(abs(inputs[C_INPUT].getVoltage()));
+		params[T_COMPRESSOR_PARAM].setValue(CT);
 	}
 	if (inputs[L_INPUT].isConnected()) {
 		if (inputs[L_INPUT].getVoltage() == 0.0f) LT = -70.0;
 		else LT = this->toDB(abs(inputs[L_INPUT].getVoltage()));
+		params[T_LIMITER_PARAM].setValue(LT);
 	}
 
 	double TS = args.sampleTime * 1000.0; //ms
