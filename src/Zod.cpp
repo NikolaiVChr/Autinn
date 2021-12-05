@@ -126,6 +126,14 @@ struct Zod : Module {
 	double ATp = 0.1;
 	double TAV = 0.03;
 
+	dsp::VuMeter2 vuMeterIn;
+	dsp::VuMeter2 vuMeterIn2;
+	dsp::VuMeter2 vuMeterOut;
+	dsp::VuMeter2 vuMeterOut2;
+	const float vuMaxDB = 22.5f;
+	const float intervalDB = vuMaxDB/15.0f;
+	unsigned short int step = 0;
+
 	Zod() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Zod::T_NOISEGATE_PARAM,  THRESHOLD_LIMIT_LOW_DB, THRESHOLD_LIMIT_HIGH_DB, THRESHOLD_DEFAULT_NOISEGATE_DB, "Noisegate", " dB", 0.0f, 1.0f);
@@ -270,6 +278,7 @@ void Zod::process(const ProcessArgs &args) {
 	if (!outputs[LEFT_OUTPUT].isConnected() && !outputs[RIGHT_OUTPUT].isConnected()) {
 		return;
 	}
+	step++;
 
 	double LT = params[T_LIMITER_PARAM].getValue();
 	double CT = params[T_COMPRESSOR_PARAM].getValue();
@@ -411,23 +420,18 @@ void Zod::process(const ProcessArgs &args) {
 
 
 	// VU meters
-	dsp::VuMeter vuMeterIn;
-	vuMeterIn.dBInterval = 1.5f;
-	vuMeterIn.setValue(pastL * 0.1f);
-	dsp::VuMeter vuMeterIn2;
-	vuMeterIn2.dBInterval = 1.5f;
-	vuMeterIn2.setValue(pastR * 0.1f);
-	dsp::VuMeter vuMeterOut;
-	vuMeterOut.dBInterval = 1.5f;
-	vuMeterOut.setValue(outL * 0.1f);
-	dsp::VuMeter vuMeterOut2;
-	vuMeterOut2.dBInterval = 1.5f;
-	vuMeterOut2.setValue(outR * 0.1f);
-	for (int v = 0; v < 15; v++) {
-		lights[VU_IN_LEFT_LIGHT + 14 - v].setSmoothBrightness(vuMeterIn.getBrightness(v), args.sampleTime); //1.f frames for deltatime
-		lights[VU_IN_RIGHT_LIGHT + 14 - v].setSmoothBrightness(vuMeterIn2.getBrightness(v), args.sampleTime);
-		lights[VU_OUT_LEFT_LIGHT + 14 - v].setSmoothBrightness(vuMeterOut.getBrightness(v), args.sampleTime);
-		lights[VU_OUT_RIGHT_LIGHT + 14 - v].setSmoothBrightness(vuMeterOut2.getBrightness(v), args.sampleTime);
+	vuMeterIn.process(args.sampleTime, pastL * 0.1f);
+	vuMeterIn2.process(args.sampleTime, pastR * 0.1f);
+	vuMeterOut.process(args.sampleTime, outL * 0.1f);
+	vuMeterOut2.process(args.sampleTime, outR * 0.1f);
+	for (int v = 0; step == 512 && v < 15; v++) {
+		lights[VU_IN_LEFT_LIGHT + 14 - v].setBrightness(vuMeterIn.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
+		lights[VU_IN_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterIn2.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
+		lights[VU_OUT_LEFT_LIGHT + 14 - v].setBrightness(vuMeterOut.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
+		lights[VU_OUT_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterOut2.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
+	}
+	if (step == 512) {
+		step = 0;
 	}
 
 	// set previous values for next step:
