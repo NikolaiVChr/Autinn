@@ -32,10 +32,10 @@ static const float HALF_PORT       = 31.58*0.5;
 static const float HALF_BUTTON     = 30*0.5;
 static const float HALF_BUTTON_SMALL = 15*0.5;
 static const float HALF_SLIDER     = 15*0.5;
-static const float HALF_LIGHT_TINY   = 3.2126f*0.5f;
-static const float HALF_LIGHT_SMALL  = 6.4252f*0.5f;
-static const float HALF_LIGHT_MEDIUM = 9.3780f*0.5f;
-static const float HALF_LIGHT_LARGE  = 12.2835f*0.5f;
+static const float HALF_LIGHT_TINY   = mm2px(1.0)*0.5f;
+static const float HALF_LIGHT_SMALL  = mm2px(2.0)*0.5f;// Was 6.4252f in Rack 1
+static const float HALF_LIGHT_MEDIUM = mm2px(3.0)*0.5f;
+static const float HALF_LIGHT_LARGE  = mm2px(5.0)*0.5f;
 
 struct AutinnSlider : app::SvgSlider {
 	AutinnSlider() {
@@ -79,6 +79,27 @@ struct RoundMediumAutinnKnob : RoundKnob {
 struct RoundSmallAutinnKnob : RoundKnob {
 	RoundSmallAutinnKnob() {
 		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinn.svg")));
+		//box.size = Vec(28, 28);
+	}
+};
+
+struct RoundSmallTyrkAutinnKnob : RoundKnob {
+	RoundSmallTyrkAutinnKnob() {
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnTyrk.svg")));
+		//box.size = Vec(28, 28);
+	}
+};
+
+struct RoundSmallPinkAutinnKnob : RoundKnob {
+	RoundSmallPinkAutinnKnob() {
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnPink.svg")));
+		//box.size = Vec(28, 28);
+	}
+};
+
+struct RoundSmallYelAutinnKnob : RoundKnob {
+	RoundSmallYelAutinnKnob() {
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnYel.svg")));
 		//box.size = Vec(28, 28);
 	}
 };
@@ -177,3 +198,4 @@ extern Model *modelVectorDriver; //deprecated
 extern Model *modelCVConverter;
 extern Model *modelZod;
 extern Model *modelTriBand;
+extern Model *modelMixer6;

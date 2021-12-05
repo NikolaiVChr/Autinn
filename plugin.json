@@ -176,6 +176,15 @@
       "tags": [
         "Equalizer"
       ]
+    },
+    {
+      "slug": "Mixer6",
+      "name": "6 Channel Mixer",
+      "description": "6 channel mixer with no CV",
+      "tags": [
+        "Mixer",
+        "Equalizer"
+      ]
     }
   ]
 }

@@ -71,4 +71,5 @@ void init(rack::Plugin *p) {
 	p->addModel(modelVectorDriver);
 	p->addModel(modelZod);
 	p->addModel(modelTriBand);
+	p->addModel(modelMixer6);
 }
