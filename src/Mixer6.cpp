@@ -91,8 +91,6 @@ struct Mixer6 : Module {
 	dsp::VuMeter2 vuMeterOut2;
 	unsigned short int step = 0;
 
-	//vuMeterOut.mode = vuMeterOut.RMS;
-
 	float rate_prev = -1.0f;
 
 	Mixer6() {
@@ -203,6 +201,7 @@ void Mixer6::process(const ProcessArgs &args) {
 	vuMeterFXB_R.process(args.sampleTime, fx_return_right_B * 0.1f);
 	vuMeterOut.process(args.sampleTime, main_left * 0.1f);
 	vuMeterOut2.process(args.sampleTime, main_right * 0.1f);
+	//vuMeterOut.mode = dsp::VuMeter2::RMS;
 	for (int v = 0; step == 512 && v < 15; v++) {
 		if (v < 8) {
 			lights[VU_FXA_LEFT_LIGHT + 7 - v].setBrightness(vuMeterFXA_L.getBrightness(-intervalDB_FX * (v + 1), -intervalDB_FX * v));
