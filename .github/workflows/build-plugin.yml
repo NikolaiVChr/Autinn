@@ -18,19 +18,22 @@ jobs:
         - {
             name: Linux,
             os: ubuntu-latest,
-            prepare-os: sudo apt install -y libglu-dev,
+            prepare-os: sudo apt-get -y --allow-downgrades --allow-remove-essential --allow-change-held-packages update,
+            prepare-os2: sudo apt install -y libglu-dev,
             postfix: lin
           }
         - {
             name: MacOS,
             os: macos-latest,
             prepare-os: "",
+            prepare-os2: "",
             postfix: mac
           }
         - {
             name: Windows,
             os: windows-latest,
             prepare-os: export CC=gcc,
+            prepare-os2: "",
             postfix: win
           }
         language: [ 'cpp' ]
@@ -62,6 +65,7 @@ jobs:
       - name: Build plugin
         run: |
           ${{ matrix.config.prepare-os }}
+          ${{ matrix.config.prepare-os2 }}
           export RACK_DIR=$HOME/Rack-SDK
           make -j dep
           make -j dist
