@@ -199,3 +199,4 @@ extern Model *modelCVConverter;
 extern Model *modelZod;
 extern Model *modelTriBand;
 extern Model *modelMixer6;
+extern Model *modelNon;

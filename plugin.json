@@ -185,6 +185,16 @@
         "Mixer",
         "Equalizer"
       ]
+    },
+    {
+      "slug": "Non",
+      "name": "Non",
+      "description": "Limiter",
+      "tags": [
+        "Limiter",
+        "Dynamics",
+        "Dual"
+      ]
     }
   ]
 }

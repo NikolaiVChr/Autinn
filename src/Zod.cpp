@@ -188,7 +188,7 @@ struct Zod : Module {
 	//dBMin = -60 dB = 0.005V
 	dBMax = 7.5 dB = 12V
 	dB    = 0.0 dB =  5V
-	dBMin = -70 dB =  0V (curve is asymptotic, so 0.0 is just a definition)
+	dBMin = -70 dB =  0V (curve is asymptotic, but 0.0 is defined in CV input)
 
 	LT = limiter threshold     PARAM dB
 	CT = compressor threshold  PARAM dB
@@ -294,22 +294,22 @@ void Zod::process(const ProcessArgs &args) {
 	double NT = params[T_NOISEGATE_PARAM].getValue();
 
 	if (inputs[N_INPUT].isConnected()) {
-		if (inputs[N_INPUT].getVoltage() == 0.0f) NT = -70.0;
+		if (inputs[N_INPUT].getVoltage() == 0.0f) NT = THRESHOLD_LIMIT_LOW_DB;
 		else NT = this->toDB(abs(inputs[N_INPUT].getVoltage()));
 		params[T_NOISEGATE_PARAM].setValue(NT);
 	}
 	if (inputs[E_INPUT].isConnected()) {
-		if (inputs[E_INPUT].getVoltage() == 0.0f) ET = -70.0;
+		if (inputs[E_INPUT].getVoltage() == 0.0f) ET = THRESHOLD_LIMIT_LOW_DB;
 		else ET = this->toDB(abs(inputs[E_INPUT].getVoltage()));
 		params[T_EXPANDER_PARAM].setValue(ET);
 	}
 	if (inputs[C_INPUT].isConnected()) {
-		if (inputs[C_INPUT].getVoltage() == 0.0f) CT = -70.0;
+		if (inputs[C_INPUT].getVoltage() == 0.0f) CT = THRESHOLD_LIMIT_LOW_DB;
 		else CT = this->toDB(abs(inputs[C_INPUT].getVoltage()));
 		params[T_COMPRESSOR_PARAM].setValue(CT);
 	}
 	if (inputs[L_INPUT].isConnected()) {
-		if (inputs[L_INPUT].getVoltage() == 0.0f) LT = -70.0;
+		if (inputs[L_INPUT].getVoltage() == 0.0f) LT = THRESHOLD_LIMIT_LOW_DB;
 		else LT = this->toDB(abs(inputs[L_INPUT].getVoltage()));
 		params[T_LIMITER_PARAM].setValue(LT);
 	}
