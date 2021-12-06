@@ -1,7 +1,6 @@
 #include "Autinn.hpp"
 #include <cmath>
 #include <queue>
-//#include "dsp/vumeter.hpp"
 
 using std::queue;
 /*
@@ -126,6 +125,7 @@ struct Zod : Module {
 	double ATp = 0.1;
 	double TAV = 0.03;
 
+	// VU Meter stuff
 	dsp::VuMeter2 vuMeterIn;
 	dsp::VuMeter2 vuMeterIn2;
 	dsp::VuMeter2 vuMeterOut;
@@ -184,25 +184,31 @@ struct Zod : Module {
 };
 
 /*
-	dBMax = 7.6 dB = 12V
-	dBMin = -60 dB = 0.005V
+	//dBMax = 7.6 dB = 12V
+	//dBMin = -60 dB = 0.005V
+	dBMax = 7.5 dB = 12V
+	dB    = 0.0 dB =  5V
+	dBMin = -70 dB =  0V (curve is asymptotic, so 0.0 is just a definition)
 
 	LT = limiter threshold     PARAM dB
 	CT = compressor threshold  PARAM dB
 	ET = expander threshold    PARAM dB
 	NT = noise gate threshold  PARAM dB
-	AT = attack time
-	RT = release time
-	TS = sampling interval
+	AT = attack time parameter          
+	RT = release time parameter
+	TAV= average time parameter
+	TS = sampling interval     Rack controls ms
 	ta = attacktime in ms      PARAM ms
 	tr = releasetime in ms     PARAM ms
-	t_M = averagetime in ms (5-130ms)
-	T_A = time constant        ?
+	t_M = averagetime in ms    PARAM (5-130ms)
+	T_A = time constant        Did I plan to use TS in seconds?
 	CS = compressor slope
 	ES = expander slope
 	NS = noise slope
-	R  = ratio                 PARAM
+	R  = ratio                 PARAM (one for each)
 	D  = delay in samples
+	X/Y=in/out-put
+	f  = control parameter
 
 	thresholds example (0dB = 5V):
 	dB = 20*log10(voltage/5)
@@ -228,7 +234,7 @@ struct Zod : Module {
 	For |x(n)| > xPEAK(n - 1) :
 	xPEAK(n) = (1 - AT) * xPEAK(n - 1) + AT * |x(n)|
 
-	for |x(n)| ≤ xPEAK(n - 1) :
+	and for |x(n)| ≤ xPEAK(n - 1) :
 	xPEAK(n) = (1 - RT) * xPEAK(n - 1)
 
 	AT = 1 - exp( -2.2TS/(ta/1000))
@@ -243,14 +249,16 @@ struct Zod : Module {
 	g(n)=(1-k)*g(n-1)+k*f(n)         [k = AT or k=RT determined by hysteresis]
 
 
-	TODO: upsample by 4..
-	      design
+	TODO: upsample for RMS/peak detection. (hesitant)
 	      optimize more?
+	      Could some of the doubles be floats instead? I should have made more notes about my tests and considerations when I made it.
+	      Since max samplerate in Rack has increased, D can cause:
+	      		unsigned(768000Hz * 350 * 0.001) x bytes = 268800 x 4 = 1075200B [Its big, but doable]
 
 
 
 
-	      design:
+	      (old) design:
 
 	                      Zod
 
