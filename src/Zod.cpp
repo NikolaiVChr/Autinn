@@ -195,6 +195,7 @@ struct Zod : Module {
 	ET = expander threshold    PARAM dB
 	NT = noise gate threshold  PARAM dB
 	AT = attack time parameter          
+	ATp= peak attack time parameter
 	RT = release time parameter
 	TAV= average time parameter
 	TS = sampling interval     Rack controls ms
@@ -207,8 +208,9 @@ struct Zod : Module {
 	NS = noise slope
 	R  = ratio                 PARAM (one for each)
 	D  = delay in samples
-	X/Y=in/out-put
+	X/Y=in/out-put             dB
 	f  = control parameter
+	k  = filter coefficient
 
 	thresholds example (0dB = 5V):
 	dB = 20*log10(voltage/5)
@@ -232,7 +234,7 @@ struct Zod : Module {
 
 	level measurements:
 	For |x(n)| > xPEAK(n - 1) :
-	xPEAK(n) = (1 - AT) * xPEAK(n - 1) + AT * |x(n)|
+	xPEAK(n) = (1 - ATp) * xPEAK(n - 1) + ATp * |x(n)|
 
 	and for |x(n)| ≤ xPEAK(n - 1) :
 	xPEAK(n) = (1 - RT) * xPEAK(n - 1)

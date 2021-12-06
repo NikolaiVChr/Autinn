@@ -32,7 +32,7 @@ using std::queue;
 #define THRESHOLD_LIMIT_HIGH_DB           7.5//12.0V
 //#define ATTACK_LOW_MS                     1.0//was 0.16
 //#define ATTACK_HIGH_MS                 2600.0
-#define ATTACK_LIMITER_LOW_MS             0.1//was 0.02
+#define ATTACK_LIMITER_LOW_MS             0.02
 #define ATTACK_LIMITER_HIGH_MS           10.0
 #define RELEASE_LOW_MS                    1.0
 #define RELEASE_HIGH_MS                5000.0
@@ -123,7 +123,7 @@ struct Non : Module {
 	double RT = 0.1;
 	//double AT = 0.1;
 	double ATp = 0.1;
-	double TAV = 0.03;
+	//double TAV = 0.03;
 
 	// VU Meter stuff
 	dsp::VuMeter2 vuMeterIn;
@@ -196,6 +196,7 @@ struct Non : Module {
 	ET = expander threshold    PARAM dB
 	NT = noise gate threshold  PARAM dB
 	AT = attack time parameter          
+	ATp= peak attack time parameter
 	RT = release time parameter
 	TAV= average time parameter
 	TS = sampling interval     Rack controls ms
@@ -208,8 +209,9 @@ struct Non : Module {
 	NS = noise slope
 	R  = ratio                 PARAM (one for each)
 	D  = delay in samples
-	X/Y=in/out-put
+	X/Y=in/out-put             dB
 	f  = control parameter
+	k  = filter coefficient
 
 	thresholds example (0dB = 5V):
 	dB = 20*log10(voltage/5)
@@ -233,7 +235,7 @@ struct Non : Module {
 
 	level measurements:
 	For |x(n)| > xPEAK(n - 1) :
-	xPEAK(n) = (1 - AT) * xPEAK(n - 1) + AT * |x(n)|
+	xPEAK(n) = (1 - ATp) * xPEAK(n - 1) + ATp * |x(n)|
 
 	and for |x(n)| ≤ xPEAK(n - 1) :
 	xPEAK(n) = (1 - RT) * xPEAK(n - 1)
@@ -254,7 +256,7 @@ struct Non : Module {
 	      optimize more?
 	      Could some of the doubles be floats instead? I should have made more notes about my tests and considerations when I made it.
 	      Since max samplerate in Rack has increased, D can cause:
-	      		unsigned(768000Hz * 350 * 0.001) x bytes = 268800 x 4 = 1075200B [Well its big, but practical?]
+	      		unsigned(768000Hz * 350 * 0.001) x bytes = 268800 x 4 = 1075200B [Its big, but doable]
 
 
 
@@ -285,6 +287,7 @@ struct Non : Module {
 		No transition from compressor, as there is non.
 		Zod specific code is commented instead of removed to ease maintaining both at same time.
 		Threshold only goes down to -25dB (0.281V)
+		Attack knob goes lower, down to 0.02ms
 	Ideas:
 		More CV control?
 */
@@ -351,8 +354,8 @@ void Non::process(const ProcessArgs &args) {
 		//AT  = 1.0 - exp(-2.2 * TS / ta );
 		ATp = 1.0 - exp(-2.2 * TS / tap);
 
-		double t_M = TS * D;
-		TAV = 1.0 - exp(-2.2 * TS / t_M);
+		//double t_M = TS * D;
+		//TAV = 1.0 - exp(-2.2 * TS / t_M);
 	}
 
 	unsigned hyst_max = HYSTERESIS_TIME_SEC / args.sampleTime;
@@ -567,8 +570,8 @@ struct NonWidget : ModuleWidget {
 
 		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.20 - HALF_KNOB_MED, 135), module, Non::AVERAGE_TIME_PARAM));
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.40 - HALF_KNOB_MED, 135), module, Non::ATTACK_PARAM));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.5 - HALF_KNOB_MED, 135), module, Non::RELEASE_PARAM));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.80 - HALF_KNOB_MED, 135), module, Non::ATTACK_PEAK_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.80 - HALF_KNOB_MED, 135), module, Non::RELEASE_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.50 - HALF_KNOB_MED, 135), module, Non::ATTACK_PEAK_PARAM));
 
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.235 - HALF_KNOB_MED, 200), module, Non::RATIO_EXPANDER_PARAM));
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.48 - HALF_KNOB_MED, 200), module, Non::RATIO_COMPRESSOR_PARAM));
