@@ -44,7 +44,7 @@ struct Disee : Module {
 	};
 
 	float dc_prev;
-	unsigned size = 50000;// fixed for now.
+	unsigned size = 12500;// fixed for now.
 	queue <float> buffer;
 
 	Disee() {
@@ -67,8 +67,8 @@ void Disee::process(const ProcessArgs &args) {
 	// VCV Rack CV is +-5V or 0V-10V
 
 	// TODO: Make buffer size depend on bitrate and review the time it should average over.
-	//       Right now its 1.13 seconds for 44.1KHz
-	//       Right now its 1.04 seconds for 48.0KHz
+	//       Right now its 0.28 seconds for 44.1KHz
+	//       Right now its 0.26 seconds for 48.0KHz
 	
 	float in = inputs[AC_INPUT].getVoltage()/size;
 	buffer.push(in);
