@@ -172,6 +172,7 @@ px=mm*75.0/25.4=mm*2.95
 
 
 float non_lin_func(float parm);
+float slew(float input, float input_prev, float maxChangePerSec, float dt);
 
 ////////////////////
 // module widgets

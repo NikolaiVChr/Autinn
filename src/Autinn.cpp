@@ -37,6 +37,21 @@ float non_lin_func(float parm) {
 	return a / b;
 }
 
+
+float slew(float input, float input_prev, float maxChangePerSec, float dt) {
+	float delta = input - input_prev;
+
+	if(maxChangePerSec*dt < delta) {
+		delta = maxChangePerSec*dt;
+	}
+	if(-maxChangePerSec*dt > delta) {
+		delta = -maxChangePerSec*dt;
+	}
+	input_prev += delta;
+
+	return input_prev;
+}
+
 void init(rack::Plugin *p) {
 	pluginInstance = p;
 	// The "slug" is the unique identifier for your pluginInstance and must never change after release, so choose wisely.
