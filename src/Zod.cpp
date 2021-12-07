@@ -174,8 +174,8 @@ struct Zod : Module {
 	double toDB(double volt);
 	double toGain(double dB);
 	double smooth(double k, double g_prev, double f);
-	double peak(double x, double TS, double ATp, double RT);
-	double rms(double x, double TS);
+	double peak(double x, double ATp, double RT);
+	double rms(double x);
 	double staticCurve(double rms, double peak, double LT, double LS, double CS, double CT, double CR, 
 					   double NT, double ET, double ES, double ER, double knee);
 	double toExp10(double x, double min, double max);
@@ -190,25 +190,25 @@ struct Zod : Module {
 	dB    = 0.0 dB =  5V
 	dBMin = -70 dB =  0V (curve is asymptotic, but 0.0 is defined in CV input)
 
-	LT = limiter threshold     PARAM dB
-	CT = compressor threshold  PARAM dB
-	ET = expander threshold    PARAM dB
-	NT = noise gate threshold  PARAM dB
+	LT = limiter threshold       PARAM dB
+	CT = compressor threshold    PARAM dB
+	ET = expander threshold      PARAM dB
+	NT = noise gate threshold    PARAM dB
 	AT = attack time parameter          
 	ATp= peak attack time parameter
 	RT = release time parameter
-	TAV= average time parameter
-	TS = sampling interval     Rack controls ms
-	ta = attacktime in ms      PARAM ms
-	tr = releasetime in ms     PARAM ms
-	t_M = averagetime in ms    PARAM (5-130ms)
-	T_A = time constant        Did I plan to use TS in seconds?
+	TAV= RMS window time parameter
+	TS = sampling interval       Rack controls ms
+	ta = attacktime in ms        PARAM ms
+	tr = releasetime in ms       PARAM ms
+	t_M = RMS window time in ms  PARAM (5-130ms)
+	T_A = time constant          Did I plan to use TS in seconds?
 	CS = compressor slope
 	ES = expander slope
 	NS = noise slope
-	R  = ratio                 PARAM (one for each)
-	D  = delay in samples
-	X/Y=in/out-put             dB
+	R  = ratio                   PARAM (one for each)
+	D  = lookahead time in samples
+	X/Y=in/out-put               dB
 	f  = control parameter
 	k  = filter coefficient
 
@@ -256,7 +256,9 @@ struct Zod : Module {
 	      Could some of the doubles be floats instead? I should have made more notes about my tests and considerations when I made it.
 	      Since max samplerate in Rack has increased, D can cause:
 	      		unsigned(768000Hz * 350 * 0.001) x bytes = 268800 x 4 = 1075200B [Its big, but doable]
-
+		  Seperate lookahead time from RMS window time (5 to 130ms) and make lookahead fixed.
+		  Auto makeupgain
+		  Auto release
 
 
 
@@ -280,7 +282,6 @@ struct Zod : Module {
 */
 
 
-
 void Zod::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
@@ -297,22 +298,22 @@ void Zod::process(const ProcessArgs &args) {
 
 	if (inputs[N_INPUT].isConnected()) {
 		if (inputs[N_INPUT].getVoltage() == 0.0f) NT = THRESHOLD_LIMIT_LOW_DB;
-		else NT = this->toDB(abs(inputs[N_INPUT].getVoltage()));
+		else NT = this->toDB(fabs(inputs[N_INPUT].getVoltage()));
 		params[T_NOISEGATE_PARAM].setValue(NT);
 	}
 	if (inputs[E_INPUT].isConnected()) {
 		if (inputs[E_INPUT].getVoltage() == 0.0f) ET = THRESHOLD_LIMIT_LOW_DB;
-		else ET = this->toDB(abs(inputs[E_INPUT].getVoltage()));
+		else ET = this->toDB(fabs(inputs[E_INPUT].getVoltage()));
 		params[T_EXPANDER_PARAM].setValue(ET);
 	}
 	if (inputs[C_INPUT].isConnected()) {
 		if (inputs[C_INPUT].getVoltage() == 0.0f) CT = THRESHOLD_LIMIT_LOW_DB;
-		else CT = this->toDB(abs(inputs[C_INPUT].getVoltage()));
+		else CT = this->toDB(fabs(inputs[C_INPUT].getVoltage()));
 		params[T_COMPRESSOR_PARAM].setValue(CT);
 	}
 	if (inputs[L_INPUT].isConnected()) {
 		if (inputs[L_INPUT].getVoltage() == 0.0f) LT = THRESHOLD_LIMIT_LOW_DB;
-		else LT = this->toDB(abs(inputs[L_INPUT].getVoltage()));
+		else LT = this->toDB(fabs(inputs[L_INPUT].getVoltage()));
 		params[T_LIMITER_PARAM].setValue(LT);
 	}
 
@@ -373,8 +374,8 @@ void Zod::process(const ProcessArgs &args) {
 	double LS = 1.0;
 
 	// level measurement:
-	double peak = this->peak(stereo, TS, ATp, RT);
-	double rms  = this->rms(stereo, TS);
+	double peak = this->peak(stereo, ATp, RT);
+	double rms  = this->rms(stereo);
 
 	// static curve:
 	double f = this->staticCurve(rms, peak, LT, LS, CS, CT, CR, NT, ET, ES, ER, knee);
@@ -512,14 +513,14 @@ double Zod::staticCurve(double rms, double peak, double LT, double LS, double CS
 	return toGain(G);
 }
 
-double Zod::rms(double x, double TS) {
+double Zod::rms(double x) {
 	double rms2 = (1.0 - TAV) * rms2_prev + TAV * x * x;
 	rms2_prev = rms2;
 	return rms2;
 }
 
-double Zod::peak(double x, double TS, double ATp, double RT) {
-	double xAbs = abs(x);
+double Zod::peak(double x, double ATp, double RT) {
+	double xAbs = fabs(x);
 	if (xAbs > peak_prev) {
 		return (1.0 - ATp) * peak_prev + ATp * xAbs;
 	}
