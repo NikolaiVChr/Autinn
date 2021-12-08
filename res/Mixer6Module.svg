@@ -5,6 +5,7 @@
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    width="480"
@@ -18,6 +19,18 @@
      id="title4816">Autinn Amp</title>
   <defs
      id="defs2">
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient3397">
+      <stop
+         style="stop-color:#394000;stop-opacity:1"
+         offset="0"
+         id="stop3401" />
+      <stop
+         style="stop-color:#202020;stop-opacity:1"
+         offset="1"
+         id="stop3403" />
+    </linearGradient>
     <rect
        x="12.356802"
        y="202.70614"
@@ -34,6 +47,16 @@
        id="path-effect2944"
        is_visible="true"
        lpeversion="0" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient3397"
+       id="linearGradient3399"
+       x1="-92.088181"
+       y1="94.557854"
+       x2="110.8993"
+       y2="294.63858"
+       gradientUnits="userSpaceOnUse"
+       spreadMethod="pad" />
   </defs>
   <sodipodi:namedview
      id="base"
@@ -42,9 +65,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="10.780066"
-     inkscape:cx="411.09511"
-     inkscape:cy="354.95431"
+     inkscape:zoom="1.3475083"
+     inkscape:cx="240.96794"
+     inkscape:cy="183.02782"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="true"
@@ -60,14 +83,16 @@
      inkscape:window-maximized="1"
      inkscape:snap-grids="true"
      inkscape:snap-to-guides="false"
-     inkscape:snap-global="false"
+     inkscape:snap-global="true"
      inkscape:pagecheckerboard="true"
      inkscape:snap-nodes="false"
      inkscape:snap-others="false"
-     inkscape:document-rotation="0">
+     inkscape:document-rotation="0"
+     showguides="true">
     <inkscape:grid
        type="xygrid"
-       id="grid4367" />
+       id="grid4367"
+       visible="true" />
   </sodipodi:namedview>
   <metadata
      id="metadata5">
@@ -88,7 +113,7 @@
      transform="translate(0,-196.45832)"
      style="display:inline">
     <path
-       style="opacity:1;vector-effect:none;fill:#202020;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1.12254;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal"
+       style="opacity:1;vector-effect:none;fill:url(#linearGradient3399);fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1.12262715;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal"
        d="M 0,196.45831 H 127.00001 V 296.99999 H 0 Z"
        id="rect817"
        inkscape:connector-curvature="0" />
@@ -1444,5 +1469,20 @@
          style="font-size:2.46944px;fill:#ffffff;stroke-width:0.264583"
          id="path959" />
     </g>
+    <path
+       style="fill:none;stroke:#5e5e5e;stroke-width:0.264112px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 100.54254,256.4374 21.16492,-0.13884"
+       id="path3406"
+       sodipodi:nodetypes="cc" />
+    <path
+       style="fill:none;stroke:#5e5e5e;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 2.4991285,280.87332 H 98.715574"
+       id="path3408"
+       sodipodi:nodetypes="cc" />
+    <path
+       style="display:inline;fill:none;stroke:#5e5e5e;stroke-width:0.264111px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 100.54256,227.90568 21.16491,-0.13884"
+       id="path3406-2"
+       sodipodi:nodetypes="cc" />
   </g>
 </svg>
