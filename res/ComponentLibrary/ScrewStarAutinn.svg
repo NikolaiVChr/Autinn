@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
 <svg
    xmlns:dc="http://purl.org/dc/elements/1.1/"
    xmlns:cc="http://creativecommons.org/ns#"
@@ -15,12 +13,36 @@
    viewBox="0 0 3.9687497 3.9684593"
    version="1.1"
    id="svg18800"
-   inkscape:version="0.92.3 (2405546, 2018-03-11)"
+   inkscape:version="1.0.2 (e86c870879, 2021-01-15, custom)"
    sodipodi:docname="ScrewStarAutinn.svg">
   <title
      id="title5649">Autinn Screw</title>
   <defs
      id="defs18794">
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient4043">
+      <stop
+         style="stop-color:#6e6e6e;stop-opacity:1"
+         offset="0"
+         id="stop4039" />
+      <stop
+         style="stop-color:#7c7c7c;stop-opacity:1"
+         offset="1"
+         id="stop4041" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient4027">
+      <stop
+         style="stop-color:#7a7a7a;stop-opacity:1"
+         offset="0"
+         id="stop4023" />
+      <stop
+         style="stop-color:#c5d6d9;stop-opacity:1"
+         offset="1"
+         id="stop4025" />
+    </linearGradient>
     <linearGradient
        inkscape:collect="always"
        id="linearGradient827">
@@ -41,7 +63,27 @@
        y1="69.222267"
        x2="32.737617"
        y2="68.440735"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(1.02465,0,0,1.02465,-0.7917785,-1.7021335)" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4027"
+       id="linearGradient4029"
+       x1="32.138424"
+       y1="70.785309"
+       x2="32.130005"
+       y2="67.08828"
        gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4043"
+       id="linearGradient4045"
+       x1="32.108253"
+       y1="68.281097"
+       x2="32.139221"
+       y2="69.583481"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(0.891,0,0,0.891,3.5013961,7.5294071)" />
   </defs>
   <sodipodi:namedview
      id="base"
@@ -50,9 +92,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="56.537478"
-     inkscape:cx="4.3958639"
-     inkscape:cy="7.4994502"
+     inkscape:zoom="3.5335924"
+     inkscape:cx="-21.007044"
+     inkscape:cy="14.884522"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -66,7 +108,9 @@
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
      units="px"
-     inkscape:snap-page="true" />
+     inkscape:snap-page="true"
+     inkscape:document-rotation="0"
+     inkscape:snap-bbox="false" />
   <metadata
      id="metadata18797">
     <rdf:RDF>
@@ -85,7 +129,7 @@
      id="layer1"
      transform="translate(-30.138143,-67.088277)">
     <ellipse
-       style="fill:#808080;fill-opacity:1;stroke-width:0.36485332"
+       style="fill:url(#linearGradient4029);fill-opacity:1;stroke-width:0.36485332"
        id="path5641"
        cx="32.122517"
        cy="69.07251"
@@ -93,20 +137,20 @@
        ry="1.7176378" />
     <path
        sodipodi:type="star"
-       style="fill:url(#linearGradient829);fill-opacity:1;stroke-width:0.26458332"
+       style="fill:url(#linearGradient829);fill-opacity:1;stroke:url(#linearGradient4045);stroke-width:0.040095;stroke-linejoin:bevel;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
        id="path5647"
        sodipodi:sides="5"
-       sodipodi:cx="32.128066"
-       sodipodi:cy="69.139328"
-       sodipodi:r1="0.75522071"
-       sodipodi:r2="0.37761036"
+       sodipodi:cx="32.128242"
+       sodipodi:cy="69.141487"
+       sodipodi:r1="0.77383691"
+       sodipodi:r2="0.38691843"
        sodipodi:arg1="0.91870252"
        sodipodi:arg2="1.547021"
        inkscape:flatsided="false"
        inkscape:rounded="0"
        inkscape:randomized="0"
-       d="m 32.586374,69.739589 -0.44933,-0.222757 -0.438234,0.243863 0.073,-0.496174 -0.36735,-0.341428 0.494449,-0.08389 0.2112,-0.454877 0.232583,0.444324 0.497878,0.0603 -0.350706,0.358502 z"
-       inkscape:transform-center-x="0.0055480791"
-       inkscape:transform-center-y="-0.066820287" />
+       d="m 32.597847,69.756544 -0.460406,-0.228248 -0.449037,0.249875 0.0748,-0.508405 -0.376405,-0.349844 0.506637,-0.08596 0.216406,-0.46609 0.238316,0.455276 0.51015,0.06179 -0.35935,0.36734 z"
+       inkscape:transform-center-x="0.0056876273"
+       inkscape:transform-center-y="-0.068459157" />
   </g>
 </svg>
