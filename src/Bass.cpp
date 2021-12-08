@@ -1,7 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-//#include "dsp/digital.hpp"
-//#include "dsp/resampler.hpp"
 #include <iostream>
 #include <string>
 
@@ -49,8 +47,6 @@
 #define SATURATION_VOLT 12.0f // Not used, users should show discipline and not input too high OSC tone voltages.
 #define ACCENT_KNOB_MINIMUM 0.25f // makes no sense to have it at 0.0 then what is the point of accent..
 #define RESONANCE_MAX 1.25f
-#define SLEW_MIN 20.0f // v/s          (resonance at max)
-#define SLEW_MAX 333.333f //        3ms attack  (resonance at min)
 #define INPUT_TO_CAPACITOR 0.05f
 #define VCV_TO_MOOG 0.18f
 #define EXPECTED_PEAK_INPUT 7.0f // Do not input larger OSC tones, or accented notes might start hard clipping.
@@ -172,7 +168,6 @@ struct Bass : Module {
 	float accentAttackPeak = 0.0f;
 
 	long int noteSteps = 0;
-	float slew_last = 0.0f;
 	
 	
 	//int counter = 17;
@@ -232,7 +227,6 @@ struct Bass : Module {
 	float accentAttackCurve(float x);
 	float accentAttackCurveInverse(float y);
 	float toExp(float x, float min, float max);
-	float slew(float input, float resonance);
 	float accent_env(bool gate, float note, bool accent, float knob_accent);
 	void process(const ProcessArgs &args) override;
 	void vca_lights(float attack, float sustain, float decay, float end);
@@ -376,7 +370,6 @@ void Bass::process(const ProcessArgs &args) {
 
 	float cutoff_env_norm = this->filter_env(gate, note, knob_env_decay, accent, clamp(resonance, 0.0f, 1.0f), knob_accent);//params[DECAY3_PARAM].getValue()
 	
-	//accent_envelope = this->slew(accent_envelope, clamp(resonance, 0.0f, 1.0f));
 
 	float vca_env;
 
@@ -460,23 +453,6 @@ float Bass::toExp(float x, float min, float max) {
 	return min * exp( x*log(max/min) );
 }
 
-float Bass::slew(float input, float resonance) {
-	// Not used atm.
-	float dt = APP->engine->getSampleTime();
-	float delta = input - slew_last;
-
-	float slew_max = SLEW_MAX-(SLEW_MAX-SLEW_MIN)*resonance;
-
-	if(slew_max*dt < delta) {
-		delta = slew_max*dt;
-	}
-	if(-slew_max*dt > delta) {
-		delta = -slew_max*dt;
-	}
-	slew_last += delta;
-
-	return slew_last;
-}
 
 float Bass::accent_env(bool gate, float note, bool accent, float knob_accent) {
 	// This method is not used atm. Does not simulate the accent envelope which is a modified vcf envelope good enough.
@@ -540,26 +516,30 @@ float Bass::vca_env(bool gate, float note,  float resonance, float knob_accent) 
 		mode_vca = 3;
 	}
 
-	if (mode_vca == 0) {//attack
-		level = current_vca+factor_vca;
-		current_vca = level;
-		this->vca_lights(1,0,0,0);
-	} else if (mode_vca == 1) {//decay
-		if (DECAY_VCA_EXP) {
-			level = current_vca*factor_vca;
-		} else {
+	switch (mode_vca) {
+		case 0: //attack
+			level = current_vca+factor_vca;
+			current_vca = level;
+			this->vca_lights(1,0,0,0);
+			break;
+		case 1: //decay
+			if (DECAY_VCA_EXP) {
+				level = current_vca*factor_vca;
+			} else {
+				level = current_vca-factor_vca;
+			}
+			current_vca = level;
+			this->vca_lights(0,0,level,0);
+			break;
+		case 2: //end note
 			level = current_vca-factor_vca;
-		}
-		current_vca = level;
-		this->vca_lights(0,0,level,0);
-	} else if (mode_vca == 2) {//end note
-		level = current_vca-factor_vca;
-		current_vca = level;
-		this->vca_lights(0,0,0,clamp(1-level,0.0f,1.0f));
-	} else {// silence
-		level = 0.0f;
-		current_vca = minimum;
-		this->vca_lights(0,0,0,1);
+			current_vca = level;
+			this->vca_lights(0,0,0,clamp(1-level,0.0f,1.0f));
+			break;
+		default:
+			level = 0.0f;
+			current_vca = minimum;
+			this->vca_lights(0,0,0,1);
 	}
 	return level;
 }
@@ -606,28 +586,33 @@ float Bass::vca_env_acc(bool gate, float note,  float resonance, float knob_acce
 
 	// when switch to any accent timing, make sure no divide by zero (target_vca) due to switching method
 
-	if (mode_vca == 0) {//attack
-		float fraction = target_vca==0?1.0f:float(number_vca)/float(target_vca);
-		level = this->accentAttackCurve(fraction) * attack_vca_accent_peak;
-		current_vca = level;
-		this->vca_lights(1,0,0,0);
-	} else if (mode_vca == 1) {//peak
-		level = attack_vca_accent_peak;
-		current_vca = level;
-		this->vca_lights(0,1,0,0);
-	} else if (mode_vca == 2) {//decay
-		float fraction = float(number_vca)/float(target_vca);
-		level = attack_vca_accent_peak * powf(1.0f+fraction*2.0f,-fraction*6.0f);
-		current_vca = level;
-		this->vca_lights(0,0,level,0);
-	} else if (mode_vca == 3) {//end note
-		level = current_vca-factor_vca;
-		current_vca = level;
-		this->vca_lights(0,0,0,clamp(1-level,0.0f,1.0f));
-	} else {// silence
-		level = 0.0f;
-		current_vca = minimum;
-		this->vca_lights(0,0,0,1);
+	switch (mode_vca) {
+		case 0: //attack
+			float fraction = target_vca==0?1.0f:float(number_vca)/float(target_vca);
+			level = this->accentAttackCurve(fraction) * attack_vca_accent_peak;
+			current_vca = level;
+			this->vca_lights(1,0,0,0);
+			break;
+		case 1: //peak
+			level = attack_vca_accent_peak;
+			current_vca = level;
+			this->vca_lights(0,1,0,0);
+			break;
+		case 2: //decay
+			float fraction = float(number_vca)/float(target_vca);
+			level = attack_vca_accent_peak * powf(1.0f+fraction*2.0f,-fraction*6.0f);
+			current_vca = level;
+			this->vca_lights(0,0,level,0);
+			break;
+		case 3: //end note
+			level = current_vca-factor_vca;
+			current_vca = level;
+			this->vca_lights(0,0,0,clamp(1-level,0.0f,1.0f));
+			break;
+		default: // silence
+			level = 0.0f;
+			current_vca = minimum;
+			this->vca_lights(0,0,0,1);
 	}
 	return level;
 }
@@ -703,55 +688,59 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 		}
 	}
 
-	if (mode_cutoff == 0) {//attack
-		if (accentBool) {
-			float fraction = target_cutoff==0?1.0f:float(number_cutoff)/float(target_cutoff);
-			level = this->accentAttackCurve(fraction) * (accentAttackPeak - accentAttackBase) + accentAttackBase;
-		} else {
-			level = 1.0f;//instant
-		}
-		
-		current_cutoff = level;
-		
-		this->vcf_lights(1,0,0,0);
-	} else if (mode_cutoff == 1) {//peak
-		level = current_cutoff;
-		this->vcf_lights(0,1,0,0);
-	} else if (mode_cutoff == 2) {//decay
-		if(accentBool) {
-			float fraction = float(number_cutoff)/float(target_cutoff);
-			level = accentAttackPeak * powf(1.0f+fraction*2.0f,-fraction*2.0f);
-		} else {
-			if (DECAY_VCF_EXP) {
-				level = current_cutoff*factor_cutoff;
+	switch (mode_cutoff) {
+		case 0: //attack
+			if (accentBool) {
+				float fraction = target_cutoff==0?1.0f:float(number_cutoff)/float(target_cutoff);
+				level = this->accentAttackCurve(fraction) * (accentAttackPeak - accentAttackBase) + accentAttackBase;
 			} else {
-				level = current_cutoff-factor_cutoff;
+				level = 1.0f;//instant
 			}
-		}
-		current_cutoff = level;
-		this->vcf_lights(0,0,level,0);
-	} else {
-		level = 0.0f;
-		current_cutoff = minimum;
-		number_cutoff = 0;
-		target_cutoff = 0;
-		this->vcf_lights(0,0,0,1);
+			
+			current_cutoff = level;
+			
+			this->vcf_lights(1,0,0,0);
+			break;
+		case 1: //peak
+			level = current_cutoff;
+			this->vcf_lights(0,1,0,0);
+			break;
+		case 2: //decay
+			if(accentBool) {
+				float fraction = float(number_cutoff)/float(target_cutoff);
+				level = accentAttackPeak * powf(1.0f+fraction*2.0f,-fraction*2.0f);
+			} else {
+				if (DECAY_VCF_EXP) {
+					level = current_cutoff*factor_cutoff;
+				} else {
+					level = current_cutoff-factor_cutoff;
+				}
+			}
+			current_cutoff = level;
+			this->vcf_lights(0,0,level,0);
+			break;
+		default:
+			level = 0.0f;
+			current_cutoff = minimum;
+			number_cutoff = 0;
+			target_cutoff = 0;
+			this->vcf_lights(0,0,0,1);
 	}
 	return level;
 }
 
 void Bass::vca_lights(float attack, float sustain, float decay, float end) {
-	lights[A_LIGHT].value = clamp(attack, 0.0f, 1.0f);
-	lights[B_LIGHT].value = clamp(sustain, 0.0f, 1.0f);
-	lights[C_LIGHT].value = clamp(decay, 0.0f, 1.0f);
-	lights[D_LIGHT].value = clamp(end, 0.0f, 1.0f);
+	lights[A_LIGHT].value = attack;
+	lights[B_LIGHT].value = sustain;
+	lights[C_LIGHT].value = decay;
+	lights[D_LIGHT].value = end;
 }
 
 void Bass::vcf_lights(float attack, float sustain, float decay, float end) {
-	lights[A2_LIGHT].value = clamp(attack, 0.0f, 1.0f);
-	lights[B2_LIGHT].value = clamp(sustain, 0.0f, 1.0f);
-	lights[C2_LIGHT].value = clamp(decay, 0.0f, 1.0f);
-	lights[D2_LIGHT].value = clamp(end, 0.0f, 1.0f);
+	lights[A2_LIGHT].value = attack;
+	lights[B2_LIGHT].value = sustain;
+	lights[C2_LIGHT].value = decay;
+	lights[D2_LIGHT].value = end;
 }
 
 float Bass::acid_filter(float in, float r, float F_c, int oversample_protected) {// from diagram of resonance of TB-303
