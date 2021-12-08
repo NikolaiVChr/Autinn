@@ -594,12 +594,12 @@ struct NonWidget : ModuleWidget {
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.20 - HALF_KNOB_MED, 75), module, Non::T_NOISEGATE_PARAM));
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.40 - HALF_KNOB_MED, 75), module, Non::T_EXPANDER_PARAM));
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.60 - HALF_KNOB_MED, 75), module, Non::T_COMPRESSOR_PARAM));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.20 - HALF_KNOB_MED, 75), module, Non::T_LIMITER_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.25 - HALF_KNOB_MED, 75), module, Non::T_LIMITER_PARAM));
 
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.20 - HALF_KNOB_MED, 135), module, Non::AVERAGE_TIME_PARAM));
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.40 - HALF_KNOB_MED, 135), module, Non::ATTACK_PARAM));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.80 - HALF_KNOB_MED, 135), module, Non::RELEASE_PARAM));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.50 - HALF_KNOB_MED, 135), module, Non::ATTACK_PEAK_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.75 - HALF_KNOB_MED, 135), module, Non::RELEASE_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(10 * RACK_GRID_WIDTH * 0.25 - HALF_KNOB_MED, 135), module, Non::ATTACK_PEAK_PARAM));
 
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.235 - HALF_KNOB_MED, 200), module, Non::RATIO_EXPANDER_PARAM));
 		//addParam(createParam<RoundMediumAutinnKnob>(Vec(16 * RACK_GRID_WIDTH * 0.48 - HALF_KNOB_MED, 200), module, Non::RATIO_COMPRESSOR_PARAM));
@@ -615,7 +615,7 @@ struct NonWidget : ModuleWidget {
 		//addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH * 0.55 - HALF_PORT, 305), module, Non::N_INPUT));
 		//addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH * 0.65 - HALF_PORT, 305), module, Non::E_INPUT));
 		//addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH * 0.75 - HALF_PORT, 305), module, Non::C_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH * 0.35 - HALF_PORT, 75 - HALF_PORT + HALF_KNOB_MED), module, Non::L_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10 * RACK_GRID_WIDTH * 0.50 - HALF_PORT, 75 - HALF_PORT + HALF_KNOB_MED), module, Non::L_INPUT));
 
 		addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH * 0.15 - HALF_PORT, 325), module, Non::SIDE_LEFT_INPUT));
 		addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH * 0.30 - HALF_PORT, 325), module, Non::SIDE_RIGHT_INPUT));

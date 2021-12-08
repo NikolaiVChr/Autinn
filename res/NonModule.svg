@@ -51,9 +51,9 @@
      showgrid="true"
      inkscape:current-layer="svg8"
      inkscape:document-units="px"
-     inkscape:cy="153.0959"
-     inkscape:cx="142.38607"
-     inkscape:zoom="1.7469715"
+     inkscape:cy="95.377458"
+     inkscape:cx="64.606666"
+     inkscape:zoom="6.987886"
      inkscape:pageshadow="2"
      inkscape:pageopacity="0.0"
      borderopacity="1.0"
@@ -267,7 +267,7 @@
      aria-label="ATTACK"
      style="font-style:normal;font-variant:normal;font-weight:500;font-stretch:normal;font-size:2.11667px;line-height:1.25;font-family:OldSansBlack;-inkscape-font-specification:'OldSansBlack, Medium';font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:0px;word-spacing:0px;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;opacity:1;vector-effect:none;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.264583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
      id="text1025"
-     transform="translate(-5.5314009)">
+     transform="translate(-16.242748)">
     <path
        d="m 22.65254,35.015269 h 0.340783 L 22.54459,33.438352 h -0.397933 l -0.455084,1.576917 h 0.338667 l 0.09102,-0.3302 h 0.446616 z m -0.302683,-1.176867 0.143933,0.5588 h -0.296333 z"
        style="stroke-width:0.264583"
@@ -402,7 +402,7 @@
      aria-label="THRESHOLDS"
      style="font-style:normal;font-variant:normal;font-weight:500;font-stretch:normal;font-size:2.11667px;line-height:1.25;font-family:OldSansBlack;-inkscape-font-specification:'OldSansBlack, Medium';font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:0px;word-spacing:0px;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;opacity:1;vector-effect:none;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.264583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
      id="text1095"
-     transform="translate(0.30290517,2.3853782)">
+     transform="translate(-1.3630732,2.3853782)">
     <path
        d="m 7.3702331,13.125186 h 0.40005 V 12.835203 H 6.6357497 v 0.289983 H 7.033683 v 1.284817 h 0.3365501 z"
        style="font-size:2.11667px;stroke-width:0.264583"
@@ -444,7 +444,7 @@
      aria-label="RELEASE"
      style="font-style:normal;font-variant:normal;font-weight:500;font-stretch:normal;font-size:2.11667px;line-height:1.25;font-family:OldSansBlack;-inkscape-font-specification:'OldSansBlack, Medium';font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-feature-settings:normal;text-indent:0;text-align:start;text-decoration:none;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:0px;word-spacing:0px;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:start;white-space:normal;shape-padding:0;vector-effect:none;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.264583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
      id="text1029"
-     transform="translate(-5.417192,0.01480127)">
+     transform="translate(-8.1559419,0.01480127)">
     <path
        d="m 34.480825,35.005164 h 0.376767 l -0.3429,-0.692151 q 0.131233,-0.04657 0.201083,-0.148166 0.07197,-0.103717 0.07197,-0.243417 0,-0.12065 -0.0381,-0.211667 -0.03598,-0.09313 -0.103717,-0.154516 -0.06562,-0.06138 -0.160867,-0.09313 -0.09525,-0.03175 -0.211666,-0.03175 h -0.632884 v 1.574801 h 0.33655 v -0.622301 h 0.2159 z m -0.09102,-1.242484 q 0.02752,0.02328 0.04233,0.06138 0.01482,0.0381 0.01482,0.09313 0,0.06138 -0.02328,0.09737 -0.02328,0.03598 -0.06138,0.05503 -0.0381,0.01905 -0.08678,0.0254 -0.04868,0.0042 -0.09737,0.0042 h -0.201084 v -0.385233 h 0.23495 q 0.122767,0 0.1778,0.04868 z"
        style="stroke-width:0.264583"
