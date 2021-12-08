@@ -517,12 +517,12 @@ float Bass::vca_env(bool gate, float note,  float resonance, float knob_accent) 
 	}
 
 	switch (mode_vca) {
-		case 0: //attack
+		case 0: {//attack
 			level = current_vca+factor_vca;
 			current_vca = level;
 			this->vca_lights(1,0,0,0);
 			break;
-		case 1: //decay
+		} case 1: { //decay
 			if (DECAY_VCA_EXP) {
 				level = current_vca*factor_vca;
 			} else {
@@ -531,15 +531,16 @@ float Bass::vca_env(bool gate, float note,  float resonance, float knob_accent) 
 			current_vca = level;
 			this->vca_lights(0,0,level,0);
 			break;
-		case 2: //end note
+		} case 2: { //end note
 			level = current_vca-factor_vca;
 			current_vca = level;
 			this->vca_lights(0,0,0,clamp(1-level,0.0f,1.0f));
 			break;
-		default:
+		} default: {
 			level = 0.0f;
 			current_vca = minimum;
 			this->vca_lights(0,0,0,1);
+		}
 	}
 	return level;
 }
@@ -587,32 +588,33 @@ float Bass::vca_env_acc(bool gate, float note,  float resonance, float knob_acce
 	// when switch to any accent timing, make sure no divide by zero (target_vca) due to switching method
 
 	switch (mode_vca) {
-		case 0: //attack
+		case 0: {//attack
 			float fraction = target_vca==0?1.0f:float(number_vca)/float(target_vca);
 			level = this->accentAttackCurve(fraction) * attack_vca_accent_peak;
 			current_vca = level;
 			this->vca_lights(1,0,0,0);
 			break;
-		case 1: //peak
+		} case 1: { //peak
 			level = attack_vca_accent_peak;
 			current_vca = level;
 			this->vca_lights(0,1,0,0);
 			break;
-		case 2: //decay
+		} case 2: { //decay
 			float fraction = float(number_vca)/float(target_vca);
 			level = attack_vca_accent_peak * powf(1.0f+fraction*2.0f,-fraction*6.0f);
 			current_vca = level;
 			this->vca_lights(0,0,level,0);
 			break;
-		case 3: //end note
+		} case 3: { //end note
 			level = current_vca-factor_vca;
 			current_vca = level;
 			this->vca_lights(0,0,0,clamp(1-level,0.0f,1.0f));
 			break;
-		default: // silence
+		} default: { // silence
 			level = 0.0f;
 			current_vca = minimum;
 			this->vca_lights(0,0,0,1);
+		}
 	}
 	return level;
 }
@@ -689,7 +691,7 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 	}
 
 	switch (mode_cutoff) {
-		case 0: //attack
+		case 0: { //attack
 			if (accentBool) {
 				float fraction = target_cutoff==0?1.0f:float(number_cutoff)/float(target_cutoff);
 				level = this->accentAttackCurve(fraction) * (accentAttackPeak - accentAttackBase) + accentAttackBase;
@@ -701,11 +703,11 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 			
 			this->vcf_lights(1,0,0,0);
 			break;
-		case 1: //peak
+		} case 1: { //peak
 			level = current_cutoff;
 			this->vcf_lights(0,1,0,0);
 			break;
-		case 2: //decay
+		} case 2: { //decay
 			if(accentBool) {
 				float fraction = float(number_cutoff)/float(target_cutoff);
 				level = accentAttackPeak * powf(1.0f+fraction*2.0f,-fraction*2.0f);
@@ -719,12 +721,13 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 			current_cutoff = level;
 			this->vcf_lights(0,0,level,0);
 			break;
-		default:
+		} default: {
 			level = 0.0f;
 			current_cutoff = minimum;
 			number_cutoff = 0;
 			target_cutoff = 0;
 			this->vcf_lights(0,0,0,1);
+		}
 	}
 	return level;
 }
