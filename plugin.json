@@ -1,7 +1,7 @@
 {
   "slug": "Autinn",
   "name": "Autinn",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "license": "GPL-3.0-or-later",
   "brand": "Autinn",
   "author": "Nikolai V. Chr.",
@@ -194,6 +194,24 @@
         "Limiter",
         "Dynamics",
         "Dual"
+      ]
+    },
+    {
+      "slug": "Overdrive",
+      "name": "Rat",
+      "description": "Gnaw and bites at audio (Overdrive)",
+      "tags": [
+        "Effect",
+        "Distortion"
+      ]
+    },
+    {
+      "slug": "Distortion",
+      "name": "Cat",
+      "description": "Toys with audio (Distortion)",
+      "tags": [
+        "Effect",
+        "Distortion"
       ]
     }
   ]

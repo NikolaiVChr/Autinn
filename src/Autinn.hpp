@@ -172,6 +172,7 @@ px=mm*75.0/25.4=mm*2.95
 
 
 float non_lin_func(float parm);
+float non_lin_func2(float parm);//sinh
 float slew(float input, float input_prev, float maxChangePerSec, float dt);
 
 ////////////////////
@@ -201,3 +202,5 @@ extern Model *modelZod;
 extern Model *modelTriBand;
 extern Model *modelMixer6;
 extern Model *modelNon;
+extern Model *modelRat;
+extern Model *modelCat;

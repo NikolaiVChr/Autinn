@@ -37,6 +37,9 @@ float non_lin_func(float parm) {
 	return a / b;
 }
 
+float non_lin_func2(float parm) {
+	return 2.0f * (exp(parm)-exp(-parm));
+}
 
 float slew(float input, float input_prev, float maxChangePerSec, float dt) {
 	float delta = input - input_prev;
@@ -88,4 +91,6 @@ void init(rack::Plugin *p) {
 	p->addModel(modelTriBand);
 	p->addModel(modelMixer6);
 	p->addModel(modelNon);
+	p->addModel(modelRat);
+	p->addModel(modelCat);
 }
