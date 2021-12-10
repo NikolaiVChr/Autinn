@@ -43,9 +43,9 @@ struct CVConverter : Module {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configBypass(FIVE_INPUT, FIVE_OUTPUT);
 		configBypass(TEN_INPUT, TEN_OUTPUT);
-		configInput(FIVE_INPUT, "+/- 5V CV");
+		configInput(FIVE_INPUT, "±5V CV");
 		configInput(TEN_INPUT, "0V to 10V CV");
-		configOutput(FIVE_OUTPUT, "+/- 5V CV");
+		configOutput(FIVE_OUTPUT, "±5V CV");
 		configOutput(TEN_OUTPUT, "0V to 10V CV");
 	}
 
