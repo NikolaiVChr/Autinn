@@ -91,6 +91,6 @@ void init(rack::Plugin *p) {
 	p->addModel(modelTriBand);
 	p->addModel(modelMixer6);
 	p->addModel(modelNon);
-	p->addModel(modelRat);
-	p->addModel(modelCat);
+	p->addModel(modelFil);
+	p->addModel(modelNap);
 }

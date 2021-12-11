@@ -202,5 +202,5 @@ extern Model *modelZod;
 extern Model *modelTriBand;
 extern Model *modelMixer6;
 extern Model *modelNon;
-extern Model *modelRat;
-extern Model *modelCat;
+extern Model *modelFil;
+extern Model *modelNap;

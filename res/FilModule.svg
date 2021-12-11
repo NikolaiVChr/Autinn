@@ -13,9 +13,9 @@
    version="1.1"
    id="svg8"
    inkscape:version="1.0.2 (e86c870879, 2021-01-15, custom)"
-   sodipodi:docname="RatModule.svg">
+   sodipodi:docname="FilModule.svg">
   <title
-     id="title4816">Autinn Rat</title>
+     id="title4816">Autinn Fil</title>
   <defs
      id="defs2">
     <inkscape:path-effect
@@ -34,9 +34,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="1.3475083"
-     inkscape:cx="-82.938052"
-     inkscape:cy="169.47112"
+     inkscape:zoom="7.622658"
+     inkscape:cx="-15.629935"
+     inkscape:cy="58.200393"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="true"
@@ -69,7 +69,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title>Autinn Rat</dc:title>
+        <dc:title>Autinn Fil</dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -161,21 +161,21 @@
          id="path885" />
     </g>
     <g
-       aria-label="RAT"
-       id="text4117"
+       aria-label="FIL"
+       id="text7562"
        style="font-size:4.93889px;line-height:1.25;font-family:OldSansBlack;-inkscape-font-specification:OldSansBlack;stroke-width:0.264583">
       <path
-         d="m 3.7454473,206.74618 h 0.8791224 l -0.8001002,-1.61502 q 0.3062112,-0.10866 0.4691946,-0.34572 0.1679222,-0.24201 0.1679222,-0.56798 0,-0.28151 -0.0889,-0.49388 -0.083961,-0.21732 -0.2420056,-0.36054 -0.1531056,-0.14323 -0.3753556,-0.21731 -0.2222501,-0.0741 -0.493889,-0.0741 H 1.784708 v 3.67454 h 0.7852835 v -1.45204 H 3.0737583 Z M 3.533075,203.84705 q 0.064206,0.0543 0.098778,0.14323 0.034572,0.0889 0.034572,0.21731 0,0.14322 -0.054328,0.22719 -0.054328,0.084 -0.1432278,0.12841 -0.0889,0.0445 -0.2024945,0.0593 -0.1135945,0.01 -0.227189,0.01 H 2.5699915 v -0.89888 h 0.5482168 q 0.2864556,0 0.4148667,0.1136 z"
+         d="m 3.4836868,203.76162 h 1.5952615 v -0.68157 h -2.380545 v 3.67453 h 0.7852835 v -1.5755 l 1.1952114,-0.005 -0.00494,-0.67169 H 3.4836868 Z"
          style="font-size:4.93889px;fill:#ffffff;stroke-width:0.264583"
-         id="path4682" />
+         id="path7564" />
       <path
-         d="M 6.9804194,206.74618 H 7.7755807 L 6.728536,203.0667 H 5.8000247 l -1.0618613,3.67948 h 0.7902224 l 0.2123722,-0.77047 h 1.0421058 z m -0.7062612,-2.74603 0.3358445,1.30387 H 5.9185581 Z"
+         d="m 5.5382637,206.75458 h 0.7902224 v -3.67453 H 5.5382637 Z"
          style="font-size:4.93889px;fill:#ffffff;stroke-width:0.264583"
-         id="path4684" />
+         id="path7566" />
       <path
-         d="m 9.1880926,203.74827 h 0.9334504 v -0.67663 H 7.4742978 v 0.67663 h 0.9285113 v 2.99791 h 0.7852835 z"
+         d="m 6.8717522,206.75458 h 2.336095 v -0.68156 H 7.6570357 v -2.99297 H 6.8717522 Z"
          style="font-size:4.93889px;fill:#ffffff;stroke-width:0.264583"
-         id="path4686" />
+         id="path7568" />
     </g>
   </g>
 </svg>

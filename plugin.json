@@ -198,8 +198,8 @@
     },
     {
       "slug": "Overdrive",
-      "name": "Rat",
-      "description": "Gnaw and bites at audio (Overdrive)",
+      "name": "Fil",
+      "description": "Filing away at audio (Overdrive)",
       "tags": [
         "Effect",
         "Distortion"
@@ -207,8 +207,8 @@
     },
     {
       "slug": "Distortion",
-      "name": "Cat",
-      "description": "Toys with audio (Distortion)",
+      "name": "Nap",
+      "description": "Taking a nap (Distortion)",
       "tags": [
         "Effect",
         "Distortion"

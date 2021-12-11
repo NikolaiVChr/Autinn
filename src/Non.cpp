@@ -465,6 +465,7 @@ void Non::process(const ProcessArgs &args) {
 	vuMeterIn2.process(args.sampleTime, pastR * 0.1f);
 	vuMeterOut.process(args.sampleTime, outL * 0.1f);
 	vuMeterOut2.process(args.sampleTime, outR * 0.1f);
+	//vuMeterOut.mode = dsp::VuMeter2::RMS;
 	for (int v = 0; step == 512 && v < 15; v++) {
 		lights[VU_IN_LEFT_LIGHT + 14 - v].setBrightness(vuMeterIn.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
 		lights[VU_IN_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterIn2.getBrightness(-intervalDB * (v + 1), -intervalDB * v));

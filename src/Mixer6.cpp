@@ -80,7 +80,7 @@ struct Mixer6 : Module {
 	float mid_prev[num_mono_channels];
 	float high_prev[num_mono_channels];
 
-	const float vuMaxDB = 22.5f;
+	const float vuMaxDB = 30.0f;
 	const float intervalDB_FX = vuMaxDB/8.0f;
 	const float intervalDB_main = vuMaxDB/15.0f;
 	dsp::VuMeter2 vuMeterFXA_L;
@@ -201,7 +201,7 @@ void Mixer6::process(const ProcessArgs &args) {
 	vuMeterFXB_R.process(args.sampleTime, fx_return_right_B * 0.1f);
 	vuMeterOut.process(args.sampleTime, main_left * 0.1f);
 	vuMeterOut2.process(args.sampleTime, main_right * 0.1f);
-	//vuMeterOut.mode = dsp::VuMeter2::RMS;
+	
 	for (int v = 0; step == 512 && v < 15; v++) {
 		if (v < 8) {
 			lights[VU_FXA_LEFT_LIGHT + 7 - v].setBrightness(vuMeterFXA_L.getBrightness(-intervalDB_FX * (v + 1), -intervalDB_FX * v));
