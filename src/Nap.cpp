@@ -24,6 +24,8 @@
 // Converted to real-time C++ for VCV Rack from
 // algorithm by Alex Jilkin, who wrote a non-real-time python distortion program.
 
+static const int oversample2 = 2;
+static const int oversample4 = 4;
 
 #define SNORING_MAX 24.0f
 #define SNORING_MIN 1.0f
@@ -66,6 +68,29 @@ struct Nap : Module {
 
 	float out_prev = 0.1f;
 
+	int current_oversample = 2;
+
+	dsp::Upsampler<oversample2, 10> upsampler2;
+	dsp::Decimator<oversample2, 10> decimator2;
+	dsp::Upsampler<oversample4, 10> upsampler4;
+	dsp::Decimator<oversample4, 10> decimator4;
+
+	json_t *dataToJson() override {
+		json_t *root = json_object();
+		json_object_set_new(root, "oversample", json_integer(current_oversample));
+		return root;
+	}
+
+	void dataFromJson(json_t *rootJ) override {
+		json_t *ext3 = json_object_get(rootJ, "oversample");
+		if (ext3) {
+			current_oversample = json_integer_value(ext3);
+			if (current_oversample != 2 and current_oversample != 4) {
+				current_oversample = 4;
+			}
+		}
+	}
+
 	float fwdEuler(float out_prev, float in);
 	float distort(float out_prev, float in);
 	void process(const ProcessArgs &args) override;
@@ -80,18 +105,37 @@ void Nap::process(const ProcessArgs &args) {
 	}
 
 	float pre = inputs[NAP_INPUT].getVoltage() * (params[SNORING_PARAM].getValue() * (SNORING_MAX - SNORING_MIN) + SNORING_MIN);
-	float in = clamp(pre, -4.5f, 4.5f);
-	float out = this->fwdEuler(out_prev, in);
+
+	float inInter [current_oversample];
+	float outBuf  [current_oversample];
+
+	if (current_oversample == oversample2) {
+		upsampler2.process(pre, inInter);
+	} else if (current_oversample == oversample4) {
+		upsampler4.process(pre, inInter);
+	}
+
+	for (int i = 0; i < current_oversample; i++) {
+		float in = clamp(inInter[i], -4.5f, 4.5f);
+		float out = this->fwdEuler(out_prev, in);
+		outBuf[i] = non_lin_func(out/12.0f);
+		out_prev = outBuf[i];
+	}
+	float final;
+	if (current_oversample == oversample2) {
+		final = decimator2.process(outBuf);
+	} else {
+		final = decimator4.process(outBuf);
+	}
+
 	//outputs[NAP_OUTPUT].setChannels(2);
     //outputs[NAP_OUTPUT].setVoltage(pre, 1);
-    outputs[NAP_OUTPUT].setVoltage(non_lin_func(out/12.0f)*12.0f, 0);    
+    outputs[NAP_OUTPUT].setVoltage(final*12.0f, 0);
 
     float pre_abs = fabs(pre);
 	lights[HIGH_LIGHT].value = fmax(0,(pre_abs-18.0f)*4.0f);
 	lights[MID_LIGHT].value = fmax(0,(pre_abs-4.5f)*2.0f);
 	lights[LOW_LIGHT].value = fmax(0,rescale(pre_abs, 0.0f, 4.5f, 1.0f, 0.0f));
-
-    out_prev = out;
 }
 
 float Nap::fwdEuler(float out_prev, float in) {
@@ -101,6 +145,25 @@ float Nap::fwdEuler(float out_prev, float in) {
 float Nap::distort(float out_prev, float in) {
     return (in - out_prev) / 22.0f - 0.504f * non_lin_func2(out_prev / 45.3f);
 }
+
+struct OversampleNapMenuItem : MenuItem {
+	Nap* _module;
+	int _os;
+
+	OversampleNapMenuItem(Nap* module, const char* label, int os)
+	: _module(module), _os(os)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->current_oversample = _os;
+	}
+
+	void step() override {
+		rightText = _module->current_oversample == _os ? "✔" : "";
+	}
+};
 
 struct NapWidget : ModuleWidget {
 	NapWidget(Nap *module) {
@@ -121,6 +184,15 @@ struct NapWidget : ModuleWidget {
 		addChild(createLight<MediumLight<RedLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 65), module, Nap::HIGH_LIGHT));
 		addChild(createLight<MediumLight<GreenLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Nap::MID_LIGHT));
 		addChild(createLight<MediumLight<BlueLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 85), module, Nap::LOW_LIGHT));
+	}
+
+	void appendContextMenu(Menu* menu) override {
+		Nap* a = dynamic_cast<Nap*>(module);
+		assert(a);
+		
+		menu->addChild(new MenuLabel());
+		menu->addChild(new OversampleNapMenuItem(a, "Oversample x2", 2));
+		menu->addChild(new OversampleNapMenuItem(a, "Oversample x4", 4));		
 	}
 };
 

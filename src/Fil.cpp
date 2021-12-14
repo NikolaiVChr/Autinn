@@ -21,6 +21,10 @@
 
 **/
 
+static const int oversample2 = 2;
+static const int oversample4 = 4;
+static const int oversample8 = 8;
+
 #define DRIVE_MAX 10.0f
 #define DRIVE_MIN 0.1f
 
@@ -56,6 +60,31 @@ struct Fil : Module {
 		configLight(LOW_LIGHT, "Hungry, feed me!  ");
 	}
 
+	int current_oversample = 4;
+
+	dsp::Upsampler<oversample2, 10> upsampler2;
+	dsp::Decimator<oversample2, 10> decimator2;
+	dsp::Upsampler<oversample4, 10> upsampler4;
+	dsp::Decimator<oversample4, 10> decimator4;
+	dsp::Upsampler<oversample8, 10> upsampler8;
+	dsp::Decimator<oversample8, 10> decimator8;
+
+	json_t *dataToJson() override {
+		json_t *root = json_object();
+		json_object_set_new(root, "oversample", json_integer(current_oversample));
+		return root;
+	}
+
+	void dataFromJson(json_t *rootJ) override {
+		json_t *ext3 = json_object_get(rootJ, "oversample");
+		if (ext3) {
+			current_oversample = json_integer_value(ext3);
+			if (current_oversample != 2 and current_oversample != 4 and current_oversample != 8) {
+				current_oversample = 4;
+			}
+		}
+	}
+
 	void process(const ProcessArgs &args) override;
 };
 
@@ -70,34 +99,79 @@ void Fil::process(const ProcessArgs &args) {
 	float in = 0.20f * inputs[FIL_INPUT].getVoltage() * (params[DIAL_PARAM].getValue() * (DRIVE_MAX - DRIVE_MIN) + DRIVE_MIN);
 	float out = 0.0f;
 
-	float th=1.0f/3.0f;
-	if (fabs(in) < th) {
-		out = 2.0f*in;
-		lights[LOW_LIGHT].value = fabs(out)/(th*2.0f);
-		lights[MID_LIGHT].value = 0.0f;
-		lights[HIGH_LIGHT].value = 0.0f;
-	} else if (fabs(in) <= 2.0f*th) {
-		if (in > 0.0f) {
-			out = (3.0f-(2.0f-in*3.0f)*(2.0f-in*3.0f))/3.0f;
-		} else {
-		    out = -(3.0f-(2.0f-fabs(in)*3.0f)*(2.0f-fabs(in)*3.0f))/3.0f;
-		}
-		lights[MID_LIGHT].value = (fabs(out)-th*2.0f)*3.0f;
-		lights[LOW_LIGHT].value = 0.0f;
-		lights[HIGH_LIGHT].value = 0.0f;
+	float inInter [current_oversample];
+	float outBuf  [current_oversample];
+	if (current_oversample == oversample2) {
+		upsampler2.process(in, inInter);
+	} else if (current_oversample == oversample4) {
+		upsampler4.process(in, inInter);
 	} else {
-		if (in > 0.0f) {
-			out =  1.0f;
-		} else {
-			out = -1.0f;
-		}
-		lights[HIGH_LIGHT].value = (fabs(in)-th*2.0f)*2.0f;
-		lights[MID_LIGHT].value = 0.0f;
-		lights[LOW_LIGHT].value = 0.0f;
+		upsampler8.process(in, inInter);
 	}
 
-    outputs[FIL_OUTPUT].setVoltage(non_lin_func(out)*5.0f);
+	float th=1.0f/3.0f;
+	for (int i = 0; i < current_oversample; i++) {
+		if (fabs(inInter[i]) < th) {
+			out = 2.0f*inInter[i];
+			if (i==0) {
+				lights[LOW_LIGHT].value = fabs(out)/(th*2.0f);
+				lights[MID_LIGHT].value = 0.0f;
+				lights[HIGH_LIGHT].value = 0.0f;
+			}
+		} else if (fabs(inInter[i]) <= 2.0f*th) {
+			if (inInter[i] > 0.0f) {
+				out = (3.0f-(2.0f-inInter[i]*3.0f)*(2.0f-inInter[i]*3.0f))/3.0f;
+			} else {
+			    out = -(3.0f-(2.0f-fabs(inInter[i])*3.0f)*(2.0f-fabs(inInter[i])*3.0f))/3.0f;
+			}
+			if (i==0) {
+				lights[MID_LIGHT].value = (fabs(out)-th*2.0f)*3.0f;
+				lights[LOW_LIGHT].value = 0.0f;
+				lights[HIGH_LIGHT].value = 0.0f;
+			}
+		} else {
+			if (inInter[i] > 0.0f) {
+				out =  1.0f;
+			} else {
+				out = -1.0f;
+			}
+			if (i==0) {
+				lights[HIGH_LIGHT].value = (fabs(inInter[i])-th*2.0f)*2.0f;
+				lights[MID_LIGHT].value = 0.0f;
+				lights[LOW_LIGHT].value = 0.0f;
+			}
+		}
+		outBuf[i] = non_lin_func(out);
+	}
+	if (current_oversample == oversample2) {
+		out = decimator2.process(outBuf);
+	} else if (current_oversample == oversample4) {
+		out = decimator4.process(outBuf);
+	} else {
+		out = decimator8.process(outBuf);
+	}
+
+    outputs[FIL_OUTPUT].setVoltage(out*5.0f);
 }
+
+struct OversampleFilMenuItem : MenuItem {
+	Fil* _module;
+	int _os;
+
+	OversampleFilMenuItem(Fil* module, const char* label, int os)
+	: _module(module), _os(os)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->current_oversample = _os;
+	}
+
+	void step() override {
+		rightText = _module->current_oversample == _os ? "✔" : "";
+	}
+};
 
 struct FilWidget : ModuleWidget {
 	FilWidget(Fil *module) {
@@ -117,6 +191,16 @@ struct FilWidget : ModuleWidget {
 		addChild(createLight<MediumLight<RedLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 65), module, Fil::HIGH_LIGHT));
 		addChild(createLight<MediumLight<GreenLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Fil::MID_LIGHT));
 		addChild(createLight<MediumLight<BlueLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 85), module, Fil::LOW_LIGHT));
+	}
+
+	void appendContextMenu(Menu* menu) override {
+		Fil* a = dynamic_cast<Fil*>(module);
+		assert(a);
+		
+		menu->addChild(new MenuLabel());
+		menu->addChild(new OversampleFilMenuItem(a, "Oversample x2", 2));
+		menu->addChild(new OversampleFilMenuItem(a, "Oversample x4", 4));
+		menu->addChild(new OversampleFilMenuItem(a, "Oversample x8", 8));
 	}
 };
 
