@@ -83,6 +83,14 @@ struct RoundSmallAutinnKnob : RoundKnob {
 	}
 };
 
+struct RoundSmallAutinnSnapKnob : RoundKnob {
+	RoundSmallAutinnSnapKnob() {
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinn.svg")));
+		snap = true;
+		//box.size = Vec(28, 28);
+	}
+};
+
 struct RoundSmallTyrkAutinnKnob : RoundKnob {
 	RoundSmallTyrkAutinnKnob() {
 		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnTyrk.svg")));
@@ -204,3 +212,4 @@ extern Model *modelMixer6;
 extern Model *modelNon;
 extern Model *modelFil;
 extern Model *modelNap;
+extern Model *modelMelody;

@@ -4,7 +4,7 @@ RACK_DIR ?= ../..
 FLAGS +=
 #FLAGS += -w
 CFLAGS +=
-CXXFLAGS +=-Wall -Wextra
+CXXFLAGS +=
 
 LDFLAGS +=
 

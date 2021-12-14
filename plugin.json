@@ -213,6 +213,15 @@
         "Effect",
         "Distortion"
       ]
+    },
+    {
+      "slug": "Melody",
+      "name": "Fluencerator",
+      "description": "Random melody sequencer with special constraints that make it sound more pleasant for the ear",
+      "tags": [
+        "Sequencer",
+        "Random"
+      ]
     }
   ]
 }
