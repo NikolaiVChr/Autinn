@@ -86,7 +86,7 @@ struct Melody : Module {
 		configParam(Melody::GLIDE_PARAM, 0, 100, 0, "Each note's chance of glide"," %", 0.0f, 1.0f);
 		configParam(Melody::ACCENT_PARAM, 0, 100, 0, "Each note's chance of accent"," %", 0.0f, 1.0f);
 		configParam(Melody::PHRASE_PARAM, PHRASE_LENGTH_MIN, PHRASE_LENGTH_MAX, PHRASE_LENGTH_DEFAULT, "Phrase length");
-		configParam(Melody::REST_PARAM, 0, REST_MAX, 2, "Rest before starting phrase");
+		configParam(Melody::REST_PARAM, 0, REST_MAX, 2, "Clock cycle rests before starting next phrase");
 		configInput(CLOCK_INPUT, "Ext. Clock");
 		configInput(GENERATE_INPUT, "Trigger Generate");
 		configOutput(FREQ_OUTPUT, "1V/Oct");
