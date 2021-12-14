@@ -82,7 +82,7 @@ struct Melody : Module {
 															"VI: Minor", "VII: Locrian", "Double Harmonic Major", "Double Harmonic Minor",
 															"Hexatonic Blues", "Bebop Dominant", "Major Pentatonic"});
 		configSwitch(Melody::GAP_PARAM, 0, 2, 1, "Expression", {"Staccato", "Normal", "Legato"});
-		configParam(Melody::BUTTON_GENERATE_PARAM, 0, 1, 0, "Generate");
+		configButton(Melody::BUTTON_GENERATE_PARAM, "Generate");
 		configParam(Melody::GLIDE_PARAM, 0, 100, 0, "Each note's chance of glide"," %", 0.0f, 1.0f);
 		configParam(Melody::ACCENT_PARAM, 0, 100, 0, "Each note's chance of accent"," %", 0.0f, 1.0f);
 		configParam(Melody::PHRASE_PARAM, PHRASE_LENGTH_MIN, PHRASE_LENGTH_MAX, PHRASE_LENGTH_DEFAULT, "Phrase length");

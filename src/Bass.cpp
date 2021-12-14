@@ -187,7 +187,7 @@ struct Bass : Module {
 		configParam(Bass::CV_RESONANCE_PARAM, 0.0f, RESONANCE_MAX/5.0f, 0.0f, "Resonance CV", "%", 0.0f, 100.0f*1.0f/(RESONANCE_MAX/5.0f));
 		configParam(Bass::CV_DECAY_PARAM, 0.0f, (DECAY_VCF_MAX-DECAY_VCF_MIN)*0.2f, 0.0f, "Decay CV", "%", 0.0f, 100.0f*1.0f/((DECAY_VCF_MAX-DECAY_VCF_MIN)*0.2f));
 		configParam(Bass::CV_ENVMOD_PARAM, 0.0f, 0.2f, 0.0f, "EnvMod CV", "%", 0.0f, 500.0f);
-		configParam(Bass::BUTTON_PARAM, 0, 1, 0, "Toggle Gate or Trigger");
+		configButton(Bass::BUTTON_PARAM, "Toggle Gate or Trigger");
 		//configParam(Bass::DECAY2_PARAM, 0.003, 0.050, 0.003, "");
 		//configParam(Bass::DECAY3_PARAM, 0.200, 0.500, 0.350, "");
 

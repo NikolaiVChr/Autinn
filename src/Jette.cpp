@@ -58,7 +58,7 @@ struct Jette : Module {
 
 	Jette() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(Jette::BUTTON_PARAM, 0, 1, 0, "Toggle waveform","",0.0f,1.0f);
+		configButton(Jette::BUTTON_PARAM, "Toggle waveform");
 		configParam(Jette::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
 		configParam(Jette::A_PARAM, 0.0f, 1.0f, 1.0f, "");
 		configParam(Jette::B_PARAM, 0.0f, 1.0f, 1.0f, "");
