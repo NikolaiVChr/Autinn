@@ -91,6 +91,11 @@ struct Nap : Module {
 		}
 	}
 
+	void onReset(const ResetEvent& e) override {
+		current_oversample = 2;
+		Module::onReset(e);
+	}
+
 	float fwdEuler(float out_prev, float in);
 	float distort(float out_prev, float in);
 	void process(const ProcessArgs &args) override;

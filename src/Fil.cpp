@@ -61,6 +61,7 @@ struct Fil : Module {
 	}
 
 	int current_oversample = 4;
+	float th=1.0f/3.0f;
 
 	dsp::Upsampler<oversample2, 10> upsampler2;
 	dsp::Decimator<oversample2, 10> decimator2;
@@ -83,6 +84,11 @@ struct Fil : Module {
 				current_oversample = 4;
 			}
 		}
+	}
+
+	void onReset(const ResetEvent& e) override {
+		current_oversample = 4;
+		Module::onReset(e);
 	}
 
 	void process(const ProcessArgs &args) override;
@@ -108,8 +114,7 @@ void Fil::process(const ProcessArgs &args) {
 	} else {
 		upsampler8.process(in, inInter);
 	}
-
-	float th=1.0f/3.0f;
+	
 	for (int i = 0; i < current_oversample; i++) {
 		if (fabs(inInter[i]) < th) {
 			out = 2.0f*inInter[i];
