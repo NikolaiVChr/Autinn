@@ -1,5 +1,6 @@
 #include "Autinn.hpp"
 #include <cmath>
+#include <algorithm>
 
 /*
 
@@ -25,21 +26,22 @@ const static int num_mono_channels = 6;
 
 struct Mixer6 : Module {
 	enum ParamIds {
-		LOW_PARAM,
-		MID_PARAM = LOW_PARAM+num_mono_channels,
-		HIGH_PARAM = MID_PARAM+num_mono_channels,
-		LEVEL = HIGH_PARAM+num_mono_channels,
-		PAN = LEVEL+num_mono_channels,
-		FX_A = PAN+num_mono_channels,
-		FX_B = FX_A+num_mono_channels,
-		FXA = FX_B+num_mono_channels,
+		ENUMS(LOW_PARAM, num_mono_channels),
+		ENUMS(MID_PARAM, num_mono_channels),
+		ENUMS(HIGH_PARAM, num_mono_channels),
+		ENUMS(LEVEL, num_mono_channels),
+		ENUMS(PAN, num_mono_channels),
+		ENUMS(FX_A, num_mono_channels),
+		ENUMS(FX_B, num_mono_channels),
+		FXA,
 		FXB,
 		LEVEL_MAIN,
+		ENUMS(MUTE_BUTTON_PARAM, num_mono_channels),
 		NUM_PARAMS
 	};
 	enum InputIds {
-		INPUT,
-		FX_RETURN_L_A = INPUT+num_mono_channels,
+		ENUMS(INPUT,num_mono_channels),
+		FX_RETURN_L_A,
 		FX_RETURN_R_A,
 		FX_RETURN_L_B,
 		FX_RETURN_R_B,
@@ -53,13 +55,14 @@ struct Mixer6 : Module {
 		NUM_OUTPUTS
 	};
 	enum LightIds {
-		VU_FXA_LEFT_LIGHT,
-		VU_OUT_LEFT_LIGHT = VU_FXA_LEFT_LIGHT + 8,
-		VU_FXB_LEFT_LIGHT = VU_OUT_LEFT_LIGHT + 15,
-		VU_FXA_RIGHT_LIGHT = VU_FXB_LEFT_LIGHT + 8,
-		VU_OUT_RIGHT_LIGHT = VU_FXA_RIGHT_LIGHT + 8,
-		VU_FXB_RIGHT_LIGHT = VU_OUT_RIGHT_LIGHT + 15,
-		NUM_LIGHTS   = VU_FXB_RIGHT_LIGHT + 8
+		ENUMS(VU_FXA_LEFT_LIGHT,8),
+		ENUMS(VU_OUT_LEFT_LIGHT,15),
+		ENUMS(VU_FXB_LEFT_LIGHT,8),
+		ENUMS(VU_FXA_RIGHT_LIGHT,8),
+		ENUMS(VU_OUT_RIGHT_LIGHT,15),
+		ENUMS(VU_FXB_RIGHT_LIGHT,8),
+		ENUMS(MUTE_LIGHT, 3*num_mono_channels),
+		NUM_LIGHTS
 	};
 
 	dsp::BiquadFilter lowS[num_mono_channels];
@@ -79,6 +82,9 @@ struct Mixer6 : Module {
 	float low_prev[num_mono_channels];
 	float mid_prev[num_mono_channels];
 	float high_prev[num_mono_channels];
+	int mute_solo_state[num_mono_channels];// -1: mute  0: norm  +1: solo
+	bool mute_solo_button_prev[num_mono_channels];
+	bool solo = false;
 
 	const float vuMaxDB = 30.0f;
 	const float intervalDB_FX = vuMaxDB/8.0f;
@@ -105,6 +111,8 @@ struct Mixer6 : Module {
 			configParam(FX_B+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX B Send", " dB", -10, 20);
 			configParam(LEVEL+ch, 0.0f, 2.0f, 1.0f, "Channel "+std::to_string(ch+1)+" Level", " dB", -10, 20);
 			configParam(PAN+ch, 0.0f, M_PI*0.5f, M_PI*0.25f, "Channel "+std::to_string(ch+1)+" Pan", " ", 0.0f, 2.0f/M_PI, -0.5f);
+			configLight(MUTE_LIGHT+ch*3, "Mute (red)/Solo (blue)");
+			configButton(MUTE_BUTTON_PARAM+ch, "Mute/Solo");
 		}
 		configParam(LEVEL_MAIN, 0.0f, 2.0f, 1.0f, "Main Level", " dB", -10, 20);
 		configParam(Mixer6::FXA, 0.0f, 2.0f, 1.0f, "FX A To Main", " dB", -10, 20);
@@ -118,7 +126,38 @@ struct Mixer6 : Module {
 		configOutput(FX_SENDB, "FX B Mono Send");
 		configOutput(MIXER_OUTPUT_L, "Left Audio");
 		configOutput(MIXER_OUTPUT_R, "Right Audio");
+
+		std::fill_n(mute_solo_button_prev, num_mono_channels, false);
+		std::fill_n(mute_solo_state, num_mono_channels, 0);
 	}
+
+	json_t *dataToJson() override {
+	    json_t *root = json_object();
+
+	    json_t *mute_json_array = json_array();
+	    for(int state : mute_solo_state) {
+	        json_array_append_new(mute_json_array, json_integer(state));
+	    }
+	    json_object_set(root, "mute_solo", mute_json_array);
+	    json_decref(mute_json_array);
+
+	    return root;
+	}
+
+	void dataFromJson(json_t *root) override
+	{
+	    json_t *mute_json_array = json_object_get(root, "mute_solo");
+	    if(mute_json_array) {
+			size_t i;
+			json_t *json_int;
+
+			json_array_foreach(mute_json_array, i, json_int) {
+			    mute_solo_state[i] = json_integer_value(json_int);
+			}
+	    }
+	}
+
+	void handleMuteButtons();
 
 	void process(const ProcessArgs &args) override;
 };
@@ -127,6 +166,9 @@ void Mixer6::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 	step++;
+
+	this->handleMuteButtons();
+
 	float rate   = args.sampleRate;
 
 	float fx_send_A = 0;
@@ -136,7 +178,7 @@ void Mixer6::process(const ProcessArgs &args) {
 	float main_right = 0;
 
 	for (int ch = 0; ch < num_mono_channels; ch++) {
-		if (!inputs[INPUT+ch].isConnected()) {
+		if (!inputs[INPUT+ch].isConnected() || mute_solo_state[ch] == -1 || (solo && mute_solo_state[ch] != 1)) {
 			continue;
 		}
 		float in = inputs[INPUT+ch].getVoltage();
@@ -217,6 +259,33 @@ void Mixer6::process(const ProcessArgs &args) {
 	}
 }
 
+void Mixer6::handleMuteButtons() {
+	solo = false;
+	for (int ch = 0; ch < num_mono_channels; ch++) {
+		bool state = params[MUTE_BUTTON_PARAM+ch].getValue() >= 1.0f;
+		
+		if (state && !mute_solo_button_prev[ch]) {
+			mute_solo_state[ch] = mute_solo_state[ch] - 1;
+			if (mute_solo_state[ch] < -1) {
+				mute_solo_state[ch] = 1;
+			}
+		}
+		if (mute_solo_state[ch] == 1) {
+			solo = true;
+			lights[MUTE_LIGHT+ch*3+0].setBrightness( 0.00f);
+			lights[MUTE_LIGHT+ch*3+2].setBrightness( 1.00f);
+		} else if (mute_solo_state[ch] == -1) {
+			lights[MUTE_LIGHT+ch*3+0].setBrightness( 1.00f);
+			lights[MUTE_LIGHT+ch*3+2].setBrightness( 0.00f);
+		} else {
+			lights[MUTE_LIGHT+ch*3+0].setBrightness( 0.00f);
+			lights[MUTE_LIGHT+ch*3+2].setBrightness( 0.00f);
+		}
+
+		mute_solo_button_prev[ch] = state;
+	}
+}
+
 struct Mixer6Widget : ModuleWidget {
 	Mixer6Widget(Mixer6 *module) {
 		setModule(module);
@@ -236,8 +305,10 @@ struct Mixer6Widget : ModuleWidget {
 			addParam(createParam<RoundSmallTyrkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 140), module, Mixer6::LOW_PARAM+ch));
 			addParam(createParam<RoundSmallPinkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 190), module, Mixer6::FX_A+ch));
 			addParam(createParam<RoundSmallPinkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 230), module, Mixer6::FX_B+ch));
-			addParam(createParam<RoundSmallYelAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 280), module, Mixer6::PAN+ch));
-			addParam(createParam<RoundSmallAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 330), module, Mixer6::LEVEL+ch));
+			addParam(createParam<RoundSmallYelAutinnKnob>(Vec(  (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 280), module, Mixer6::PAN+ch));
+			addParam(createParam<RoundSmallAutinnKnob>(Vec(     (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 330), module, Mixer6::LEVEL+ch));
+			addChild(createLight<MediumLight<RedGreenBlueLight>>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_LIGHT_MEDIUM-RACK_GRID_WIDTH*2, 270-HALF_LIGHT_MEDIUM), module, Mixer6::MUTE_LIGHT + ch*3));
+			addParam(createParam<RoundButtonSmallAutinn>(Vec(         (ch+1) * 4 * RACK_GRID_WIDTH-HALF_BUTTON_SMALL-RACK_GRID_WIDTH*0.5, 270-HALF_BUTTON_SMALL), module, Mixer6::MUTE_BUTTON_PARAM + ch));
 		}
 
 		// FX to Main knobs
