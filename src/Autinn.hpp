@@ -213,3 +213,4 @@ extern Model *modelNon;
 extern Model *modelFil;
 extern Model *modelNap;
 extern Model *modelMelody;
+extern Model *modelChord;

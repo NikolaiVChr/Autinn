@@ -222,6 +222,15 @@
         "Sequencer",
         "Random"
       ]
+    },
+    {
+      "slug": "Chord",
+      "name": "Rebel",
+      "description": "Plays a random selected chord from a root note. Polyphonic outputs.",
+      "tags": [
+        "Utility",
+        "Polyphonic"
+      ]
     }
   ]
 }
