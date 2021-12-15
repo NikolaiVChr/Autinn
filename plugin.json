@@ -1,7 +1,7 @@
 {
   "slug": "Autinn",
   "name": "Autinn",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "license": "GPL-3.0-or-later",
   "brand": "Autinn",
   "author": "Nikolai V. Chr.",
@@ -97,7 +97,7 @@
     {
       "slug": "Oxcart",
       "name": "Oxcart",
-      "description": "Aggresive oscillator",
+      "description": "Aggresive oscillator. Best for low/mid frequencies.",
       "tags": [
         "VCO"
       ]
@@ -226,7 +226,7 @@
     {
       "slug": "Chord",
       "name": "Rebel",
-      "description": "Plays a random selected chord from a root note. Polyphonic outputs.",
+      "description": "Plays a random selected chord from a root note (does not have to be in tune). Polyphonic outputs.",
       "tags": [
         "Utility",
         "Polyphonic"

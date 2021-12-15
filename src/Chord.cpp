@@ -49,8 +49,8 @@ struct Chord : Module {
 	Chord() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configBypass(ROOT_INPUT, CHORD_OUTPUT);
-		configInput(ROOT_INPUT, "Root 1V/Oct");
-		configInput(TRIGGER_INPUT, "Switch Chord Trigger.");
+		configInput(ROOT_INPUT, "Root note 1V/Oct");
+		configInput(TRIGGER_INPUT, "Switch chord trigger");
 		configOutput(CHORD_OUTPUT, "Poly 1V/Oct chord");
 		configOutput(FINGER_PLAYING_OUTPUT, "Poly CV. Active channels. Output from inactives is garbage.");
 
@@ -72,6 +72,7 @@ struct Chord : Module {
 		"Augmented Triad Inverted",
 		"Diminished Triad Inverted",
 		"Minor 7th",
+	//  "Major 7th",
 		"Dominant 7th",
 		"Diminished 7th",
 	};
