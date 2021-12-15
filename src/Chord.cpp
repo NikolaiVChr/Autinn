@@ -52,7 +52,7 @@ struct Chord : Module {
 		configInput(ROOT_INPUT, "Root note 1V/Oct");
 		configInput(TRIGGER_INPUT, "Switch chord trigger");
 		configOutput(CHORD_OUTPUT, "Poly 1V/Oct chord");
-		configOutput(FINGER_PLAYING_OUTPUT, "Poly CV. Active channels. Output from inactives is garbage.");
+		configOutput(FINGER_PLAYING_OUTPUT, "Poly CV. Active channels. (Output from inactives is garbage).");
 
 		for (int light = 0; light < NUM_CHORDS; light++) {
 			configLight(CHORD_LIGHT+light, chordNames[light]);
