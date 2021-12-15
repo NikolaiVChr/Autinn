@@ -59,6 +59,7 @@ jobs:
           echo "Set plugin version from $pluginversion to $pluginversion-$gitrev"
           cat <<< `jq --arg VERSION "$pluginversion-$gitrev" '.version=$VERSION' plugin.json` > plugin.json
       - name: Initialize CodeQL
+        if: runner.os == 'Linux'
         uses: github/codeql-action/init@v1
         with:
           languages: ${{ matrix.language }}
@@ -75,6 +76,7 @@ jobs:
           path: dist
           name: ${{ matrix.config.name }}
       - name: Perform CodeQL Analysis
+        if: runner.os == 'Linux'
         uses: github/codeql-action/analyze@v1
 
   publish:
