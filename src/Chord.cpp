@@ -1,5 +1,6 @@
 #include "Autinn.hpp"
 #include <cmath>
+#include <string>
 
 /*
 
@@ -41,9 +42,7 @@ struct Chord : Module {
 		NUM_OUTPUTS
 	};
 	enum LightIds {
-		/*LOW_LIGHT,
-		MID_LIGHT,
-		HIGH_LIGHT,*/
+		ENUMS(CHORD_LIGHT, NUM_CHORDS),
 		NUM_LIGHTS
 	};
 
@@ -55,10 +54,27 @@ struct Chord : Module {
 		configOutput(CHORD_OUTPUT, "Poly 1V/Oct chord");
 		configOutput(FINGER_PLAYING_OUTPUT, "Poly CV. Active channels. Output from inactives is garbage.");
 
-		/*configLight(HIGH_LIGHT, "Serious grinding going on.. ");
-		configLight(MID_LIGHT, "Moderate filing.. ");
-		configLight(LOW_LIGHT, "Hungry, feed me!  ");*/
+		for (int light = 0; light < NUM_CHORDS; light++) {
+			configLight(CHORD_LIGHT+light, chordNames[light]);
+		}
 	}
+
+	std::string chordNames[NUM_CHORDS] = {
+		"Major Triad",
+		"Minor Triad",
+		"Augmented Triad",
+		"Diminished Triad",
+		"Power",
+		"Augmented Power",
+		"Diminished Power",
+		"Major Triad Inverted",
+		"Minor Triad Inverted",
+		"Augmented Triad Inverted",
+		"Diminished Triad Inverted",
+		"Minor 7th",
+		"Dominant 7th",
+		"Diminished 7th",
+	};
 
 	int chords[NUM_CHORDS][4] = {
 		{0,4,7,NOT_PLAYING},          // Major Triad
@@ -112,6 +128,10 @@ void Chord::process(const ProcessArgs &args) {
 		chordIndex = (rand() % static_cast<int>(NUM_CHORDS));
 	}
 
+	for (int light = 0; light < NUM_CHORDS; light++) {
+		lights[CHORD_LIGHT+light].setBrightness(light == chordIndex);
+	}
+
 	float root = inputs[ROOT_INPUT].getVoltage();
 
 	outputs[FINGER_PLAYING_OUTPUT].setChannels(NUM_FINGERS);
@@ -139,9 +159,24 @@ struct ChordWidget : ModuleWidget {
 		addInput(createInput<InPortAutinn>(Vec(   5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 248), module, Chord::ROOT_INPUT));
 		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 310), module, Chord::CHORD_OUTPUT));
 
-		//addChild(createLight<MediumLight<RedLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 65), module, Chord::HIGH_LIGHT));
-		//addChild(createLight<MediumLight<GreenLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Chord::MID_LIGHT));
-		//addChild(createLight<MediumLight<BlueLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 85), module, Chord::LOW_LIGHT));
+		float light_y = 55;
+		addChild(createLight<SmallLight<GreenLight>>(Vec(5 * RACK_GRID_WIDTH*0.2 - HALF_LIGHT_SMALL, light_y), module, Chord::CHORD_LIGHT + 0 ));
+		addChild(createLight<SmallLight<GreenLight>>(Vec(5 * RACK_GRID_WIDTH*0.4 - HALF_LIGHT_SMALL, light_y), module, Chord::CHORD_LIGHT + 1 ));
+		addChild(createLight<SmallLight<GreenLight>>(Vec(5 * RACK_GRID_WIDTH*0.6 - HALF_LIGHT_SMALL, light_y), module, Chord::CHORD_LIGHT + 2 ));
+		addChild(createLight<SmallLight<GreenLight>>(Vec(5 * RACK_GRID_WIDTH*0.8 - HALF_LIGHT_SMALL, light_y), module, Chord::CHORD_LIGHT + 3 ));
+
+		addChild(createLight<SmallLight<RedLight>>(Vec(5 * RACK_GRID_WIDTH*0.3 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*4), module, Chord::CHORD_LIGHT + 4 ));
+		addChild(createLight<SmallLight<RedLight>>(Vec(5 * RACK_GRID_WIDTH*0.5 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*4), module, Chord::CHORD_LIGHT + 5 ));
+		addChild(createLight<SmallLight<RedLight>>(Vec(5 * RACK_GRID_WIDTH*0.7 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*4), module, Chord::CHORD_LIGHT + 6 ));
+
+		addChild(createLight<SmallLight<BlueLight>>(Vec(5 * RACK_GRID_WIDTH*0.2 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*8), module, Chord::CHORD_LIGHT + 7 ));
+		addChild(createLight<SmallLight<BlueLight>>(Vec(5 * RACK_GRID_WIDTH*0.4 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*8), module, Chord::CHORD_LIGHT + 8 ));
+		addChild(createLight<SmallLight<BlueLight>>(Vec(5 * RACK_GRID_WIDTH*0.6 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*8), module, Chord::CHORD_LIGHT + 9 ));
+		addChild(createLight<SmallLight<BlueLight>>(Vec(5 * RACK_GRID_WIDTH*0.8 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*8), module, Chord::CHORD_LIGHT + 10 ));
+
+		addChild(createLight<SmallLight<YellowLight>>(Vec(5 * RACK_GRID_WIDTH*0.3 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*12), module, Chord::CHORD_LIGHT + 11 ));
+		addChild(createLight<SmallLight<YellowLight>>(Vec(5 * RACK_GRID_WIDTH*0.5 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*12), module, Chord::CHORD_LIGHT + 12 ));
+		addChild(createLight<SmallLight<YellowLight>>(Vec(5 * RACK_GRID_WIDTH*0.7 - HALF_LIGHT_SMALL, light_y+HALF_LIGHT_SMALL*12), module, Chord::CHORD_LIGHT + 13 ));
 	}
 };
 
