@@ -58,9 +58,6 @@ struct Chord : Module {
 		/*configLight(HIGH_LIGHT, "Serious grinding going on.. ");
 		configLight(MID_LIGHT, "Moderate filing.. ");
 		configLight(LOW_LIGHT, "Hungry, feed me!  ");*/
-
-		outputs[FINGER_PLAYING_OUTPUT].setChannels(NUM_FINGERS);
-		outputs[CHORD_OUTPUT].setChannels(NUM_FINGERS);
 	}
 
 	int chords[NUM_CHORDS][4] = {
@@ -80,6 +77,19 @@ struct Chord : Module {
 		{0,4,7,10},                   // Dominant 7th
 		{0,3,6, 9},                   // Diminished 7th
 	};
+
+	json_t *dataToJson() override {
+		json_t *root = json_object();
+		json_object_set_new(root, "chordIndex", json_integer(chordIndex));
+		return root;
+	}
+
+	void dataFromJson(json_t *rootJ) override {
+		json_t *ext3 = json_object_get(rootJ, "chordIndex");
+		if (ext3) {
+			chordIndex = json_integer_value(ext3);
+		}
+	}
 
 	float semitone = 1.0f/12.0f;
 	bool trig_prev = false;
@@ -104,6 +114,8 @@ void Chord::process(const ProcessArgs &args) {
 
 	float root = inputs[ROOT_INPUT].getVoltage();
 
+	outputs[FINGER_PLAYING_OUTPUT].setChannels(NUM_FINGERS);
+	outputs[CHORD_OUTPUT].setChannels(NUM_FINGERS);
 	for (int finger = 0; finger < NUM_FINGERS; finger++) {
 	    outputs[FINGER_PLAYING_OUTPUT].setVoltage(chords[chordIndex][finger] == NOT_PLAYING?0.0f:10.0f, finger);
 	    outputs[CHORD_OUTPUT].setVoltage(root+semitone*chords[chordIndex][finger],finger);
