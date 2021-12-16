@@ -58,10 +58,10 @@ struct Flopper : Module {
 		configBypass(ONE_INPUT, ONE_OUTPUT);
 		configBypass(TWO_INPUT, TWO_OUTPUT);
 		configInput(CV_INPUT, "CV");
-		configInput(ONE_INPUT, "First");
-		configInput(TWO_INPUT, "Second");
-		configOutput(ONE_OUTPUT, "First");
-		configOutput(TWO_OUTPUT, "Second");
+		configInput(ONE_INPUT, "First (these are NOT for stereo)");
+		configInput(TWO_INPUT, "Second (these are NOT for stereo)");
+		configOutput(ONE_OUTPUT, "First (these are NOT for stereo)");
+		configOutput(TWO_OUTPUT, "Second (these are NOT for stereo)");
 	}
 
 	void process(const ProcessArgs &args) override;
