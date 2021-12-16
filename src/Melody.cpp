@@ -30,7 +30,8 @@
 #define PHRASE_LENGTH_MAX 32
 #define PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION 6
 #define PHRASE_LENGTH_THAT_DEMANDS_CADENCE 8
-#define GAP_STACCATO 0.6f
+#define GAP_STACCATISSIMO 0.40f
+#define GAP_STACCATO 0.60f
 #define GAP_NORMAL 0.87f
 #define GAP_LEGATO 0.99f
 #define GLIDE_MAXIMUM 0.060f
@@ -81,7 +82,7 @@ struct Melody : Module {
 		configSwitch(Melody::MODE_PARAM, 0, NUMBER_OF_MODES-1, 4, "Mode", { "I: Major", "II: Dorian", "III: Phrygian", "IV: Lydian", "V: Mixolydian",
 															"VI: Minor", "VII: Locrian", "Double Harmonic Major", "Double Harmonic Minor",
 															"Hexatonic Blues", "Bebop Dominant", "Major Pentatonic"});
-		configSwitch(Melody::GAP_PARAM, 0, 2, 1, "Expression", {"Staccato", "Normal", "Legato"});
+		configSwitch(Melody::GAP_PARAM, 0, 3, 2.50f, "Expression", {"Staccatissimo", "Staccato", "Normal", "Legato"});
 		configButton(Melody::BUTTON_GENERATE_PARAM, "Generate new phrase from settings (will start when current phrase ends)");
 		configParam(Melody::GLIDE_PARAM, 0, 100, 0, "Each note's chance of glide"," %", 0.0f, 1.0f);
 		configParam(Melody::ACCENT_PARAM, 0, 100, 0, "Each note's chance of accent"," %", 0.0f, 1.0f);
@@ -271,6 +272,7 @@ struct Melody : Module {
 	void generateMelody ();
 	//int attenuvertInt(int CV, int KNOB, float min_result, float max_result);
 	void attenuvert(int CV, int KNOB, float min_result, float max_result);
+	void attenuvertFloat(int CV, int KNOB, float min_result, float max_result);
 
 	void onReset(const ResetEvent& e) override {
 		// Later might think of something needed here
@@ -355,7 +357,7 @@ void Melody::process(const ProcessArgs &args) {
 		this->attenuvert(CV_ACCENT_INPUT, ACCENT_PARAM, 0, 100.99f);
 		this->attenuvert(CV_GLIDE_INPUT, GLIDE_PARAM, 0, 100.99f);
 		this->attenuvert(CV_REST_INPUT, REST_PARAM, 0, REST_MAX+0.99f);
-		this->attenuvert(CV_GAP_INPUT, GAP_PARAM, 0, 2.99f);
+		this->attenuvertFloat(CV_GAP_INPUT, GAP_PARAM, 0, 3);
 	}
 
 	if (generate && !generate_prev) {
@@ -369,7 +371,7 @@ void Melody::process(const ProcessArgs &args) {
 		int phrase_index_prev = phrase_index - 1;
 		if (phrase_index_prev < 0) phrase_index_prev = phrase_length - 1;
 		float out_prev = this->note2vPoct(phrase[phrase_index_prev]);
-		outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount, 0, fmin(clockCount_last*GAP_STACCATO, GLIDE_MAXIMUM/args.sampleTime), out_prev, out), out_prev, out));// 60ms glide at start of note
+		outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount, 0, fmin(clockCount_last*gap, GLIDE_MAXIMUM/args.sampleTime), out_prev, out), out_prev, out));// 60ms glide at start of note
 	}
 	outputs[ACCENT_OUTPUT].setVoltage(float(phraseAccents[phrase_index])*10.0f);
 	if (resting > 0 || (clockCount > clockCount_last*gap && passedClocks >= phraseDurations[phrase_index]-1)) {// Normal
@@ -467,7 +469,8 @@ void Melody::generateMelody () {
 	rest_amount = int(params[REST_PARAM].getValue());
 
 	// Gaps
-	switch(int(params[GAP_PARAM].getValue())) {
+	nextGap = rescale(params[GAP_PARAM].getValue(), 0, 3, GAP_STACCATISSIMO, GAP_LEGATO);
+	/*switch(int(params[GAP_PARAM].getValue())) {
 		case 0:
 			nextGap = GAP_STACCATO;
 			break;
@@ -477,7 +480,7 @@ void Melody::generateMelody () {
 		case 2:
 			nextGap = GAP_LEGATO;
 			break;
-	}
+	}*/
 }
 
 /*
@@ -495,6 +498,13 @@ int Melody::attenuvertInt(int CV, int KNOB, float min_result, float max_result) 
 void Melody::attenuvert(int CV, int KNOB, float min_result, float max_result) {
 	if (inputs[CV].isConnected()) {
 		int result = clamp(rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, min_result, max_result), min_result, max_result);
+		params[KNOB].setValue(result);
+	}
+}
+
+void Melody::attenuvertFloat(int CV, int KNOB, float min_result, float max_result) {
+	if (inputs[CV].isConnected()) {
+		float result = clamp(rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, min_result, max_result), min_result, max_result);
 		params[KNOB].setValue(result);
 	}
 }
@@ -580,7 +590,7 @@ struct MelodyWidget : ModuleWidget {
 		addParam(createParam<RoundSmallAutinnSnapKnob>(Vec(16 * RACK_GRID_WIDTH*0.33-HALF_KNOB_SMALL, 85-HALF_KNOB_SMALL), module, Melody::TONIC_PARAM));
 		addParam(createParam<RoundSmallAutinnSnapKnob>(Vec(16 * RACK_GRID_WIDTH*0.66-HALF_KNOB_SMALL, 85-HALF_KNOB_SMALL), module, Melody::MODE_PARAM));
 		addParam(createParam<RoundSmallAutinnSnapKnob>(Vec(16 * RACK_GRID_WIDTH*0.33-HALF_KNOB_SMALL, 140-HALF_KNOB_SMALL), module, Melody::PHRASE_PARAM));
-		addParam(createParam<RoundSmallAutinnSnapKnob>(Vec(16 * RACK_GRID_WIDTH*0.66-HALF_KNOB_SMALL, 140-HALF_KNOB_SMALL), module, Melody::GAP_PARAM));
+		addParam(createParam<RoundSmallAutinnKnob>(Vec(16 * RACK_GRID_WIDTH*0.66-HALF_KNOB_SMALL, 140-HALF_KNOB_SMALL), module, Melody::GAP_PARAM));
 		addParam(createParam<RoundSmallAutinnSnapKnob>(Vec(16 * RACK_GRID_WIDTH*0.33-HALF_KNOB_SMALL, 190-HALF_KNOB_SMALL), module, Melody::ACCENT_PARAM));
 		addParam(createParam<RoundSmallAutinnSnapKnob>(Vec(16 * RACK_GRID_WIDTH*0.66-HALF_KNOB_SMALL, 190-HALF_KNOB_SMALL), module, Melody::GLIDE_PARAM));
 		addParam(createParam<RoundSmallAutinnSnapKnob>(Vec(16 * RACK_GRID_WIDTH*0.66-HALF_KNOB_SMALL, 240-HALF_KNOB_SMALL), module, Melody::REST_PARAM));
