@@ -29,7 +29,7 @@
 #define PHRASE_LENGTH_DEFAULT 8
 #define PHRASE_LENGTH_MAX 32
 #define PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION 6
-#define PHRASE_LENGTH_THAT_DEMANDS_CADENCE 8
+#define PHRASE_LENGTH_THAT_DEMANDS_CADENCE 10
 #define GAP_STACCATISSIMO 0.40f
 #define GAP_STACCATO 0.60f
 #define GAP_NORMAL 0.87f
@@ -366,7 +366,10 @@ void Melody::process(const ProcessArgs &args) {
 
 	float out = this->note2vPoct(phrase[phrase_index]);
 	if (!phraseGlides[phrase_index] || passedClocks > 0) {
-		outputs[FREQ_OUTPUT].setVoltage(out);
+		if (resting == 0) {
+			// Only if not between phrase do we set voltage, so that previous voltage can be allowed to 'decay' if envelope is put on output.
+			outputs[FREQ_OUTPUT].setVoltage(out);
+		}
 	} else {
 		int phrase_index_prev = phrase_index - 1;
 		if (phrase_index_prev < 0) phrase_index_prev = phrase_length - 1;
@@ -401,7 +404,7 @@ void Melody::generateMelody () {
 	*/
 
 	// Melody
-	int tonic = int(params[TONIC_PARAM].getValue());// Add almost 1 to give it a chance of being selected
+	int tonic = int(params[TONIC_PARAM].getValue());
 	std::vector<int> mode = modes[int(params[MODE_PARAM].getValue())];
 	next_phrase_length = int(params[PHRASE_PARAM].getValue());
 	int minOffset = -2;
@@ -413,26 +416,37 @@ void Melody::generateMelody () {
 	int distanceToTonic = 0;
 	int closure = next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
 	for (int i = 1; i < next_phrase_length+closure; i++) {
-		int maxUp;
-		int minUp;
+		int maxClamp;
+		int minClamp;
 		if (closure == 0) {
 			// Skipping resolution
-			minUp = -100;
-			maxUp =  100;
+			minClamp =  minOffset;
+			maxClamp =  maxOffset;
 		} else if (i == next_phrase_length-2 && next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
 			// We are at cadence in larger phrase
-			minUp = -distanceToTonic-1;
-			maxUp = -distanceToTonic+1;
+			maxClamp = std::min(maxOffset, -distanceToTonic+1);
+			minClamp = std::max(minOffset, -distanceToTonic-1);
 		} else if (next_phrase_length < PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
 			// Small phrase
-			maxUp = fmin(maxOffset, fabs((next_phrase_length-i-1)*minOffset)-distanceToTonic);
-			minUp = fmax(minOffset, -(((next_phrase_length-i-1)*maxOffset)-distanceToTonic));
+			int stepsLeft  = next_phrase_length-i; // steps left including tonic step
+			int howFarDown = stepsLeft * minOffset; // How far towards tonic can we get from now till tonic (negative number)
+			int howFarUp   = stepsLeft * maxOffset;
+			int maxUp   = minOffset-(distanceToTonic+howFarDown);
+			int maxDown = maxOffset-(howFarUp+distanceToTonic);
+			maxClamp = std::min(maxOffset, maxUp);
+			minClamp = std::max(minOffset, maxDown);
 		} else {
 			// Longer phrase
-			maxUp = fmin(maxOffset, fabs((next_phrase_length-i-2)*minOffset)-(distanceToTonic-1));
-			minUp = fmax(minOffset, -(((next_phrase_length-i-2)*maxOffset)-(distanceToTonic-1)));
+			int stepsLeft  = next_phrase_length-i-1; // steps left including cadence step
+			int howFarDown = stepsLeft * minOffset; // How far towards cadence can we get from now till cadence (negative number)
+			int howFarUp   = stepsLeft * maxOffset;
+			int maxUp   = minOffset-((distanceToTonic-1)+howFarDown);// note the asymmetry here, as we can approach from either side.
+			int maxDown = maxOffset-(howFarUp+(distanceToTonic+1));
+			maxClamp = std::min(maxOffset, maxUp);
+			minClamp = std::max(minOffset, maxDown);
 		}
-		int noteOffset = clamp(-maxOffset+(rand() % static_cast<int>(maxOffset+maxOffset+1)), minUp, maxUp);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
+		// Using only maxOffset to make sure initial equal chance of either way, but clamp will restrict that afterwards:
+		int noteOffset = clamp(-maxOffset+(rand() % static_cast<int>(maxOffset+maxOffset+1)), minClamp, maxClamp);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
 		int note = lastNote + getSemiNoteOffset(noteOffset, lastIndex, mode);
 		nextPhrase.push_back(note);
 		distanceToTonic += noteOffset;
