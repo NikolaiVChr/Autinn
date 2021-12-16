@@ -29,12 +29,12 @@ struct Mixer6 : Module {
 		ENUMS(LOW_PARAM, num_mono_channels),
 		ENUMS(MID_PARAM, num_mono_channels),
 		ENUMS(HIGH_PARAM, num_mono_channels),
-		ENUMS(LEVEL, num_mono_channels),
-		ENUMS(PAN, num_mono_channels),
-		ENUMS(FX_A, num_mono_channels),
-		ENUMS(FX_B, num_mono_channels),
-		FXA,
-		FXB,
+		ENUMS(CHANNEL_LEVEL_PARAM, num_mono_channels),
+		ENUMS(PAN_PARAM, num_mono_channels),
+		ENUMS(FX_A_SEND_PARAM, num_mono_channels),
+		ENUMS(FX_B_SEND_PARAM, num_mono_channels),
+		FX_A_TO_MAIN_PARAM,
+		FX_B_TO_MAIN_PARAM,
 		LEVEL_MAIN,
 		ENUMS(MUTE_BUTTON_PARAM, num_mono_channels),
 		NUM_PARAMS
@@ -50,8 +50,8 @@ struct Mixer6 : Module {
 	enum OutputIds {
 		MIXER_OUTPUT_L,
 		MIXER_OUTPUT_R,
-		FX_SENDA,
-		FX_SENDB,
+		FX_SEND_A,
+		FX_SEND_B,
 		NUM_OUTPUTS
 	};
 	enum LightIds {
@@ -107,23 +107,23 @@ struct Mixer6 : Module {
 			configParam(HIGH_PARAM+ch, 0.5f, Pm, Pm, "Channel "+std::to_string(ch+1)+" EQ High", " dB", 0.0f, 1.0f, -Pm);
 			configParam(MID_PARAM+ch, 0.5f, Pm, Pm, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", 0.0f, 1.0f, -Pm);
 			configParam(LOW_PARAM+ch, 0.5f, Pm, Pm, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", 0.0f, 1.0f, -Pm);
-			configParam(FX_A+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX A Send", " dB", -10, 20);
-			configParam(FX_B+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX B Send", " dB", -10, 20);
-			configParam(LEVEL+ch, 0.0f, 2.0f, 1.0f, "Channel "+std::to_string(ch+1)+" Level", " dB", -10, 20);
-			configParam(PAN+ch, 0.0f, M_PI*0.5f, M_PI*0.25f, "Channel "+std::to_string(ch+1)+" Pan", " ", 0.0f, 2.0f/M_PI, -0.5f);
+			configParam(FX_A_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX A Send", " dB", -10, 20);
+			configParam(FX_B_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX B Send", " dB", -10, 20);
+			configParam(CHANNEL_LEVEL_PARAM+ch, 0.0f, 2.0f, 1.0f, "Channel "+std::to_string(ch+1)+" Level", " dB", -10, 20);
+			configParam(PAN_PARAM+ch, 0.0f, M_PI*0.5f, M_PI*0.25f, "Channel "+std::to_string(ch+1)+" Pan", " ", 0.0f, 2.0f/M_PI, -0.5f);
 			configLight(MUTE_LIGHT+ch*3, "Mute (red)/Solo (blue)");
 			configButton(MUTE_BUTTON_PARAM+ch, "Mute/Solo");
 		}
 		configParam(LEVEL_MAIN, 0.0f, 2.0f, 1.0f, "Main Level", " dB", -10, 20);
-		configParam(Mixer6::FXA, 0.0f, 2.0f, 1.0f, "FX A To Main", " dB", -10, 20);
-		configParam(Mixer6::FXB, 0.0f, 2.0f, 1.0f, "FX B To Main", " dB", -10, 20);
+		configParam(Mixer6::FX_A_TO_MAIN_PARAM, 0.0f, 2.0f, 1.0f, "FX A To Main", " dB", -10, 20);
+		configParam(Mixer6::FX_B_TO_MAIN_PARAM, 0.0f, 2.0f, 1.0f, "FX B To Main", " dB", -10, 20);
 		//configBypass(MIXER_INPUT, MIXER_OUTPUT);
 		configInput(FX_RETURN_L_A, "FX A Return Left");
 		configInput(FX_RETURN_R_A, "FX A Return Right");
-		configOutput(FX_SENDA, "FX A Mono Send");
+		configOutput(FX_SEND_A, "FX A Mono Send");
 		configInput(FX_RETURN_L_B, "FX B Return Left");
 		configInput(FX_RETURN_R_B, "FX B Return Right");
-		configOutput(FX_SENDB, "FX B Mono Send");
+		configOutput(FX_SEND_B, "FX B Mono Send");
 		configOutput(MIXER_OUTPUT_L, "Left Audio");
 		configOutput(MIXER_OUTPUT_R, "Right Audio");
 
@@ -205,26 +205,26 @@ void Mixer6::process(const ProcessArgs &args) {
 
 			if(std::isfinite(out1) && std::isfinite(out2) && std::isfinite(out3)) {
 				float out = (out1+out2+out3)/Gd;
-				fx_send_A += params[FX_A+ch].getValue() * out;
-				fx_send_B += params[FX_B+ch].getValue() * out;
-				main_left  += cos(params[PAN+ch].getValue()) * params[LEVEL+ch].getValue() * out;
-				main_right += sin(params[PAN+ch].getValue()) * params[LEVEL+ch].getValue() * out;
+				fx_send_A += params[FX_A_SEND_PARAM+ch].getValue() * out;
+				fx_send_B += params[FX_B_SEND_PARAM+ch].getValue() * out;
+				main_left  += cos(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * out;
+				main_right += sin(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * out;
 			}
 		} else{
-			fx_send_A += params[FX_A+ch].getValue() * in;
-			fx_send_B += params[FX_B+ch].getValue() * in;
-			main_left  += cos(params[PAN+ch].getValue()) * params[LEVEL+ch].getValue() * in;
-			main_right += sin(params[PAN+ch].getValue()) * params[LEVEL+ch].getValue() * in;
+			fx_send_A += params[FX_A_SEND_PARAM+ch].getValue() * in;
+			fx_send_B += params[FX_B_SEND_PARAM+ch].getValue() * in;
+			main_left  += cos(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * in;
+			main_right += sin(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * in;
 		}
 	}
 	
 	// FX
-	outputs[FX_SENDA].setVoltage(fx_send_A);
-	outputs[FX_SENDB].setVoltage(fx_send_B);
-	float fx_return_left_A  = params[FXA].getValue() * inputs[FX_RETURN_L_A].getVoltage();
-	float fx_return_right_A = params[FXA].getValue() * inputs[FX_RETURN_R_A].getVoltage();
-	float fx_return_left_B  = params[FXB].getValue() * inputs[FX_RETURN_L_B].getVoltage();
-	float fx_return_right_B = params[FXB].getValue() * inputs[FX_RETURN_R_B].getVoltage();
+	outputs[FX_SEND_A].setVoltage(fx_send_A);
+	outputs[FX_SEND_B].setVoltage(fx_send_B);
+	float fx_return_left_A  = params[FX_A_TO_MAIN_PARAM].getValue() * inputs[FX_RETURN_L_A].getVoltage();
+	float fx_return_right_A = params[FX_A_TO_MAIN_PARAM].getValue() * inputs[FX_RETURN_R_A].getVoltage();
+	float fx_return_left_B  = params[FX_B_TO_MAIN_PARAM].getValue() * inputs[FX_RETURN_L_B].getVoltage();
+	float fx_return_right_B = params[FX_B_TO_MAIN_PARAM].getValue() * inputs[FX_RETURN_R_B].getVoltage();
 
 	// Main out
 	main_left  = fx_return_left_A  + fx_return_left_B  + main_left;
@@ -303,10 +303,10 @@ struct Mixer6Widget : ModuleWidget {
 			addParam(createParam<RoundSmallTyrkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2,  60), module, Mixer6::HIGH_PARAM+ch));
 			addParam(createParam<RoundSmallTyrkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 100), module, Mixer6::MID_PARAM+ch));
 			addParam(createParam<RoundSmallTyrkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 140), module, Mixer6::LOW_PARAM+ch));
-			addParam(createParam<RoundSmallPinkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 190), module, Mixer6::FX_A+ch));
-			addParam(createParam<RoundSmallPinkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 230), module, Mixer6::FX_B+ch));
-			addParam(createParam<RoundSmallYelAutinnKnob>(Vec(  (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 280), module, Mixer6::PAN+ch));
-			addParam(createParam<RoundSmallAutinnKnob>(Vec(     (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 330), module, Mixer6::LEVEL+ch));
+			addParam(createParam<RoundSmallPinkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 190), module, Mixer6::FX_A_SEND_PARAM+ch));
+			addParam(createParam<RoundSmallPinkAutinnKnob>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 230), module, Mixer6::FX_B_SEND_PARAM+ch));
+			addParam(createParam<RoundSmallYelAutinnKnob>(Vec(  (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 280), module, Mixer6::PAN_PARAM+ch));
+			addParam(createParam<RoundSmallAutinnKnob>(Vec(     (ch+1) * 4 * RACK_GRID_WIDTH-HALF_KNOB_SMALL-RACK_GRID_WIDTH*2, 330), module, Mixer6::CHANNEL_LEVEL_PARAM+ch));
 			addChild(createLight<MediumLight<RedGreenBlueLight>>(Vec( (ch+1) * 4 * RACK_GRID_WIDTH-HALF_LIGHT_MEDIUM-RACK_GRID_WIDTH*2, 270-HALF_LIGHT_MEDIUM), module, Mixer6::MUTE_LIGHT + ch*3));
 			addParam(createParam<RoundButtonSmallAutinn>(Vec(         (ch+1) * 4 * RACK_GRID_WIDTH-HALF_BUTTON_SMALL-RACK_GRID_WIDTH*0.5, 270-HALF_BUTTON_SMALL), module, Mixer6::MUTE_BUTTON_PARAM + ch));
 		}
@@ -314,8 +314,8 @@ struct Mixer6Widget : ModuleWidget {
 		// FX to Main knobs
 		float fx_to_main_x = moduleWidth*0.87;
 		float fx_to_main_y = 180+HALF_KNOB_SMALL;
-		addParam(createParam<RoundSmallPinkAutinnKnob>(Vec(-moduleWidth*0.05+fx_to_main_x-HALF_KNOB_SMALL, fx_to_main_y-HALF_KNOB_SMALL), module, Mixer6::FXA));
-		addParam(createParam<RoundSmallPinkAutinnKnob>(Vec(moduleWidth*0.05+fx_to_main_x-HALF_KNOB_SMALL, fx_to_main_y-HALF_KNOB_SMALL), module, Mixer6::FXB));
+		addParam(createParam<RoundSmallPinkAutinnKnob>(Vec(-moduleWidth*0.05+fx_to_main_x-HALF_KNOB_SMALL, fx_to_main_y-HALF_KNOB_SMALL), module, Mixer6::FX_A_TO_MAIN_PARAM));
+		addParam(createParam<RoundSmallPinkAutinnKnob>(Vec(moduleWidth*0.05+fx_to_main_x-HALF_KNOB_SMALL, fx_to_main_y-HALF_KNOB_SMALL), module, Mixer6::FX_B_TO_MAIN_PARAM));
 
 		//Main Level
 		float main_level_x = fx_to_main_x;
@@ -324,12 +324,12 @@ struct Mixer6Widget : ModuleWidget {
 		
 		
 		// FX A ports
-		addOutput(createOutput<OutPortAutinn>(Vec(moduleWidth*0.81-HALF_PORT, 20), module, Mixer6::FX_SENDA));
+		addOutput(createOutput<OutPortAutinn>(Vec(moduleWidth*0.81-HALF_PORT, 20), module, Mixer6::FX_SEND_A));
 		addInput(createInput<InPortAutinn>(Vec(moduleWidth*0.89-HALF_PORT, 20), module, Mixer6::FX_RETURN_L_A));
 		addInput(createInput<InPortAutinn>(Vec(moduleWidth*0.95-HALF_PORT, 20), module, Mixer6::FX_RETURN_R_A));
 
 		// FX B ports
-		addOutput(createOutput<OutPortAutinn>(Vec(moduleWidth*0.81-HALF_PORT, 70), module, Mixer6::FX_SENDB));
+		addOutput(createOutput<OutPortAutinn>(Vec(moduleWidth*0.81-HALF_PORT, 70), module, Mixer6::FX_SEND_B));
 		addInput(createInput<InPortAutinn>(Vec(moduleWidth*0.89-HALF_PORT, 70), module, Mixer6::FX_RETURN_L_B));
 		addInput(createInput<InPortAutinn>(Vec(moduleWidth*0.95-HALF_PORT, 70), module, Mixer6::FX_RETURN_R_B));
 

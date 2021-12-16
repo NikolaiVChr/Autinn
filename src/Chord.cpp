@@ -38,7 +38,7 @@ struct Chord : Module {
 	};
 	enum OutputIds {
 		CHORD_OUTPUT,
-		FINGER_PLAYING_OUTPUT,
+		FINGERS_PLAYING_OUTPUT,
 		NUM_OUTPUTS
 	};
 	enum LightIds {
@@ -52,7 +52,7 @@ struct Chord : Module {
 		configInput(ROOT_INPUT, "Root note 1V/Oct");
 		configInput(TRIGGER_INPUT, "Switch chord trigger");
 		configOutput(CHORD_OUTPUT, "Poly 1V/Oct chord");
-		configOutput(FINGER_PLAYING_OUTPUT, "Poly CV. Active channels. (Output from inactives is garbage).");
+		configOutput(FINGERS_PLAYING_OUTPUT, "Poly CV. Active channels. (Output from inactives is garbage).");
 
 		for (int light = 0; light < NUM_CHORDS; light++) {
 			configLight(CHORD_LIGHT+light, chordNames[light]);
@@ -135,10 +135,10 @@ void Chord::process(const ProcessArgs &args) {
 
 	float root = inputs[ROOT_INPUT].getVoltage();
 
-	outputs[FINGER_PLAYING_OUTPUT].setChannels(NUM_FINGERS);
+	outputs[FINGERS_PLAYING_OUTPUT].setChannels(NUM_FINGERS);
 	outputs[CHORD_OUTPUT].setChannels(NUM_FINGERS);
 	for (int finger = 0; finger < NUM_FINGERS; finger++) {
-	    outputs[FINGER_PLAYING_OUTPUT].setVoltage(chords[chordIndex][finger] == NOT_PLAYING?0.0f:10.0f, finger);
+	    outputs[FINGERS_PLAYING_OUTPUT].setVoltage(chords[chordIndex][finger] == NOT_PLAYING?0.0f:10.0f, finger);
 	    outputs[CHORD_OUTPUT].setVoltage(root+semitone*chords[chordIndex][finger],finger);
 	}
 
@@ -155,7 +155,7 @@ struct ChordWidget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 125), module, Chord::FINGER_PLAYING_OUTPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 125), module, Chord::FINGERS_PLAYING_OUTPUT));
 		addInput(createInput<InPortAutinn>(Vec(   5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 187), module, Chord::TRIGGER_INPUT));
 		addInput(createInput<InPortAutinn>(Vec(   5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 248), module, Chord::ROOT_INPUT));
 		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 310), module, Chord::CHORD_OUTPUT));
