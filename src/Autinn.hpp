@@ -152,7 +152,7 @@ struct RoundButtonAutinn : app::SvgSwitch {
 	RoundButtonAutinn() {
 		momentary = true;
 		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinn.svg")));
-		//addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinn.svg")));
+		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinnDown.svg")));
 	}
 };
 
@@ -160,7 +160,7 @@ struct RoundButtonSmallAutinn : app::SvgSwitch {
 	RoundButtonSmallAutinn() {
 		momentary = true;
 		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinn.svg")));
-		//addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinn.svg")));
+		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinnDown.svg")));
 	}
 };
 
