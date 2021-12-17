@@ -6,6 +6,10 @@
 #include <iterator> // back_inserter()
 #include <sys/time.h>
 
+
+//#include <iostream>
+//#include <string>
+
 /*
 
     Autinn VCV Rack Plugin
@@ -422,9 +426,12 @@ void Melody::generateMelody () {
 	int distanceToTonic = 0;
 	int closure = next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
 	int stepsTillEstablish = (12+rand() % static_cast<int>(16-12+1));
+	//std::cout << "    :::: \n";
+	//std::cout << "    :::: \n";
+	//std::cout << "    :::: \n";
 	for (int i = 1; i < next_phrase_length+closure; i++) {
-		if (distanceToTonic > 6) maxOffset = 2;
-		if (distanceToTonic > 4) maxOffset = 3;
+		if (distanceToTonic > 4) maxOffset = 2;
+		if (distanceToTonic > 3) maxOffset = 3;
 		else maxOffset = 4;
 		int maxClamp;
 		int minClamp;
