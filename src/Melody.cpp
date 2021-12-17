@@ -374,7 +374,7 @@ void Melody::process(const ProcessArgs &args) {
 		int phrase_index_prev = phrase_index - 1;
 		if (phrase_index_prev < 0) phrase_index_prev = phrase_length - 1;
 		float out_prev = this->note2vPoct(phrase[phrase_index_prev]);
-		outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount, 0, fmin(clockCount_last*gap, GLIDE_MAXIMUM/args.sampleTime), out_prev, out), out_prev, out));// 60ms glide at start of note
+		outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount, 0, fmin(float(double(clockCount_last)*gap), GLIDE_MAXIMUM/args.sampleTime), out_prev, out), out_prev, out));// 60ms glide at start of note
 	}
 	outputs[ACCENT_OUTPUT].setVoltage(float(phraseAccents[phrase_index])*10.0f);
 	if (resting > 0 || (clockCount > clockCount_last*gap && passedClocks >= phraseDurations[phrase_index]-1)) {// Normal

@@ -151,16 +151,16 @@ struct InPortAutinn : SVGPort {
 struct RoundButtonAutinn : app::SvgSwitch {
 	RoundButtonAutinn() {
 		momentary = true;
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinn.svg")));
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinnDown.svg")));
+		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinn.svg")));//up
+		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinnDown.svg")));//depressed state
 	}
 };
 
 struct RoundButtonSmallAutinn : app::SvgSwitch {
 	RoundButtonSmallAutinn() {
 		momentary = true;
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinn.svg")));
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinnDown.svg")));
+		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinn.svg")));//up
+		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinnDown.svg")));//depressed state
 	}
 };
 
