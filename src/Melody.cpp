@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm> // copy(), assign()
 #include <iterator> // back_inserter()
+#include <sys/time.h>
 
 /*
 
@@ -273,6 +274,7 @@ struct Melody : Module {
 	//int attenuvertInt(int CV, int KNOB, float min_result, float max_result);
 	void attenuvert(int CV, int KNOB, float min_result, float max_result);
 	void attenuvertFloat(int CV, int KNOB, float min_result, float max_result);
+	//unsigned int hash3(unsigned int h1, unsigned int h2, unsigned int h3);
 
 	void onReset(const ResetEvent& e) override {
 		// Later might think of something needed here
@@ -403,6 +405,10 @@ void Melody::generateMelody () {
 	 more scales/modes?
 	*/
 
+	//struct timeval times;
+	//gettimeofday(&times, NULL);
+	//srand(hash3(times.tv_sec, times.tv_usec, getpid()));
+
 	// Melody
 	int tonic = int(params[TONIC_PARAM].getValue());
 	std::vector<int> mode = modes[int(params[MODE_PARAM].getValue())];
@@ -417,6 +423,9 @@ void Melody::generateMelody () {
 	int closure = next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
 	int stepsTillEstablish = (12+rand() % static_cast<int>(16-12+1));
 	for (int i = 1; i < next_phrase_length+closure; i++) {
+		if (distanceToTonic > 6) maxOffset = 2;
+		if (distanceToTonic > 4) maxOffset = 3;
+		else maxOffset = 4;
 		int maxClamp;
 		int minClamp;
 		if (closure == 0) {
@@ -595,6 +604,10 @@ float Melody::note2freq (int note) {
 
 float Melody::freq2vPoct (float freq) {
 	return log2(freq / dsp::FREQ_C4);
+}*/
+
+/*unsigned int Melody::hash3(unsigned int h1, unsigned int h2, unsigned int h3) {
+    return (((h1 * 2654435789U) + h2) * 2654435789U) + h3;
 }*/
 
 float Melody::note2vPoct (int note) {
