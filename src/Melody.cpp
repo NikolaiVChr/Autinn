@@ -226,18 +226,18 @@ struct Melody : Module {
 	int c4 = 60;
 	
 	// Intervals [modes][intervals]
-	std::vector<int> modes[NUMBER_OF_MODES] = { {2,2,1,2,2,2,1},//   I Major
-												{2,1,2,2,2,1,2},//  II Dorian
-												{1,2,2,2,1,2,2},// III Phrygian
-												{2,2,2,1,2,2,1},//  IV Lydian
-												{2,1,2,2,2,1,2},//   V Mixolydian
-												{2,1,2,2,1,2,2},//  VI Minor
-												{1,2,2,1,2,2,2},// VII Locrian
-												{1,3,1,2,1,3,1},//   Double Harmonic Major (arabic)
-												{2,1,3,1,1,3,1},//   Double Harmonic Minor (hungarian gypsy)
-												{3,2,1,1,3,2},  //   Hexatonic Blues
-												{2,2,1,2,2,1,1,1},// Bebop dominant
-												{2,2,3,2,3}     //   Major Pentatonic
+	std::vector<int> modes[NUMBER_OF_MODES] = { {2,2,1,2,2,2,1},  //   I Major
+												{2,1,2,2,2,1,2},  //  II Dorian
+												{1,2,2,2,1,2,2},  // III Phrygian
+												{2,2,2,1,2,2,1},  //  IV Lydian
+												{2,1,2,2,2,1,2},  //   V Mixolydian
+												{2,1,2,2,1,2,2},  //  VI Minor
+												{1,2,2,1,2,2,2},  // VII Locrian
+												{1,3,1,2,1,3,1},  //   Double Harmonic Major
+												{2,1,3,1,1,3,1},  //   Double Harmonic Minor
+												{3,2,1,1,3,2},    //   Hexatonic Blues
+												{2,2,1,2,2,1,1,1},//   Bebop dominant
+												{2,2,3,2,3}       //   Major Pentatonic
 											  };
 
 	int phrase_length = 6;
@@ -415,6 +415,7 @@ void Melody::generateMelody () {
 	int lastIndex = 0;
 	int distanceToTonic = 0;
 	int closure = next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
+	int stepsTillEstablish = (12+rand() % static_cast<int>(16-12+1));
 	for (int i = 1; i < next_phrase_length+closure; i++) {
 		int maxClamp;
 		int minClamp;
@@ -427,7 +428,7 @@ void Melody::generateMelody () {
 			maxClamp = std::min(maxOffset, -distanceToTonic+1);
 			minClamp = std::max(minOffset, -distanceToTonic-1);
 		} else if (next_phrase_length < PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
-			// Small phrase
+			// Small phrase target resolution
 			int stepsLeft  = next_phrase_length-i; // steps left including tonic step
 			int howFarDown = stepsLeft * minOffset; // How far towards tonic can we get from now till tonic (negative number)
 			int howFarUp   = stepsLeft * maxOffset;
@@ -435,8 +436,18 @@ void Melody::generateMelody () {
 			int maxDown = maxOffset-(howFarUp+distanceToTonic);
 			maxClamp = std::min(maxOffset, maxUp);
 			minClamp = std::max(minOffset, maxDown);
+		} else if (stepsTillEstablish < next_phrase_length-i-1) {
+			// Longer phrase target establish
+			int stepsLeft  = stepsTillEstablish; // steps left including tonic step
+			if (stepsTillEstablish == 1) stepsTillEstablish = (12+rand() % static_cast<int>(16-12+1));
+			int howFarDown = stepsLeft * minOffset; // How far towards tonic can we get from now till tonic (negative number)
+			int howFarUp   = stepsLeft * maxOffset;
+			int maxUp   = minOffset-(distanceToTonic+howFarDown);
+			int maxDown = maxOffset-(howFarUp+distanceToTonic);
+			maxClamp = std::min(maxOffset, maxUp);
+			minClamp = std::max(minOffset, maxDown);
 		} else {
-			// Longer phrase
+			// Longer phrase target cadence
 			int stepsLeft  = next_phrase_length-i-1; // steps left including cadence step
 			int howFarDown = stepsLeft * minOffset; // How far towards cadence can we get from now till cadence (negative number)
 			int howFarUp   = stepsLeft * maxOffset;
@@ -454,6 +465,7 @@ void Melody::generateMelody () {
 		lastIndex += noteOffset;
 		if (lastIndex < 0) lastIndex += mode.size();
 		if (lastIndex > int(mode.size())-1) lastIndex -= mode.size();
+		stepsTillEstablish--;
 	}
 	if (closure == -1) {
 		nextPhrase.push_back(tonic);
