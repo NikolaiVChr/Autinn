@@ -115,16 +115,15 @@ void Nap::process(const ProcessArgs &args) {
 	float outBuf  [current_oversample];
 
 	if (current_oversample == oversample2) {
-		upsampler2.process(pre, inInter);
+		upsampler2.process(clamp(pre, -4.5f, 4.5f), inInter);
 	} else if (current_oversample == oversample4) {
-		upsampler4.process(pre, inInter);
+		upsampler4.process(clamp(pre, -4.5f, 4.5f), inInter);
 	}
 
 	for (int i = 0; i < current_oversample; i++) {
-		float in = clamp(inInter[i], -4.5f, 4.5f);
-		float out = this->fwdEuler(out_prev, in);
+		float out = this->fwdEuler(out_prev, inInter[i]);
 		outBuf[i] = non_lin_func(out/12.0f);
-		out_prev = outBuf[i];
+		out_prev = out;
 	}
 	float final;
 	if (current_oversample == oversample2) {
@@ -143,12 +142,12 @@ void Nap::process(const ProcessArgs &args) {
 	lights[LOW_LIGHT].value = fmax(0,rescale(pre_abs, 0.0f, 4.5f, 1.0f, 0.0f));
 }
 
-float Nap::fwdEuler(float out_prev, float in) {
-    return out_prev + this->distort(out_prev, in)*params[DREAMING_PARAM].getValue();
+float Nap::fwdEuler(float out_prv, float in) {
+    return out_prv + this->distort(out_prv, in)*params[DREAMING_PARAM].getValue();
 }
 
-float Nap::distort(float out_prev, float in) {
-    return (in - out_prev) / 22.0f - 0.504f * non_lin_func2(out_prev / 45.3f);
+float Nap::distort(float out_prv, float in) {
+    return (in - out_prv) / 22.0f - 0.504f * non_lin_func2(out_prv / 45.3f);
 }
 
 struct OversampleNapMenuItem : MenuItem {
