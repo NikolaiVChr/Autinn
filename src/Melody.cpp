@@ -5,6 +5,7 @@
 #include <algorithm> // copy(), assign()
 #include <iterator> // back_inserter()
 #include <sys/time.h>
+#include <random>
 
 
 //#include <iostream>
@@ -117,6 +118,9 @@ struct Melody : Module {
 		phraseAccents.assign(init_phrase_acc,init_phrase_acc+6);
 		int init_phrase_glide[6] = {false,false,false,false,false,false};
 		phraseGlides.assign(init_phrase_glide,init_phrase_glide+6);
+
+		generator = std::mt19937_64(device());
+
 		this->generateMelody();
 	}
 
@@ -269,6 +273,10 @@ struct Melody : Module {
 	int rest_amount = 0;
 	long int stepCounter = 0;
 
+
+	std::random_device device;
+	std::mt19937_64 generator;	
+
 	//float note2freq (int note);
 	//float freq2vPoct (float freq);
 	float note2vPoct (int note);
@@ -278,7 +286,6 @@ struct Melody : Module {
 	//int attenuvertInt(int CV, int KNOB, float min_result, float max_result);
 	void attenuvert(int CV, int KNOB, float min_result, float max_result);
 	void attenuvertFloat(int CV, int KNOB, float min_result, float max_result);
-	//unsigned int hash3(unsigned int h1, unsigned int h2, unsigned int h3);
 
 	void onReset(const ResetEvent& e) override {
 		// Later might think of something needed here
@@ -409,9 +416,7 @@ void Melody::generateMelody () {
 	 more scales/modes?
 	*/
 
-	//struct timeval times;
-	//gettimeofday(&times, NULL);
-	//srand(hash3(times.tv_sec, times.tv_usec, getpid()));
+
 
 	// Melody
 	int tonic = int(params[TONIC_PARAM].getValue());
@@ -425,7 +430,9 @@ void Melody::generateMelody () {
 	int lastIndex = 0;
 	int distanceToTonic = 0;
 	int closure = next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
-	int stepsTillEstablish = (12+rand() % static_cast<int>(16-12+1));
+	std::uniform_int_distribution<int> uniform_dist_e(12, 16);
+	int stepsTillEstablish = uniform_dist_e(generator);
+	//int direction = 0;
 	//std::cout << "    :::: \n";
 	//std::cout << "    :::: \n";
 	//std::cout << "    :::: \n";
@@ -455,7 +462,7 @@ void Melody::generateMelody () {
 		} else if (stepsTillEstablish < next_phrase_length-i-1) {
 			// Longer phrase target establish
 			int stepsLeft  = stepsTillEstablish; // steps left including tonic step
-			if (stepsTillEstablish == 1) stepsTillEstablish = (12+rand() % static_cast<int>(16-12+1));
+			if (stepsTillEstablish == 1) stepsTillEstablish = uniform_dist_e(generator);
 			int howFarDown = stepsLeft * minOffset; // How far towards tonic can we get from now till tonic (negative number)
 			int howFarUp   = stepsLeft * maxOffset;
 			int maxUp   = minOffset-(distanceToTonic+howFarDown);
@@ -473,12 +480,17 @@ void Melody::generateMelody () {
 			minClamp = std::max(minOffset, maxDown);
 		}
 		// Using only maxOffset to make sure initial equal chance of either way, but clamp will restrict that afterwards:
-		int noteOffset = clamp(-maxOffset+(rand() % static_cast<int>(maxOffset+maxOffset+1)), minClamp, maxClamp);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
+		int maxiRand =  maxOffset;
+		int miniRand = -maxOffset;
+		//maxiRand = std::min(miniRand+1, direction>2?-1:maxiRand);
+		std::uniform_int_distribution<int> uniform_dist(miniRand, maxiRand);
+		int noteOffset = clamp(uniform_dist(generator), minClamp, maxClamp);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
 		int note = lastNote + getSemiNoteOffset(noteOffset, lastIndex, mode);
 		nextPhrase.push_back(note);
 		distanceToTonic += noteOffset;
 		lastNote = note;
 		lastIndex += noteOffset;
+		//direction += std::min(1, std::max(-1, noteOffset));
 		if (lastIndex < 0) lastIndex += mode.size();
 		if (lastIndex > int(mode.size())-1) lastIndex -= mode.size();
 		stepsTillEstablish--;
@@ -611,10 +623,6 @@ float Melody::note2freq (int note) {
 
 float Melody::freq2vPoct (float freq) {
 	return log2(freq / dsp::FREQ_C4);
-}*/
-
-/*unsigned int Melody::hash3(unsigned int h1, unsigned int h2, unsigned int h3) {
-    return (((h1 * 2654435789U) + h2) * 2654435789U) + h3;
 }*/
 
 float Melody::note2vPoct (int note) {
