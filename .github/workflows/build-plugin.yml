@@ -17,7 +17,7 @@ jobs:
         config:        
         - {
             name: Linux,
-            os: ubuntu-18.04,
+            os: ubuntu-latest,
             prepare-os: sudo apt-get -y --allow-downgrades --allow-remove-essential --allow-change-held-packages update,
             prepare-os2: sudo apt install -y libglu-dev,
             postfix: lin
@@ -71,7 +71,7 @@ jobs:
           make -j dep
           make -j dist
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: dist
           name: ${{ matrix.config.name }}
