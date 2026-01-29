@@ -1,7 +1,7 @@
 {
   "slug": "Autinn",
   "name": "Autinn",
-  "version": "2.1.0",
+  "version": "2.6.0",
   "license": "GPL-3.0-or-later",
   "brand": "Autinn",
   "author": "Nikolai V. Chr.",
@@ -18,7 +18,7 @@
       "name": "Amp",
       "description": "Amplifier",
       "tags": [
-        "VCA",
+        "Voltage-controlled amplifier",
         "Polyphonic",
         "Attenuator"
       ]
@@ -28,7 +28,7 @@
       "name": "Bass",
       "description": "Bass and Acid synth",
       "tags": [
-        "VCF",
+        "Filter",
         "Physical modeling"
       ]
     },
@@ -37,7 +37,7 @@
       "name": "Mera",
       "description": "Pre-post VCA",
       "tags": [
-        "VCA",
+        "Voltage-controlled amplifier",
         "Attenuator"
       ]
     },
@@ -54,7 +54,7 @@
       "name": "Deadband",
       "description": "Constrain low voltages to zero",
       "tags": [
-        "VCA",
+        "Voltage-controlled amplifier",
         "Attenuator"
       ]
     },
@@ -75,7 +75,8 @@
       "name": "DC",
       "description": "Outputs DC component of signal",
       "tags": [
-        "Utility"
+        "Utility",
+        "Polyphonic"
       ]
     },
     {
@@ -91,7 +92,8 @@
       "name": "Jette",
       "description": "Oscillator with harmonics control",
       "tags": [
-        "VCO"
+        "Oscillator",
+        "Polyphonic"
       ]
     },
     {
@@ -99,7 +101,8 @@
       "name": "Oxcart",
       "description": "Aggresive oscillator. Best for low/mid frequencies.",
       "tags": [
-        "VCO"
+        "Oscillator",
+        "Polyphonic"
       ]
     },
     {
@@ -107,7 +110,7 @@
       "name": "Flora",
       "description": "A 24dB low-pass filter emulating a 4-pole transistor ladder",
       "tags": [
-        "VCF",
+        "Filter",
         "Physical modeling",
         "Dual"
       ]
@@ -117,7 +120,7 @@
       "name": "Saw",
       "description": "Oscillator with a sawish sound",
       "tags": [
-        "VCO"
+        "Oscillator"
       ]
     },
     {
@@ -125,7 +128,7 @@
       "name": "Sjip",
       "description": "Oscillator with rounded waveform",
       "tags": [
-        "VCO"
+        "Oscillator"
       ]
     },
     {
@@ -133,7 +136,7 @@
       "name": "Square",
       "description": "Oscillator with a squareish sound",
       "tags": [
-        "VCO"
+        "Oscillator"
       ]
     },
     {
