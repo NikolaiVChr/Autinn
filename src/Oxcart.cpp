@@ -40,9 +40,9 @@ struct Oxcart : Module {
 		NUM_LIGHTS
 	};
 
-	float phase = 0.0f;
+	float phase[16] = {};
 	float blinkTime = 0.0f;
-	dsp::MinBlepGenerator<16,32,float> oxMinBLEP;// 16 zero crossings, x32 oversample
+	dsp::MinBlepGenerator<16,32,float> oxMinBLEP[16];// 16 zero crossings, x32 oversample
 
 	Oxcart() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -60,34 +60,42 @@ void Oxcart::process(const ProcessArgs &args) {
 	// VCV Rack CV is +-5V or 0V-10V
 
 	if (!outputs[BUZZ_OUTPUT].isConnected()) {
+		lights[BLINK_LIGHT].value = 0.0f;
 		return;
 	}
 
+	int channels = std::max(1, inputs[PITCH_INPUT].getChannels());
+    outputs[BUZZ_OUTPUT].setChannels(channels);
 	float deltaTime = args.sampleTime;
 
-	float pitch = params[PITCH_PARAM].getValue();
-	pitch += inputs[PITCH_INPUT].getVoltage();
-	pitch = clamp(pitch, -4.0f, 4.0f);
-	float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+	float pitchBase = params[PITCH_PARAM].getValue();
 
-	float period = 4.0f;
-	float deltaPhase = freq * deltaTime * period;
+	for (int ch = 0; ch < channels; ch++) {
+		float pitch = pitchBase + inputs[PITCH_INPUT].getPolyVoltage(ch);
+		pitch = clamp(pitch, -4.0f, 4.0f);
+		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
 	
-	phase += deltaPhase;
+		float period = 4.0f;
+		float deltaPhase = freq * deltaTime * period;
+		
+		phase[ch] += deltaPhase;
+	
+		if (phase[ch] >= period) {
+			phase[ch] -= period;
+			float crossing = -phase[ch] / deltaPhase;
+			oxMinBLEP[ch].insertDiscontinuity(crossing, 1.0);
+		}
+		
+	    float buzz = -non_lin_func(phase[ch])+oxMinBLEP[ch].process()+0.826795f;
+		outputs[BUZZ_OUTPUT].setVoltage(6.0f * buzz, ch);// keep its peaks within approx 5V.
 
-	if (phase >= period) {
-		phase -= period;
-		float crossing = -phase / deltaPhase;
-		oxMinBLEP.insertDiscontinuity(crossing, 1.0);
+		if (ch == 0) {
+            blinkTime += deltaTime;
+            float blinkPeriod = 1.0f/(freq*0.01f);
+            if (blinkTime >= blinkPeriod) blinkTime = 0.0f;
+            lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod*0.5f) ? 1.0f : 0.0f;
+        }
 	}
-	
-    float buzz = -non_lin_func(phase)+oxMinBLEP.process()+0.826795f;
-	outputs[BUZZ_OUTPUT].setVoltage(6.0f * buzz);// keep its peaks within approx 5V.
-	
-	blinkTime += args.sampleTime;
-	float blinkPeriod = 1.0f/(freq*0.01f);
-	blinkTime = fmod(blinkTime, blinkPeriod);
-	lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod*0.5f) ? 1.0f : 0.0f;
 }
 
 struct OxcartWidget : ModuleWidget {
