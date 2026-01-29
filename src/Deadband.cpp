@@ -89,7 +89,8 @@ void Deadband::process(const ProcessArgs &args) {
 		float unlimit = inBuf[i];
 		float limit   = 0.0f;
 		if (width == 0.0f) {
-			limit = 0.0f;
+			// width of zero should mean bypass
+			limit = unlimit;
 		} else if (unlimit > width) {
 			limit = unlimit-width*gap;
 		} else if (unlimit < -width) {
