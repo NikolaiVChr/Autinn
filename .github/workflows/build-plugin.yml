@@ -1,8 +1,8 @@
 name: Build VCV Rack Plugin
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 env:
-  rack-sdk-version: 2.0.3
+  rack-sdk-version: 2.6.6
 
 defaults:
   run:
@@ -20,25 +20,32 @@ jobs:
             os: ubuntu-latest,
             prepare-os: sudo apt-get -y --allow-downgrades --allow-remove-essential --allow-change-held-packages update,
             prepare-os2: sudo apt install -y libglu-dev,
-            postfix: lin
+            postfix: lin-x64
           }
         - {
-            name: MacOS,
+            name: MacOS-Intel,
             os: macos-latest,
             prepare-os: "",
             prepare-os2: "",
-            postfix: mac
+            postfix: mac-x64
+          }          
+        - {
+            name: MacOS-ARM,
+            os: macos-latest,
+            prepare-os: "",
+            prepare-os2: "",
+            postfix: mac-arm64
           }
         - {
             name: Windows,
             os: windows-latest,
             prepare-os: export CC=gcc,
             prepare-os2: "",
-            postfix: win
+            postfix: win-x64
           }
         language: [ 'cpp' ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Get Rack-SDK
@@ -60,7 +67,7 @@ jobs:
           cat <<< `jq --arg VERSION "$pluginversion-$gitrev" '.version=$VERSION' plugin.json` > plugin.json
       - name: Initialize CodeQL
         if: runner.os == 'Linux'
-        uses: github/codeql-action/init@v1
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
       - name: Build plugin
@@ -77,7 +84,7 @@ jobs:
           name: ${{ matrix.config.name }}
       - name: Perform CodeQL Analysis
         if: runner.os == 'Linux'
-        uses: github/codeql-action/analyze@v1
+        uses: github/codeql-action/analyze@v3
 
   publish:
     name: Publish plugin
@@ -87,8 +94,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v2
-      - uses: FranzDiebold/github-env-vars-action@v1.2.1
+      - uses: actions/checkout@v4
+      - uses: FranzDiebold/github-env-vars-action@v2
       - name: Check if plugin version matches tag
         run: |
           pluginversion=`jq -r '.version' plugin.json`
@@ -97,7 +104,7 @@ jobs:
             exit 1
           fi
       - name: Create Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -110,6 +117,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: _artifacts
+          pattern: '*'
+          merge-multiple: true
       - name: Upload release assets
         uses: svenstaro/upload-release-action@v2
         with:
