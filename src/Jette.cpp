@@ -51,7 +51,7 @@ struct Jette : Module {
 		NUM_LIGHTS
 	};
 
-	float phase = 0.0f;
+	float phase[16] = {};
 	float blinkTime = 0.0f;
 	int down = 0;
 	int shape = 0;
@@ -122,41 +122,72 @@ void Jette::process(const ProcessArgs &args) {
 
 	float dt = args.sampleTime;
 
-	float pitch = params[PITCH_PARAM].getValue();
-	pitch += inputs[PITCH_INPUT].getVoltage();
-	pitch = clamp(pitch, -4.0f, 6.0f);
-	float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+	int channels = std::max(1, inputs[PITCH_INPUT].getChannels());
+    outputs[BUZZ_OUTPUT].setChannels(channels);
+	
+	float pitchBase = params[PITCH_PARAM].getValue();
 
-	float period = 2.0f*M_PI;
-	float deltaPhase = freq * dt * period;
-	phase += deltaPhase;
-	phase = fmod(phase, period);
+	float a_raw = params[A_PARAM].getValue();
+	float b_raw = params[B_PARAM].getValue();
+	float c_raw = params[C_PARAM].getValue();
+	float d_raw = params[D_PARAM].getValue();
+	float e_raw = params[E_PARAM].getValue();
+	float f_raw = params[F_PARAM].getValue();
+	float g_raw = params[G_PARAM].getValue();
+	float h_raw = params[H_PARAM].getValue();
 
-	float a = params[A_PARAM].getValue();
-	float b = params[B_PARAM].getValue();
-	float c = params[C_PARAM].getValue();
-	float d = params[D_PARAM].getValue();
-	float e = params[E_PARAM].getValue();
-	float f = params[F_PARAM].getValue();
-	float g = params[G_PARAM].getValue();
-	float h = params[H_PARAM].getValue();
-
-	float nyquist = args.sampleRate*0.5f;
-	if (shape < 2.0f) {
-		if (freq * 15.0f > nyquist) {
-			h = 0.0f;
-			if (freq * 13.0f > nyquist) {
-				g = 0.0f;
-				if (freq * 11.0f > nyquist) {
-					f = 0.0f;
-					if (freq * 9.0f > nyquist) {
-						e = 0.0f;
-						if (freq * 7.0f > nyquist) {
-							d = 0.0f;
-							if (freq * 5.0f > nyquist) {
-								c = 0.0f;
+	for (int ch = 0; ch < channels; ch++) {
+		float pitch = pitchBase + inputs[PITCH_INPUT].getPolyVoltage(ch);
+		pitch = clamp(pitch, -4.0f, 6.0f);
+		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+	
+		float period = 2.0f*M_PI;
+		float deltaPhase = freq * dt * period;
+		phase[ch] += deltaPhase;
+		//phase[ch] = fmod(phase[ch], period);
+		if (phase[ch] >= period) phase[ch] -= period; // Faster than fmod
+	
+		float a=a_raw, b=b_raw, c=c_raw, d=d_raw, e=e_raw, f=f_raw, g=g_raw, h=h_raw;
+	
+		float nyquist = args.sampleRate*0.5f;
+		if (shape < 2.0f) {
+			if (freq * 15.0f > nyquist) {
+				h = 0.0f;
+				if (freq * 13.0f > nyquist) {
+					g = 0.0f;
+					if (freq * 11.0f > nyquist) {
+						f = 0.0f;
+						if (freq * 9.0f > nyquist) {
+							e = 0.0f;
+							if (freq * 7.0f > nyquist) {
+								d = 0.0f;
+								if (freq * 5.0f > nyquist) {
+									c = 0.0f;
+									if (freq * 3.0f > nyquist) {
+										b = 0.0f;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		} else {
+			if (freq * 8.0f > nyquist) {
+				h = 0.0f;
+				if (freq * 7.0f > nyquist) {
+					g = 0.0f;
+					if (freq * 6.0f > nyquist) {
+						f = 0.0f;
+						if (freq * 5.0f > nyquist) {
+							e = 0.0f;
+							if (freq * 4.0f > nyquist) {
+								d = 0.0f;
 								if (freq * 3.0f > nyquist) {
-									b = 0.0f;
+									c = 0.0f;
+									if (freq * 2.0f > nyquist) {
+										b = 0.0f;
+									}
 								}
 							}
 						}
@@ -164,50 +195,30 @@ void Jette::process(const ProcessArgs &args) {
 				}
 			}
 		}
-	} else {
-		if (freq * 8.0f > nyquist) {
-			h = 0.0f;
-			if (freq * 7.0f > nyquist) {
-				g = 0.0f;
-				if (freq * 6.0f > nyquist) {
-					f = 0.0f;
-					if (freq * 5.0f > nyquist) {
-						e = 0.0f;
-						if (freq * 4.0f > nyquist) {
-							d = 0.0f;
-							if (freq * 3.0f > nyquist) {
-								c = 0.0f;
-								if (freq * 2.0f > nyquist) {
-									b = 0.0f;
-								}
-							}
-						}
-					}
-				}
-			}
+		float buzz = 0.0f;
+		if (shape == 0) {
+			// square
+			buzz = a*sin(phase[ch]) + b*sin(3.0f*phase[ch])/3.0f + c*sin(5.0f*phase[ch])/5.0f + d*sin(7.0f*phase[ch])/7.0f + e*sin(9.0f*phase[ch])/9.0f + f*sin(11.0f*phase[ch])/11.0f + g*sin(13.0f*phase[ch])/13.0f + h*sin(15.0f*phase[ch])/15.0f;
+			buzz *= 20.0f/M_PI;
+		} else if (shape == 1 ) {
+			// triangle
+			buzz = a*cos(phase[ch]) + b*cos(3.0f*phase[ch])/9.0f + c*cos(5.0f*phase[ch])/25.0f + d*cos(7.0f*phase[ch])/49.0f + e*cos(9.0f*phase[ch])/81.0f + f*cos(11.0f*phase[ch])/121.0f + g*cos(13.0f*phase[ch])/169.0f + h*cos(15.0f*phase[ch])/225.0f;
+			buzz *= 40.0f/(M_PI*M_PI);
+		} else {
+			// saw
+			buzz = a*sin(phase[ch]) - b*sin(2.0f*phase[ch])/2.0f + c*sin(3.0f*phase[ch])/3.0f - d*sin(4.0f*phase[ch])/4.0f + e*sin(5.0f*phase[ch])/5.0f - f*sin(6.0f*phase[ch])/6.0f + g*sin(7.0f*phase[ch])/7.0f - h*sin(8.0f*phase[ch])/8.0f;
+			// + sin(9*phase[ch])/9 - sin(10*phase[ch])/10 + sin(11*phase[ch])/11 - sin(12*phase[ch])/12 + sin(13*phase[ch])/13 - sin(14*phase[ch])/14;
+			buzz *= 10.0f/M_PI;
 		}
-	}
-	float buzz = 0.0f;
-	if (shape == 0) {
-		// square
-		buzz = a*sin(phase) + b*sin(3.0f*phase)/3.0f + c*sin(5.0f*phase)/5.0f + d*sin(7.0f*phase)/7.0f + e*sin(9.0f*phase)/9.0f + f*sin(11.0f*phase)/11.0f + g*sin(13.0f*phase)/13.0f + h*sin(15.0f*phase)/15.0f;
-		buzz *= 20.0f/M_PI;
-	} else if (shape == 1 ) {
-		// triangle
-		buzz = a*cos(phase) + b*cos(3.0f*phase)/9.0f + c*cos(5.0f*phase)/25.0f + d*cos(7.0f*phase)/49.0f + e*cos(9.0f*phase)/81.0f + f*cos(11.0f*phase)/121.0f + g*cos(13.0f*phase)/169.0f + h*cos(15.0f*phase)/225.0f;
-		buzz *= 40.0f/(M_PI*M_PI);
-	} else {
-		// saw
-		buzz = a*sin(phase) - b*sin(2.0f*phase)/2.0f + c*sin(3.0f*phase)/3.0f - d*sin(4.0f*phase)/4.0f + e*sin(5.0f*phase)/5.0f - f*sin(6.0f*phase)/6.0f + g*sin(7.0f*phase)/7.0f - h*sin(8.0f*phase)/8.0f;
-		// + sin(9*phase)/9 - sin(10*phase)/10 + sin(11*phase)/11 - sin(12*phase)/12 + sin(13*phase)/13 - sin(14*phase)/14;
-		buzz *= 10.0f/M_PI;
-	}
-	outputs[BUZZ_OUTPUT].setVoltage(buzz);//aprox 10V PP 
+		outputs[BUZZ_OUTPUT].setVoltage(buzz, ch);//aprox 10V PP 
 
-	blinkTime += dt;
-	float blinkPeriod = 1.0f/(freq*0.01f);
-	blinkTime = fmod(blinkTime, blinkPeriod);
-	lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod*0.5f) ? 1.0 : 0.0;
+		if (ch == 0) {
+			blinkTime += dt;
+			float blinkPeriod = 1.0f/(freq*0.01f);
+			blinkTime = fmod(blinkTime, blinkPeriod);
+			lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod*0.5f) ? 1.0 : 0.0;
+		}
+	}
 }
 
 struct JetteWidget : ModuleWidget {
