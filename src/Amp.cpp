@@ -109,13 +109,13 @@ struct AmpWidget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		//addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
 		//addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-
+		INFO("AmpWidget: Adding port Widgets");
 		addInput(createInput<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 115), module, Amp::CV_INPUT));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Amp::DIAL_PARAM));
-
 		addInput(createInput<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Amp::AMP_INPUT));
 		addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Amp::AMP_OUTPUT));
-
+		INFO("AmpWidget: Adding knob Widgets");
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Amp::DIAL_PARAM));
+		INFO("AmpWidget: Adding light Widgets");
 		addChild(createLight<MediumLight<YellowLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Amp::BLINK_LIGHT));
 		INFO("AmpWidget: Constructor Finished Successfully");
 	}

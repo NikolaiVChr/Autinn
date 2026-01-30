@@ -132,7 +132,14 @@ struct ScrewStarAutinn : SVGScrew {
 	ScrewStarAutinn() {
 		if (!pluginInstance) return;
 		//setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
-		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
+		std::shared_ptr<Svg> s = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg"));
+		if (s) {
+			setSvg(s);
+			INFO("ScrewStarAutinn: Loaded SVG successfully");
+		} else {
+			INFO("ScrewStarAutinn: Loaded SVG unsuccessfully");
+		}
+		//setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
 		/*
 		sw->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg"));
 		sw->wrap();
