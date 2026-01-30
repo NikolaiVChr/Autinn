@@ -5,7 +5,6 @@
 #include <algorithm> // copy(), assign()
 #include <iterator> // back_inserter()
 #include <sys/time.h>
-#include <random>
 
 
 //#include <iostream>
@@ -82,6 +81,33 @@ struct Melody : Module {
 		NUM_LIGHTS
 	};
 
+	std::vector<int> phrase[16];
+	std::vector<int> nextPhrase[16];
+	std::vector<int> phraseDurations[16];
+	std::vector<int> nextPhraseDurations[16];
+	std::vector<bool> phraseAccents[16];
+	std::vector<bool> nextPhraseAccents[16];
+	std::vector<bool> phraseGlides[16];
+	std::vector<bool> nextPhraseGlides[16];
+
+	int phrase_length[16];
+	int next_phrase_length[16];
+	int phrase_index[16] = {};
+
+	bool clockExt_prev[16] = {};
+	long int clockCount[16] = {};
+	long int clockCount_last[16] = {};
+	int passedClocks[16] = {};
+
+	float gap[16];
+	float nextGap[16];
+
+	int resting[16] = {};
+	int rest_amount[16] = {};
+
+	bool generate_prev = false;
+	long int stepCounter = 0;
+
 	Melody() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configSwitch(Melody::TONIC_PARAM, TONIC_MIN, TONIC_MAX, 62, "Tonic", {"C", "C#", "D", "D#","E","F","F#","G","G#","A","A#","B"});
@@ -110,135 +136,199 @@ struct Melody : Module {
 		configInput(CV_GAP_INPUT, "Expression CV ±5V");
 		configInput(CV_REST_INPUT, "Rest CV ±5V");
 
-		phrase.reserve(PHRASE_LENGTH_MAX);
-        nextPhrase.reserve(PHRASE_LENGTH_MAX);
-        phraseDurations.reserve(PHRASE_LENGTH_MAX);
-        nextPhraseDurations.reserve(PHRASE_LENGTH_MAX);
-        phraseAccents.reserve(PHRASE_LENGTH_MAX);
-        nextPhraseAccents.reserve(PHRASE_LENGTH_MAX);
-        phraseGlides.reserve(PHRASE_LENGTH_MAX);
-        nextPhraseGlides.reserve(PHRASE_LENGTH_MAX);
-
 		int init_phrase[6] = {60,62,67,65,62,60};
-		phrase.assign(init_phrase,init_phrase+6); 
 		int init_phrase_dura[6] = {2,2,2,2,2,2};
-		phraseDurations.assign(init_phrase_dura,init_phrase_dura+6);
 		int init_phrase_acc[6] = {false,false,false,false,false,false};
-		phraseAccents.assign(init_phrase_acc,init_phrase_acc+6);
 		int init_phrase_glide[6] = {false,false,false,false,false,false};
-		phraseGlides.assign(init_phrase_glide,init_phrase_glide+6);
 
-		generator = std::mt19937_64(device());
+		for (int c = 0; c < 16; c++) {
+			phrase[c].reserve(PHRASE_LENGTH_MAX);
+			nextPhrase[c].reserve(PHRASE_LENGTH_MAX);
+			phraseDurations[c].reserve(PHRASE_LENGTH_MAX);
+			nextPhraseDurations[c].reserve(PHRASE_LENGTH_MAX);
+			phraseAccents[c].reserve(PHRASE_LENGTH_MAX);
+			nextPhraseAccents[c].reserve(PHRASE_LENGTH_MAX);
+			phraseGlides[c].reserve(PHRASE_LENGTH_MAX);
+			nextPhraseGlides[c].reserve(PHRASE_LENGTH_MAX);
 
-		this->generateMelody();
+			phrase[c].assign(init_phrase, init_phrase+6);
+			phraseDurations[c].assign(init_phrase_dura, init_phrase_dura+6);
+			phraseAccents[c].assign(init_phrase_acc, init_phrase_acc+6);
+			phraseGlides[c].assign(init_phrase_glide, init_phrase_glide+6);
+
+			phrase_length[c] = 6;
+			gap[c] = GAP_NORMAL;
+			nextGap[c] = GAP_NORMAL;
+			rest_amount[c] = 2; // Default rest
+
+			// Generate initial 'next' state
+			this->generateMelody(c);
+		}
 	}
 
 	json_t *dataToJson() override {
 	    json_t *root = json_object();
 
-	    json_t *sequence_json_array = json_array();
-	    for(int note : phrase) {
-	        json_array_append_new(sequence_json_array, json_integer(note));
-	    }
-	    json_object_set(root, "sequence", sequence_json_array);
-	    json_decref(sequence_json_array);
+		json_t *voicesJ = json_array();
 
-	    json_t *durations_json_array = json_array();
-	    for(int dura : phraseDurations) {
-	        json_array_append_new(durations_json_array, json_integer(dura));
-	    }
-	    json_object_set(root, "durations", durations_json_array);
-	    json_decref(durations_json_array);
+		for (int c = 0; c < 16; c++) {
+			json_t *voiceRoot = json_object();
 
-	    json_t *accents_json_array = json_array();
-	    for(bool acc : phraseAccents) {
-	        json_array_append_new(accents_json_array, json_boolean(acc));
-	    }
-	    json_object_set(root, "accents", accents_json_array);
-	    json_decref(accents_json_array);
+			json_object_set_new(voiceRoot, "phrase_index", json_integer(phrase_index[c]));
+			json_object_set_new(voiceRoot, "resting", json_integer(resting[c]));
+			json_object_set_new(voiceRoot, "phrase_length", json_integer(phrase_length[c]));
 
-	    json_t *glides_json_array = json_array();
-	    for(bool glide : phraseGlides) {
-	        json_array_append_new(glides_json_array, json_boolean(glide));
-	    }
-	    json_object_set(root, "glides", glides_json_array);
-	    json_decref(glides_json_array);
+			json_object_set_new(voiceRoot, "rest_amount", json_integer(rest_amount[c]));
+			json_object_set_new(voiceRoot, "gap", json_real(gap[c]));
 
-	    json_object_set_new(root, "gap", json_real(gap));
+			json_t *phraseJ = json_array();
+			for (int val : phrase[c]) json_array_append_new(phraseJ, json_integer(val));
+			json_object_set_new(voiceRoot, "sequence", phraseJ);
 
-	    json_object_set_new(root, "rest", json_integer(rest_amount));
+			json_t *durJ = json_array();
+			for (int val : phraseDurations[c]) json_array_append_new(durJ, json_integer(val));
+			json_object_set_new(voiceRoot, "durations", durJ);
+
+			json_t *accJ = json_array();
+			for (bool val : phraseAccents[c]) json_array_append_new(accJ, json_integer((int)val));
+			json_object_set_new(voiceRoot, "accents", accJ);
+
+			json_t *glideJ = json_array();
+			for (bool val : phraseGlides[c]) json_array_append_new(glideJ, json_integer((int)val));
+			json_object_set_new(voiceRoot, "glides", glideJ);
+
+			json_array_append_new(voicesJ, voiceRoot);
+		}
 
 	    return root;
 	}
 
 	void dataFromJson(json_t *root) override
 	{
-	    json_t *sequence_json_array = json_object_get(root, "sequence");
-	    if(sequence_json_array) {
-			phrase.resize(0);
-			size_t i;
-			json_t *json_int;
+		// 1. Try to find the new Polyphonic format
+		json_t *voicesJ = json_object_get(root, "voices");
 
-			json_array_foreach(sequence_json_array, i, json_int) {
-			    phrase.push_back(json_integer_value(json_int));
+		if (voicesJ) {
+			for (int c = 0; c < 16; c++) {
+                json_t *voiceRoot = json_array_get(voicesJ, c);
+                if (!voiceRoot) continue;
+
+                json_t *curr;
+
+                curr = json_object_get(voiceRoot, "phrase_index");
+                if (curr) phrase_index[c] = json_integer_value(curr);
+
+                curr = json_object_get(voiceRoot, "resting");
+                if (curr) resting[c] = json_integer_value(curr);
+
+                curr = json_object_get(voiceRoot, "rest_amount");
+                if (curr) rest_amount[c] = json_integer_value(curr);
+
+                curr = json_object_get(voiceRoot, "phrase_length");
+                if (curr) phrase_length[c] = json_integer_value(curr);
+
+                curr = json_object_get(voiceRoot, "gap");
+                if (curr) gap[c] = json_real_value(curr);
+
+                // Load Vectors
+                json_t *arr;
+
+                arr = json_object_get(voiceRoot, "sequence");
+                if (arr) {
+                    phrase[c].clear();
+                    size_t len = json_array_size(arr);
+                    for (size_t i = 0; i < len; i++) phrase[c].push_back(json_integer_value(json_array_get(arr, i)));
+                }
+
+                arr = json_object_get(voiceRoot, "durations");
+                if (arr) {
+                    phraseDurations[c].clear();
+                    size_t len = json_array_size(arr);
+                    for (size_t i = 0; i < len; i++) phraseDurations[c].push_back(json_integer_value(json_array_get(arr, i)));
+                }
+
+                arr = json_object_get(voiceRoot, "accents");
+                if (arr) {
+                    phraseAccents[c].clear();
+                    size_t len = json_array_size(arr);
+                    for (size_t i = 0; i < len; i++) phraseAccents[c].push_back((bool)json_integer_value(json_array_get(arr, i)));
+                }
+
+                arr = json_object_get(voiceRoot, "glides");
+                if (arr) {
+                    phraseGlides[c].clear();
+                    size_t len = json_array_size(arr);
+                    for (size_t i = 0; i < len; i++) phraseGlides[c].push_back((bool)json_integer_value(json_array_get(arr, i)));
+                }
+            }
+		} else {
+			json_t *sequence_json_array = json_object_get(root, "sequence");
+			if(sequence_json_array) {
+				phrase[0].resize(0);
+				size_t i;
+				json_t *json_int;
+
+				json_array_foreach(sequence_json_array, i, json_int) {
+					phrase[0].push_back(json_integer_value(json_int));
+				}
 			}
-	    }
 
-	    json_t *durations_json_array = json_object_get(root, "durations");
-	    if(durations_json_array) {
-			phraseDurations.resize(0);
-			size_t i;
-			json_t *json_int;
+			json_t *durations_json_array = json_object_get(root, "durations");
+			if(durations_json_array) {
+				phraseDurations[0].resize(0);
+				size_t i;
+				json_t *json_int;
 
-			json_array_foreach(durations_json_array, i, json_int) {
-			    phraseDurations.push_back(json_integer_value(json_int));
+				json_array_foreach(durations_json_array, i, json_int) {
+					phraseDurations[0].push_back(json_integer_value(json_int));
+				}
 			}
-	    }
 
-	    json_t *accents_json_array = json_object_get(root, "accents");
-	    if(accents_json_array) {
-			phraseAccents.resize(0);
-			size_t i;
-			json_t *json_bool;
+			json_t *accents_json_array = json_object_get(root, "accents");
+			if(accents_json_array) {
+				phraseAccents[0].resize(0);
+				size_t i;
+				json_t *json_bool;
 
-			json_array_foreach(accents_json_array, i, json_bool) {
-			    phraseAccents.push_back(json_boolean_value(json_bool));
+				json_array_foreach(accents_json_array, i, json_bool) {
+					phraseAccents[0].push_back(json_boolean_value(json_bool));
+				}
 			}
-	    }
 
-	    json_t *glides_json_array = json_object_get(root, "glides");
-	    if(glides_json_array) {
-			phraseGlides.resize(0);
-			size_t i;
-			json_t *json_bool;
+			json_t *glides_json_array = json_object_get(root, "glides");
+			if(glides_json_array) {
+				phraseGlides[0].resize(0);
+				size_t i;
+				json_t *json_bool;
 
-			json_array_foreach(glides_json_array, i, json_bool) {
-			    phraseGlides.push_back(json_boolean_value(json_bool));
+				json_array_foreach(glides_json_array, i, json_bool) {
+					phraseGlides[0].push_back(json_boolean_value(json_bool));
+				}
 			}
-	    }
 
-	    json_t *ext = json_object_get(root, "gap");
-		if (ext) {
-			gap = float(json_real_value(ext));
+			json_t *ext = json_object_get(root, "gap");
+			if (ext) {
+				gap[0] = float(json_real_value(ext));
+			}
+
+			json_t *ext2 = json_object_get(root, "rest");
+			if (ext2) {
+				rest_amount[0] = json_integer_value(ext2);
+			}
+
+			if (phraseDurations[0].size() != phrase[0].size() || phraseAccents[0].size() != phrase[0].size() || phraseGlides[0].size() != phrase[0].size() || phrase[0].size() < PHRASE_LENGTH_MIN) {
+				// Illegal Json, we generate new phrase instead
+				this->generateMelody(0);
+				phrase_length[0] = fmin(phrase[0].size(), phraseDurations[0].size());// fmin to prevent index being bigger than any of the vectors.
+			} else {
+				phrase_length[0] = phrase[0].size();
+				nextPhrase[0].resize(0);// else it will switch to constructor generated one, right after loading json.
+				nextPhraseDurations[0].resize(0);
+				nextPhraseAccents[0].resize(0);
+				nextPhraseGlides[0].resize(0);
+			}
+			phrase_index[0] = 0;
 		}
-
-		json_t *ext2 = json_object_get(root, "rest");
-		if (ext2) {
-			rest_amount = json_integer_value(ext2);
-		}
-
-		if (phraseDurations.size() != phrase.size() || phraseAccents.size() != phrase.size() || phraseGlides.size() != phrase.size() || phrase.size() < PHRASE_LENGTH_MIN) {
-			// Illegal Json, we generate new phrase instead
-	    	this->generateMelody();
-	    	phrase_length = fmin(phrase.size(), phraseDurations.size());// fmin to prevent index being bigger than any of the vectors.
-	    } else {
-	    	phrase_length = phrase.size();
-	    	nextPhrase.resize(0);// else it will switch to constructor generated one, right after loading json.
-	    	nextPhraseDurations.resize(0);
-	    	nextPhraseAccents.resize(0);
-	    	nextPhraseGlides.resize(0);
-	    }
-	    phrase_index = 0;
 	}
 
 	int c4 = 60;
@@ -259,40 +349,12 @@ struct Melody : Module {
 												{1,1,1,1,1,1,1,1,1,1,1,1} //   Chromatic
 											  };
 
-	int phrase_length = 6;
-	int next_phrase_length = 0;
-
-	std::vector<int> phrase;
-	std::vector<int> nextPhrase;
-	std::vector<int> phraseDurations;
-	std::vector<int> nextPhraseDurations;
-	std::vector<bool> phraseAccents;
-	std::vector<bool> nextPhraseAccents;
-	std::vector<bool> phraseGlides;
-	std::vector<bool> nextPhraseGlides;
-	
-	int phrase_index = 0;
-	bool clockExt_prev = false;
-	long int clockCount = 0;
-	long int clockCount_last = 0;
-	int passedClocks = 0;
-	float gap = GAP_NORMAL;
-	float nextGap = gap;
-	bool generate_prev = false;
-	int resting = 0;
-	int rest_amount = 0;
-	long int stepCounter = 0;
-
-
-	std::random_device device;
-	std::mt19937_64 generator;	
-
 	//float note2freq (int note);
 	//float freq2vPoct (float freq);
 	float note2vPoct (int note);
 	int getSemiNoteOffset (int steps, int referenceIndex, std::vector<int> mode);
 	//int getModeIndex (int note, int reference, int referenceIndex, std::vector<int> mode);
-	void generateMelody ();
+	void generateMelody (int c);
 	//int attenuvertInt(int CV, int KNOB, float min_result, float max_result);
 	void attenuvert(int CV, int KNOB, float min_result, float max_result);
 	void attenuvertFloat(int CV, int KNOB, float min_result, float max_result);
@@ -317,57 +379,22 @@ void Melody::process(const ProcessArgs &args) {
 	if (!outputs[FREQ_OUTPUT].isConnected()) {
 		return;
 	}
+
+	int active_voices = inputs[CLOCK_INPUT].getChannels();
+	if (active_voices < 1) active_voices = 1;
+	if (active_voices > 16) active_voices = 16;
+
+	int clock_channels = inputs[CLOCK_INPUT].getChannels();
+
+	outputs[FREQ_OUTPUT].setChannels(active_voices);
+	outputs[GATE_OUTPUT].setChannels(active_voices);
+	outputs[ACCENT_OUTPUT].setChannels(active_voices);
+	outputs[START_PHRASE_OUTPUT].setChannels(active_voices);
+	outputs[NEW_PHRASE_OUTPUT].setChannels(active_voices);
+
 	stepCounter++;
 	if (stepCounter > 512) {
 		stepCounter = 0;
-	}
-
-	
-	bool clockExt = inputs[CLOCK_INPUT].getVoltage() >= 1.0f;
-	bool generate = params[BUTTON_GENERATE_PARAM].getValue() >= 1.0f || inputs[GENERATE_INPUT].getVoltage() >= 1.0f;
-	float start = 0.0f;
-	float newStart = 0.0f;
-
-	if (clockExt && !clockExt_prev) {
-		if (resting == 0) {
-			if (passedClocks >= phraseDurations[phrase_index]-1) {
-				passedClocks = 0;
-				phrase_index++;
-			} else {
-				passedClocks++;
-			}
-		} else {
-			resting--;
-		}
-		if (phrase_index > phrase_length - 1) {
-			start = 10.0f;
-			phrase_index = 0;
-			if(nextPhrase.size() > 0) {
-				newStart = 10.0f;
-				// Switching to next phrase
-				phrase = nextPhrase; // Vector assignment is fast IF capacity is already there
-			    phraseDurations = nextPhraseDurations;
-			    phraseAccents = nextPhraseAccents;
-			    phraseGlides = nextPhraseGlides;
-			    
-			    phrase_length = next_phrase_length;
-				//nextPhrase.resize(0);
-				gap = nextGap;
-			}
-			if (rest_amount > 0) {
-				resting = rest_amount;
-			}
-		}
-		clockCount_last = clockCount;
-		clockCount = 0;
-		
-		outputs[START_PHRASE_OUTPUT].setVoltage(start);
-		outputs[NEW_PHRASE_OUTPUT].setVoltage(newStart);
-	} else {
-		clockCount++;
-		if (clockCount > 10000000) {
-			clockCount = 0;
-		}
 	}
 
 	if (stepCounter == 512) {
@@ -380,33 +407,87 @@ void Melody::process(const ProcessArgs &args) {
 		this->attenuvertFloat(CV_GAP_INPUT, GAP_PARAM, 0, 3);
 	}
 
+	bool generate = params[BUTTON_GENERATE_PARAM].getValue() >= 1.0f || inputs[GENERATE_INPUT].getVoltage() >= 1.0f;
 	if (generate && !generate_prev) {
-		this->generateMelody();
-	}
-
-	float out = this->note2vPoct(phrase[phrase_index]);
-	if (!phraseGlides[phrase_index] || passedClocks > 0) {
-		if (resting == 0) {
-			// Only if not between phrase do we set voltage, so that previous voltage can be allowed to 'decay' if envelope is put on output.
-			outputs[FREQ_OUTPUT].setVoltage(out);
+		for(int c = 0; c < active_voices; c++) {
+			this->generateMelody(c);
 		}
-	} else {
-		int phrase_index_prev = phrase_index - 1;
-		if (phrase_index_prev < 0) phrase_index_prev = phrase_length - 1;
-		float out_prev = this->note2vPoct(phrase[phrase_index_prev]);
-		outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount, 0, fmin(float(double(clockCount_last)*gap), GLIDE_MAXIMUM/args.sampleTime), out_prev, out), out_prev, out));// 60ms glide at start of note
 	}
-	outputs[ACCENT_OUTPUT].setVoltage(float(phraseAccents[phrase_index])*10.0f);
-	if (resting > 0 || (clockCount > clockCount_last*gap && passedClocks >= phraseDurations[phrase_index]-1)) {// Normal
-		outputs[GATE_OUTPUT].setVoltage(0.0f);
-	} else {
-		outputs[GATE_OUTPUT].setVoltage(10.0f);
-	}
-	clockExt_prev = clockExt;
 	generate_prev = generate;
+
+	for (int c = 0; c < active_voices; c++) {
+		int clock_idx = (clock_channels > 1) ? c : 0;
+
+		float clockVolt = inputs[CLOCK_INPUT].getPolyVoltage(clock_idx);
+		bool clockExt = clockVolt >= 1.0f;
+		float start = 0.0f;
+		float newStart = 0.0f;
+
+		if (clockExt && !clockExt_prev[c]) {
+			if (resting[c] == 0) {
+				if (passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1) {
+					passedClocks[c] = 0;
+					phrase_index[c]++;
+				} else {
+					passedClocks[c]++;
+				}
+			} else {
+				resting[c]--;
+			}
+			if (phrase_index[c] > phrase_length[c] - 1) {
+				start = 10.0f;
+				phrase_index[c] = 0;
+				if(nextPhrase[c].size() > 0) {
+					newStart = 10.0f;
+					// Switching to next phrase
+					phrase[c] = nextPhrase[c]; // Vector assignment is fast IF capacity is already there
+					phraseDurations[c] = nextPhraseDurations[c];
+					phraseAccents[c] = nextPhraseAccents[c];
+					phraseGlides[c] = nextPhraseGlides[c];
+
+					phrase_length[c] = next_phrase_length[c];
+					//nextPhrase.resize(0);
+					gap[c] = nextGap[c];
+				}
+				if (rest_amount[c] > 0) {
+					resting[c] = rest_amount[c];
+				}
+			}
+			clockCount_last[c] = clockCount[c];
+			clockCount[c] = 0;
+
+			outputs[START_PHRASE_OUTPUT].setVoltage(start, c);
+			outputs[NEW_PHRASE_OUTPUT].setVoltage(newStart, c);
+		} else {
+			clockCount[c]++;
+			if (clockCount[c] > 10000000) {
+				clockCount[c] = 0;
+			}
+		}
+
+		float out = this->note2vPoct(phrase[c][phrase_index[c]]);
+		if (!phraseGlides[c][phrase_index[c]] || passedClocks[c] > 0) {
+			if (resting[c] == 0) {
+				// Only if not between phrase do we set voltage, so that previous voltage can be allowed to 'decay' if envelope is put on output.
+				outputs[FREQ_OUTPUT].setVoltage(out, c);
+			}
+		} else {
+			int phrase_index_prev = phrase_index[c] - 1;
+			if (phrase_index_prev < 0) phrase_index_prev = phrase_length[c] - 1;
+			float out_prev = this->note2vPoct(phrase[c][phrase_index_prev]);
+			outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount[c], 0, fmin(float(double(clockCount_last[c])*gap[c]), GLIDE_MAXIMUM/args.sampleTime), out_prev, out), out_prev, out));// 60ms glide at start of note
+		}
+		outputs[ACCENT_OUTPUT].setVoltage(float(phraseAccents[c][phrase_index[c]])*10.0f, c);
+		if (resting[c] > 0 || (clockCount[c] > clockCount_last[c]*gap[c] && passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1)) {// Normal
+			outputs[GATE_OUTPUT].setVoltage(0.0f, c);
+		} else {
+			outputs[GATE_OUTPUT].setVoltage(10.0f, c);
+		}
+		clockExt_prev[c] = clockExt;
+	}
 }
 
-void Melody::generateMelody () {
+void Melody::generateMelody (int c) {
 	/*
 	 +Polarity determines steepness
 	 +Even chance of up or down with constraint for hitting cadence
@@ -428,22 +509,21 @@ void Melody::generateMelody () {
 	// Melody
 	int tonic = int(params[TONIC_PARAM].getValue());
 	std::vector<int> mode = modes[int(params[MODE_PARAM].getValue())];
-	next_phrase_length = int(params[PHRASE_PARAM].getValue());
+	next_phrase_length[c] = int(params[PHRASE_PARAM].getValue());
 	int minOffset = -2;
 	int maxOffset =  4;
-	nextPhrase.clear(); // Keeps capacity, just sets size to 0
-	nextPhrase.push_back(tonic);
+	nextPhrase[c].clear(); // Keeps capacity, just sets size to 0
+	nextPhrase[c].push_back(tonic);
 	int lastNote = tonic;
 	int lastIndex = 0;
 	int distanceToTonic = 0;
-	int closure = next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
-	std::uniform_int_distribution<int> uniform_dist_e(12, 16);
-	int stepsTillEstablish = uniform_dist_e(generator);
+	int closure = next_phrase_length[c] >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
+	int stepsTillEstablish = 12 + (int)(rack::random::uniform() * 5.0f); // 12 to 16
 	//int direction = 0;
 	//std::cout << "    :::: \n";
 	//std::cout << "    :::: \n";
 	//std::cout << "    :::: \n";
-	for (int i = 1; i < next_phrase_length+closure; i++) {
+	for (int i = 1; i < next_phrase_length[c]+closure; i++) {
 		if (distanceToTonic > 4) maxOffset = 2;
 		if (distanceToTonic > 3) maxOffset = 3;
 		else maxOffset = 4;
@@ -453,23 +533,23 @@ void Melody::generateMelody () {
 			// Skipping resolution
 			minClamp =  minOffset;
 			maxClamp =  maxOffset;
-		} else if (i == next_phrase_length-2 && next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
+		} else if (i == next_phrase_length[c]-2 && next_phrase_length[c] >= PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
 			// We are at cadence in larger phrase
 			maxClamp = std::min(maxOffset, -distanceToTonic+1);
 			minClamp = std::max(minOffset, -distanceToTonic-1);
-		} else if (next_phrase_length < PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
+		} else if (next_phrase_length[c] < PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
 			// Small phrase target resolution
-			int stepsLeft  = next_phrase_length-i; // steps left including tonic step
+			int stepsLeft  = next_phrase_length[c]-i; // steps left including tonic step
 			int howFarDown = stepsLeft * minOffset; // How far towards tonic can we get from now till tonic (negative number)
 			int howFarUp   = stepsLeft * maxOffset;
 			int maxUp   = minOffset-(distanceToTonic+howFarDown);
 			int maxDown = maxOffset-(howFarUp+distanceToTonic);
 			maxClamp = std::min(maxOffset, maxUp);
 			minClamp = std::max(minOffset, maxDown);
-		} else if (stepsTillEstablish < next_phrase_length-i-1) {
+		} else if (stepsTillEstablish < next_phrase_length[c]-i-1) {
 			// Longer phrase target establish
 			int stepsLeft  = stepsTillEstablish; // steps left including tonic step
-			if (stepsTillEstablish == 1) stepsTillEstablish = uniform_dist_e(generator);
+			if (stepsTillEstablish == 1) stepsTillEstablish = 12 + (int)(rack::random::uniform() * 5.0f);
 			int howFarDown = stepsLeft * minOffset; // How far towards tonic can we get from now till tonic (negative number)
 			int howFarUp   = stepsLeft * maxOffset;
 			int maxUp   = minOffset-(distanceToTonic+howFarDown);
@@ -478,7 +558,7 @@ void Melody::generateMelody () {
 			minClamp = std::max(minOffset, maxDown);
 		} else {
 			// Longer phrase target cadence
-			int stepsLeft  = next_phrase_length-i-1; // steps left including cadence step
+			int stepsLeft  = next_phrase_length[c]-i-1; // steps left including cadence step
 			int howFarDown = stepsLeft * minOffset; // How far towards cadence can we get from now till cadence (negative number)
 			int howFarUp   = stepsLeft * maxOffset;
 			int maxUp   = minOffset-((distanceToTonic-1)+howFarDown);// note the asymmetry here, as we can approach from either side.
@@ -490,10 +570,10 @@ void Melody::generateMelody () {
 		int maxiRand =  maxOffset;
 		int miniRand = -maxOffset;
 		//maxiRand = std::min(miniRand+1, direction>2?-1:maxiRand);
-		std::uniform_int_distribution<int> uniform_dist(miniRand, maxiRand);
-		int noteOffset = clamp(uniform_dist(generator), minClamp, maxClamp);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
+		int range = (maxiRand - (miniRand)) + 1; // 9
+		int noteOffset = miniRand + (int)(rack::random::uniform() * range);
 		int note = lastNote + getSemiNoteOffset(noteOffset, lastIndex, mode);
-		nextPhrase.push_back(note);
+		nextPhrase[c].push_back(note);
 		distanceToTonic += noteOffset;
 		lastNote = note;
 		lastIndex += noteOffset;
@@ -503,34 +583,25 @@ void Melody::generateMelody () {
 		stepsTillEstablish--;
 	}
 	if (closure == -1) {
-		nextPhrase.push_back(tonic);
+		nextPhrase[c].push_back(tonic);
 	}
 
-	// Durations
-	nextPhraseDurations.resize(0);
-	for (int i = 0; i < next_phrase_length; i++) {
-		nextPhraseDurations.push_back(1+(rand() % static_cast<int>(2+1)));
-	}
-
-	// Accents
+	nextPhraseDurations[c].clear();
 	float chance = int(params[ACCENT_PARAM].getValue());
-	nextPhraseAccents.resize(0);
-	for (int i = 0; i < next_phrase_length; i++) {
-		nextPhraseAccents.push_back((rand() % static_cast<int>(100+1)) < int(chance));
-	}
-
-	// Glides
+	nextPhraseAccents[c].clear();
 	float chance_g = int(params[GLIDE_PARAM].getValue());
-	nextPhraseGlides.resize(0);
-	for (int i = 0; i < next_phrase_length; i++) {
-		nextPhraseGlides.push_back((rand() % static_cast<int>(100+1)) < int(chance_g));
+	nextPhraseGlides[c].clear();
+	for (int i = 0; i < next_phrase_length[c]; i++) {
+		nextPhraseDurations[c].push_back(1 + (int)(rack::random::uniform() * 2)); // 1 or 2
+		nextPhraseAccents[c].push_back((rack::random::uniform() * 100.0f) < chance);
+		nextPhraseGlides[c].push_back((rack::random::uniform() * 100.0f) < chance_g);
 	}
 
 	// Rest
-	rest_amount = int(params[REST_PARAM].getValue());
+	rest_amount[c] = int(params[REST_PARAM].getValue());
 
 	// Gaps
-	nextGap = rescale(params[GAP_PARAM].getValue(), 0, 3, GAP_STACCATISSIMO, GAP_LEGATO);
+	nextGap[c] = rescale(params[GAP_PARAM].getValue(), 0, 3, GAP_STACCATISSIMO, GAP_LEGATO);
 	/*switch(int(params[GAP_PARAM].getValue())) {
 		case 0:
 			nextGap = GAP_STACCATO;
