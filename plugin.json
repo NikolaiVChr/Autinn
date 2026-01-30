@@ -99,7 +99,7 @@
     {
       "slug": "Oxcart",
       "name": "Oxcart",
-      "description": "Aggresive oscillator. Best for low/mid frequencies.",
+      "description": "Aggressive oscillator. Best for low/mid frequencies.",
       "tags": [
         "Oscillator",
         "Polyphonic"
@@ -135,7 +135,7 @@
     {
       "slug": "Square",
       "name": "Square",
-      "description": "Oscillator with a squareish sound",
+      "description": "Oscillator with a squarish sound",
       "tags": [
         "Oscillator",
         "Polyphonic"

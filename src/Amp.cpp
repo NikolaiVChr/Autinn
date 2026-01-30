@@ -92,10 +92,12 @@ void Amp::process(const ProcessArgs &args) {
 
 struct AmpWidget : ModuleWidget {
 	AmpWidget(Amp *module) {
+		INFO("AmpWidget: Starting constructor. Module is %s", module ? "VALID" : "NULL");
 		setModule(module);
+		INFO("AmpWidget: Loading Panel SVG");
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/AmpModule.svg")));
 		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
-
+		INFO("AmpWidget: Adding Screw Widgets");
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		//addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -108,6 +110,7 @@ struct AmpWidget : ModuleWidget {
 		addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Amp::AMP_OUTPUT));
 
 		addChild(createLight<MediumLight<YellowLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Amp::BLINK_LIGHT));
+		INFO("AmpWidget: Constructor Finished Successfully");
 	}
 };
 
