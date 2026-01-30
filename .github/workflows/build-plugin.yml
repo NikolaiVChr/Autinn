@@ -80,6 +80,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
       - name: Build plugin
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
         run: |
           ${{ matrix.config.prepare-os }}
           ${{ matrix.config.prepare-os2 }}
