@@ -1,8 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-#include <queue>
-
-using std::queue;
 /*
 
     Autinn VCV Rack Plugin
@@ -102,8 +99,12 @@ struct Zod : Module {
 	bool limiter = false;
 
 	unsigned D = 2;
-	queue <float> bufferL;
-	queue <float> bufferR;
+	// Ring Buffer: Max delay ~350ms @ 768kHz = ~268k samples.
+	// We use 2^20 for safety and power-of-two masking if needed.
+	static const int BUFFER_SIZE = 1048576;
+	float bufferL[BUFFER_SIZE] = {};
+	float bufferR[BUFFER_SIZE] = {};
+	int writeIndex = 0;
 
 	// these are here to optimize so not to do expensive ops every step:
 	double ta = -150.0;
@@ -351,14 +352,22 @@ void Zod::process(const ProcessArgs &args) {
 	// inputs:
 	float left  = inputs[LEFT_INPUT].getVoltage();
 	float right = inputs[RIGHT_INPUT].getVoltage();
-	bufferL.push(left);
-	bufferR.push(right);
-	float pastL = bufferL.front();
-	float pastR = bufferR.front();
-	while (bufferL.size() > D) {
-		bufferL.pop();
-		bufferR.pop();
-	}
+
+	// --- Ring Buffer Write ---
+	bufferL[writeIndex] = left;
+	bufferR[writeIndex] = right;
+
+	// --- Ring Buffer Read (Lookahead D) ---
+	// Read from 'D' samples behind the current write head
+	int readIndex = (writeIndex - (int)D) & (BUFFER_SIZE - 1);
+
+	float pastL = bufferL[readIndex];
+	float pastR = bufferR[readIndex];
+
+	// Increment & Wrap
+	writeIndex++;
+	if (writeIndex >= BUFFER_SIZE) writeIndex = 0;
+
 	double stereo = left + right;
 
 	if (inputs[SIDE_LEFT_INPUT].isConnected() || inputs[SIDE_RIGHT_INPUT].isConnected()) {
