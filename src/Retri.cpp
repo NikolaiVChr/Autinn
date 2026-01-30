@@ -63,6 +63,7 @@ struct Flora : Module {
 	//float t = 30.0f + 273.15f; // 30 celcius
 	//float V_t = 2.0f * t * Boltzman; // thermal voltage * 2 (should be divided by q also). Thermal V should be around 0.026V, times 2 its 0.052. Something divided by that gets multiplied by 19.23.
 	const float V_t = 2.0f * 0.026f;// more standard 2xthermalvoltage.
+	const float inv_Vt = 1.0f / V_t;
 
 	float r = 0.0f;
 	float Gres = 1.0f;
@@ -153,8 +154,8 @@ struct Flora : Module {
 	void process(const ProcessArgs &args) override;
 	void process_left(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive);
 	void process_right(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive);
-	float toExp(float x, float min, float max);
-	
+	float toExp(float x);
+
 	json_t *dataToJson() override {
 		json_t *root = json_object();
 		//json_object_set_new(root, "Gcomp", json_righteal((double) gComp));
@@ -187,9 +188,11 @@ struct Flora : Module {
 	}
 };
 
-float Flora::toExp(float x, float min, float max) {
+static const float LOG_FREQ_RANGE = float(log(FREQ_MAX/FREQ_MIN));
+
+float Flora::toExp(float x) {
 	// 0 to 1 to exp range
-	return min * exp( x*log(max/min) );
+	return FREQ_MIN * exp( x*LOG_FREQ_RANGE );
 }
 
 
@@ -232,13 +235,14 @@ void Flora::process(const ProcessArgs &args) {
 	
 	r     = clamp(params[RESONANCE_PARAM].getValue()+(inputs[RESONANCE_INPUT].getVoltage()*params[RESONANCE_INFL_PARAM].getValue()), 0.0f, RESONANCE_MAX);
 	input_cutoff =  powf(2.0f, inputs[CUTOFF_INPUT].getVoltage()*params[CUTOFF_INFL_PARAM].getValue());
-	float F_c   = clamp(this->toExp(params[CUTOFF_PARAM].getValue(),FREQ_MIN,FREQ_MAX)*input_cutoff, FREQ_MIN, FREQ_MAX);
+	float F_c   = clamp(this->toExp(params[CUTOFF_PARAM].getValue())*input_cutoff, FREQ_MIN, FREQ_MAX);
 	F_s   = args.sampleRate*oversample_protected;
 
 	if (F_c != F_c_prev || F_s != F_s_prev) {
 		double w_c = double(2.0f*M_PI*F_c/F_s);// cutoff in radians per sample.
 		//g = V_t * ( 0.9892f*w_c-0.4342f*w_c*w_c+0.1381f*w_c*w_c*w_c-0.0202f*w_c*w_c*w_c*w_c); // old auto tuned g for cutoff
 		g = V_t * (0.0008116984 + 0.9724111*w_c - 0.5077766*w_c*w_c + 0.1534058*w_c*w_c*w_c);// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
+		//g = V_t * 2.0f * non_lin_func(w_c * 0.5f);//newest auto tuned g for cutoff
 		//g = V_t * (1.0f - exp(-2.0f*M_PI*F_c/F_s));// old naive
 		//Gres = 1.0029f+0.0526f*w_c-0.0926f*w_c*w_c+0.0218f*w_c*w_c*w_c;// old auto tuned resonance power for resonance <= 1.0 (0.0218->0.218)
 		Gres = 1.037174 + 3.606925*w_c + 7.074555*w_c*w_c - 18.14674*w_c*w_c*w_c + 9.364587*w_c*w_c*w_c*w_c;
@@ -274,16 +278,16 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
-		y_a = y_a_prev+g*(non_lin_func( x/V_t )-W_a_prev);
-		W_a = non_lin_func( y_a/V_t );
+		y_a = y_a_prev+g*(non_lin_func( x*inv_Vt )-W_a_prev);
+		W_a = non_lin_func( y_a*inv_Vt );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
-		W_b = non_lin_func( y_b/V_t );
+		W_b = non_lin_func( y_b*inv_Vt );
 		// 3rd transistor stage:
 		y_c = y_c_prev+g*(W_b-W_c_prev);
-		W_c = non_lin_func( y_c/V_t );
+		W_c = non_lin_func( y_c*inv_Vt );
 		// 4th transistor stage:
-		y_d = y_d_prev+g*(W_c-non_lin_func( y_d_prev/V_t ));
+		y_d = y_d_prev+g*(W_c-non_lin_func( y_d_prev*inv_Vt ));
 
 		// record stuff for next step
 		y_d_prev_prev = y_d_prev;
@@ -304,8 +308,17 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 	} else {
 		out = decimator4.process(outBuf);
 	}
-	if(!std::isfinite(out)) {
+	if(!std::isfinite(out) || out > 100.0f || out < -100.0f) {
 		out = 0.0f;
+
+		// Reset all State Variables to 0 to stop the NaN
+		y_a_prev = 0.0f; y_b_prev = 0.0f; y_c_prev = 0.0f;
+		y_d_prev = 0.0f; y_d_prev_prev = 0.0f;
+		W_a_prev = 0.0f; W_b_prev = 0.0f; W_c_prev = 0.0f;
+
+		// Reset current steps too (not strictly necessary but safe)
+		y_a = 0.0f; y_b = 0.0f; y_c = 0.0f; y_d = 0.0f;
+		W_a = 0.0f; W_b = 0.0f; W_c = 0.0f;
 	}
 	outputs[FLORA_OUTPUT].setVoltage(out/inv_drive);
 }
@@ -326,16 +339,16 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
-		y_a_right = y_a_prev_right+g*(non_lin_func( x/V_t )-W_a_prev_right);
-		W_a_right = non_lin_func( y_a_right/V_t );
+		y_a_right = y_a_prev_right+g*(non_lin_func( x*inv_Vt )-W_a_prev_right);
+		W_a_right = non_lin_func( y_a_right*inv_Vt );
 		// 2nd transistor stage:
 		y_b_right = y_b_prev_right+g*(W_a_right-W_b_prev_right);
-		W_b_right = non_lin_func( y_b_right/V_t );
+		W_b_right = non_lin_func( y_b_right*inv_Vt );
 		// 3rd transistor stage:
 		y_c_right = y_c_prev_right+g*(W_b_right-W_c_prev_right);
-		W_c_right = non_lin_func( y_c_right/V_t );
+		W_c_right = non_lin_func( y_c_right*inv_Vt );
 		// 4th transistor stage:
-		y_d_right = y_d_prev_right+g*(W_c_right-non_lin_func( y_d_prev_right/V_t ));
+		y_d_right = y_d_prev_right+g*(W_c_right-non_lin_func( y_d_prev_right*inv_Vt ));
 
 		// record stuff for next step
 		y_d_prev_prev_right = y_d_prev_right;
@@ -356,8 +369,17 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 	} else {
 		out = decimator4_right.process(outBuf);
 	}
-	if(!std::isfinite(out)) {
+	if(!std::isfinite(out) || out > 100.0f || out < -100.0f) {
 		out = 0.0f;
+
+		// Reset all State Variables to 0 to stop the NaN
+		y_a_prev_right = 0.0f; y_b_prev_right = 0.0f; y_c_prev_right = 0.0f;
+		y_d_prev_right = 0.0f; y_d_prev_prev_right = 0.0f;
+		W_a_prev_right = 0.0f; W_b_prev_right = 0.0f; W_c_prev_right = 0.0f;
+
+		// Reset current steps too (not strictly necessary but safe)
+		y_a_right = 0.0f; y_b_right = 0.0f; y_c_right = 0.0f; y_d_right = 0.0f;
+		W_a_right = 0.0f; W_b_right = 0.0f; W_c_right = 0.0f;
 	}
 	outputs[FLORA_OUTPUT2].setVoltage(out/inv_drive);
 }
