@@ -128,13 +128,14 @@ struct RoundTinyAutinnKnob : RoundKnob {
 	}
 }; 
 
-struct ScrewStarAutinn : SVGScrew {
+struct ScrewStarAutinn : ThemedSvgScrew {
 	ScrewStarAutinn() {
 		//if (!pluginInstance) return;
 		//setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
-		std::shared_ptr<Svg> s = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg"));
+		std::shared_ptr<window::Svg> s = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg"));
 		if (s) {
-			setSvg(s);
+			INFO("ScrewStarAutinn: Loading SVG..");
+			setSvg(s,s);
 			INFO("ScrewStarAutinn: Loaded SVG successfully");
 		} else {
 			INFO("ScrewStarAutinn: Loaded SVG unsuccessfully");
