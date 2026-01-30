@@ -60,35 +60,34 @@ void Amp::process(const ProcessArgs &args) {
 		return;
 	}
 	int channels = inputs[AMP_INPUT].getChannels();
-	simd::float_4 in[4];
-	
-	//float level = clamp(params[DIAL_PARAM].getValue()+inputs[CV_INPUT].getVoltage()*0.2f,0.0f,2.0f);//-infinite to +6 dB
-	
-	for (int channel = 0; channel < channels; channel += 4) {
-		in[channel / 4] = simd::float_4::load(inputs[AMP_INPUT].getVoltages(channel));
-	}
-	//float in = inputs[AMP_INPUT].getVoltage();
-
-	if (inputs[CV_INPUT].isPolyphonic()) {
-		for (int channel = 0; channel < channels; channel += 4) {
-			simd::float_4 multiplier = simd::float_4::load(inputs[CV_INPUT].getVoltages(channel))*0.2f;
-			multiplier = clamp(params[DIAL_PARAM].getValue()+multiplier, 0.0f,2.0f);
-			in[channel / 4] *= multiplier;
-		}
-	} else {
-		float multiplier = inputs[CV_INPUT].getVoltage()*0.2f;
-		multiplier = clamp(params[DIAL_PARAM].getValue()+multiplier, 0.0f,2.0f);
-		for (int channel = 0; channel < channels; channel += 4) {
-			in[channel / 4] *= multiplier;
-		}
-	}
-	
+	if (channels == 0) channels = 1; // Default to 1 if nothing is connected to input
 	outputs[AMP_OUTPUT].setChannels(channels);
-    for (int channel = 0; channel < channels; channel += 4) {
-		in[channel / 4].store(outputs[AMP_OUTPUT].getVoltages(channel));
+
+	float dial = params[DIAL_PARAM].getValue();
+	bool cvPoly = inputs[CV_INPUT].isPolyphonic();
+	float cvMono = inputs[CV_INPUT].getVoltage() * 0.2f;
+
+	for (int c = 0; c < channels; c++) {
+		float in = inputs[AMP_INPUT].getPolyVoltage(c);
+		float multiplier;
+
+		if (cvPoly) {
+			multiplier = inputs[CV_INPUT].getPolyVoltage(c) * 0.2f;
+		} else {
+			multiplier = cvMono;
+		}
+
+		multiplier = clamp(dial+multiplier, 0.0f,2.0f);
+
+		float out = in * multiplier;
+
+		outputs[AMP_OUTPUT].setVoltage(out, c);
+
+		if (c == 0) {
+			float light = fabs(in);
+			lights[BLINK_LIGHT].value = (light > 10.0f) ? 1.0 : 0.0;
+		}
 	}
-	float light = fabs(in[0][0]);
-	lights[BLINK_LIGHT].value = (light > 10.0f) ? 1.0 : 0.0;
 }
 
 struct AmpWidget : ModuleWidget {
