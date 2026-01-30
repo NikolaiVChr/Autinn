@@ -38,8 +38,8 @@ jobs:
           }
         - {
             name: Windows,
-            os: ubuntu-latest,
-            prepare-os: sudo apt-get update && sudo apt-get install -y mingw-w64,
+            os: windows-latest,
+            prepare-os: export CC=gcc,
             prepare-os2: "",
             postfix: win-x64
           }
@@ -48,6 +48,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Install MSYS2 (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+            msystem: MINGW64
+            update: true
+            install: git make mingw-w64-x86_64-gcc mingw-w64-x86_64-tools unzip zip
+
       - name: Get Rack-SDK
         run: |
           pushd $HOME
@@ -66,7 +75,7 @@ jobs:
           echo "Set plugin version from $pluginversion to $pluginversion-$gitrev"
           cat <<< `jq --arg VERSION "$pluginversion" '.version=$VERSION' plugin.json` > plugin.json
       - name: Initialize CodeQL
-        if: matrix.config.name == 'Linux'
+        if: runner.os == 'Linux'
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
@@ -75,17 +84,6 @@ jobs:
           ${{ matrix.config.prepare-os }}
           ${{ matrix.config.prepare-os2 }}
           export RACK_DIR=$HOME/Rack-SDK
-          # Setup Windows Cross-Compiler variables
-          if [ "${{ matrix.config.postfix }}" == "win-x64" ]; then
-            # Define the prefix
-            export CROSS_COMPILE=x86_64-w64-mingw32-
-            # Force the compilers to use that prefix (Overriding GitHub defaults)
-            export CC=${CROSS_COMPILE}gcc
-            export CXX=${CROSS_COMPILE}g++
-            # Force linker as well
-            export LD=${CROSS_COMPILE}ld
-            echo "Configured for Windows Cross-Compilation"
-          fi
           make -j dep
           make -j dist
       - name: Upload artifact
