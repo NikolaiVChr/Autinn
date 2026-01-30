@@ -42,12 +42,12 @@ struct AutinnSlider : app::SvgSlider {
 		if (!pluginInstance) return;
 		maxHandlePos = Vec(0,   0);
 		minHandlePos = Vec(0, 270);
-		setBackgroundSvg(APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderAutinn.svg")));
+		setBackgroundSvg(Svg::load(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderAutinn.svg")));
 		//background->wrap();
 		background->box.pos = Vec(0, 0);
 		background->box.size = Vec(15,300);
 		box.size = background->box.size;
-		setHandleSvg(APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderHandleAutinn.svg")));
+		setHandleSvg(Svg::load(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderHandleAutinn.svg")));
 		handle->box.size = Vec(15,30);
 		handle->box.pos = Vec(0,15);
 		//handle->wrap();
@@ -59,12 +59,12 @@ struct AutinnSliderShort : app::SvgSlider {
 		if (!pluginInstance) return;
 		maxHandlePos = Vec(0,   0);
 		minHandlePos = Vec(0, 70);
-		setBackgroundSvg(APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderShortAutinn.svg")));
+		setBackgroundSvg(Svg::load(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderShortAutinn.svg")));
 		//background->wrap();
 		background->box.pos = Vec(0, 0);
 		background->box.size = Vec(15,100);
 		box.size = background->box.size;
-		setHandleSvg(APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderHandleAutinn.svg")));
+		setHandleSvg(Svg::load(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderHandleAutinn.svg")));
 		handle->box.size = Vec(15,30);
 		handle->box.pos = Vec(0,15);
 		//handle->wrap();
@@ -74,7 +74,7 @@ struct AutinnSliderShort : app::SvgSlider {
 struct RoundMediumAutinnKnob : RoundKnob {
 	RoundMediumAutinnKnob() {
 		if (!pluginInstance) return;
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobLargeAutinn.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobLargeAutinn.svg")));
 		//box.size = Vec(38, 38);
 	}
 };
@@ -82,7 +82,7 @@ struct RoundMediumAutinnKnob : RoundKnob {
 struct RoundSmallAutinnKnob : RoundKnob {
 	RoundSmallAutinnKnob() {
 		if (!pluginInstance) return;
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinn.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinn.svg")));
 		//box.size = Vec(28, 28);
 	}
 };
@@ -90,7 +90,7 @@ struct RoundSmallAutinnKnob : RoundKnob {
 struct RoundSmallAutinnSnapKnob : RoundKnob {
 	RoundSmallAutinnSnapKnob() {
 		if (!pluginInstance) return;
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinn.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinn.svg")));
 		snap = true;
 		//box.size = Vec(28, 28);
 	}
@@ -99,7 +99,7 @@ struct RoundSmallAutinnSnapKnob : RoundKnob {
 struct RoundSmallTyrkAutinnKnob : RoundKnob {
 	RoundSmallTyrkAutinnKnob() {
 		if (!pluginInstance) return;
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnTyrk.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnTyrk.svg")));
 		//box.size = Vec(28, 28);
 	}
 };
@@ -107,7 +107,7 @@ struct RoundSmallTyrkAutinnKnob : RoundKnob {
 struct RoundSmallPinkAutinnKnob : RoundKnob {
 	RoundSmallPinkAutinnKnob() {
 		if (!pluginInstance) return;
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnPink.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnPink.svg")));
 		//box.size = Vec(28, 28);
 	}
 };
@@ -115,7 +115,7 @@ struct RoundSmallPinkAutinnKnob : RoundKnob {
 struct RoundSmallYelAutinnKnob : RoundKnob {
 	RoundSmallYelAutinnKnob() {
 		if (!pluginInstance) return;
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnYel.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobSmallAutinnYel.svg")));
 		//box.size = Vec(28, 28);
 	}
 };
@@ -123,7 +123,7 @@ struct RoundSmallYelAutinnKnob : RoundKnob {
 struct RoundTinyAutinnKnob : RoundKnob {
 	RoundTinyAutinnKnob() {
 		if (!pluginInstance) return;
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundTinyAutinn.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundTinyAutinn.svg")));
 		//box.size = Vec(18, 18);
 	}
 }; 
@@ -131,10 +131,10 @@ struct RoundTinyAutinnKnob : RoundKnob {
 struct ScrewStarAutinn : SVGScrew {
 	ScrewStarAutinn() {
 		if (!pluginInstance) return;
-		//setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
+		//setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
 		/*
-		sw->svg = APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg"));
+		sw->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg"));
 		sw->wrap();
 		box.size = sw->box.size;
 		*/
@@ -144,9 +144,9 @@ struct ScrewStarAutinn : SVGScrew {
 struct OutPortAutinn : SVGPort {
 	OutPortAutinn() {
 		if (!pluginInstance) return;
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg")));
 		shadow->opacity = 0.0;
-		//background->svg = APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg"));
+		//background->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg"));
 		//background->wrap();
 		//box.size = background->box.size;
 	}
@@ -155,9 +155,9 @@ struct OutPortAutinn : SVGPort {
 struct InPortAutinn : SVGPort {
 	InPortAutinn() {
 		if (!pluginInstance) return;
-		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg")));
+		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg")));
 		shadow->opacity = 0.0;
-		//background->svg = APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg"));
+		//background->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg"));
 		//background->wrap();
 		//box.size = background->box.size;
 	}
@@ -167,8 +167,8 @@ struct RoundButtonAutinn : app::SvgSwitch {
 	RoundButtonAutinn() {
 		if (!pluginInstance) return;
 		momentary = true;
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinn.svg")));//up
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinnDown.svg")));//depressed state
+		addFrame(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinn.svg")));//up
+		addFrame(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonAutinnDown.svg")));//depressed state
 	}
 };
 
@@ -176,8 +176,8 @@ struct RoundButtonSmallAutinn : app::SvgSwitch {
 	RoundButtonSmallAutinn() {
 		if (!pluginInstance) return;
 		momentary = true;
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinn.svg")));//up
-		addFrame(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinnDown.svg")));//depressed state
+		addFrame(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinn.svg")));//up
+		addFrame(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinnDown.svg")));//depressed state
 	}
 };
 
