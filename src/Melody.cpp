@@ -110,6 +110,15 @@ struct Melody : Module {
 		configInput(CV_GAP_INPUT, "Expression CV ±5V");
 		configInput(CV_REST_INPUT, "Rest CV ±5V");
 
+		phrase.reserve(PHRASE_LENGTH_MAX);
+        nextPhrase.reserve(PHRASE_LENGTH_MAX);
+        phraseDurations.reserve(PHRASE_LENGTH_MAX);
+        nextPhraseDurations.reserve(PHRASE_LENGTH_MAX);
+        phraseAccents.reserve(PHRASE_LENGTH_MAX);
+        nextPhraseAccents.reserve(PHRASE_LENGTH_MAX);
+        phraseGlides.reserve(PHRASE_LENGTH_MAX);
+        nextPhraseGlides.reserve(PHRASE_LENGTH_MAX);
+
 		int init_phrase[6] = {60,62,67,65,62,60};
 		phrase.assign(init_phrase,init_phrase+6); 
 		int init_phrase_dura[6] = {2,2,2,2,2,2};
@@ -335,16 +344,13 @@ void Melody::process(const ProcessArgs &args) {
 			if(nextPhrase.size() > 0) {
 				newStart = 10.0f;
 				// Switching to next phrase
-				phrase.resize(0);
-				std::copy(nextPhrase.begin(), nextPhrase.end(), std::back_inserter(phrase));
-				phraseDurations.resize(0);
-				std::copy(nextPhraseDurations.begin(), nextPhraseDurations.end(), std::back_inserter(phraseDurations));
-				phraseAccents.resize(0);
-				std::copy(nextPhraseAccents.begin(), nextPhraseAccents.end(), std::back_inserter(phraseAccents));
-				phraseGlides.resize(0);
-				std::copy(nextPhraseGlides.begin(), nextPhraseGlides.end(), std::back_inserter(phraseGlides));
-				phrase_length = next_phrase_length;
-				nextPhrase.resize(0);
+				phrase = nextPhrase; // Vector assignment is fast IF capacity is already there
+			    phraseDurations = nextPhraseDurations;
+			    phraseAccents = nextPhraseAccents;
+			    phraseGlides = nextPhraseGlides;
+			    
+			    phrase_length = next_phrase_length;
+				//nextPhrase.resize(0);
 				gap = nextGap;
 			}
 			if (rest_amount > 0) {
@@ -424,7 +430,7 @@ void Melody::generateMelody () {
 	next_phrase_length = int(params[PHRASE_PARAM].getValue());
 	int minOffset = -2;
 	int maxOffset =  4;
-	nextPhrase.resize(0);
+	nextPhrase.clear(); // Keeps capacity, just sets size to 0
 	nextPhrase.push_back(tonic);
 	int lastNote = tonic;
 	int lastIndex = 0;
@@ -542,7 +548,9 @@ int Melody::attenuvertInt(int CV, int KNOB, float min_result, float max_result) 
 	int result;
 	if (inputs[CV].isConnected()) {
 		result = clamp(rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, min_result, max_result), min_result, max_result);
-		params[KNOB].setValue(result);
+		if (params[KNOB].getValue() != result) { 
+	        params[KNOB].setValue(result); 
+	    }
 	} else {
 		result = int(params[KNOB].getValue());
 	}
@@ -552,14 +560,18 @@ int Melody::attenuvertInt(int CV, int KNOB, float min_result, float max_result) 
 void Melody::attenuvert(int CV, int KNOB, float min_result, float max_result) {
 	if (inputs[CV].isConnected()) {
 		int result = clamp(rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, min_result, max_result), min_result, max_result);
-		params[KNOB].setValue(result);
+		if (params[KNOB].getValue() != result) { 
+	        params[KNOB].setValue(result); 
+	    }
 	}
 }
 
 void Melody::attenuvertFloat(int CV, int KNOB, float min_result, float max_result) {
 	if (inputs[CV].isConnected()) {
 		float result = clamp(rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, min_result, max_result), min_result, max_result);
-		params[KNOB].setValue(result);
+		if (params[KNOB].getValue() != result) { 
+	        params[KNOB].setValue(result); 
+	    }
 	}
 }
 
