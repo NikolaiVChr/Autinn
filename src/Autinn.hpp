@@ -133,8 +133,8 @@ struct ScrewStarAutinn : ThemedSvgScrew {
 	ScrewStarAutinn() {
 		//if (!pluginInstance) return;
 		//setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
-		if (pluginInstance && false) {
-			std::string str = asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg");
+		if (pluginInstance) {
+			std::string str = asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg");
 			INFO("ScrewStarAutinn: Loading string..");
 			std::shared_ptr<Svg> s = Svg::load(str);
 			if (s) {
