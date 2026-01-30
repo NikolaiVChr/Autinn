@@ -79,8 +79,18 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-      - name: Build plugin
-        shell: ${{ matrix.config.name == 'Windows' && 'msys2 {0}' || 'bash' }}
+      - name: Build plugin 1
+        if: runner.os == 'Windows'
+        shell: 'msys2 {0}'
+        run: |
+          ${{ matrix.config.prepare-os }}
+          ${{ matrix.config.prepare-os2 }}
+          export RACK_DIR=$HOME/Rack-SDK
+          make -j dep
+          make -j dist
+      - name: Build plugin 2
+        if: runner.os != 'Windows'
+        shell: 'bash'
         run: |
           ${{ matrix.config.prepare-os }}
           ${{ matrix.config.prepare-os2 }}
