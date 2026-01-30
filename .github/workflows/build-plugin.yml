@@ -18,7 +18,6 @@ jobs:
         - {
             name: Linux,
             os: ubuntu-latest,
-            build_shell: "bash",
             prepare-os: sudo apt-get -y --allow-downgrades --allow-remove-essential --allow-change-held-packages update,
             prepare-os2: sudo apt install -y libglu-dev,
             postfix: lin-x64
@@ -26,7 +25,6 @@ jobs:
         - {
             name: MacOS-Intel,
             os: macos-latest,
-            build_shell: "bash",
             prepare-os: "",
             prepare-os2: "",
             postfix: mac-x64
@@ -34,7 +32,6 @@ jobs:
         - {
             name: MacOS-ARM,
             os: macos-latest,
-            build_shell: "bash",
             prepare-os: "",
             prepare-os2: "",
             postfix: mac-arm64
@@ -42,7 +39,6 @@ jobs:
         - {
             name: Windows,
             os: windows-latest,
-            build_shell: "msys2 {0}",
             prepare-os: export CC=gcc,
             prepare-os2: "",
             postfix: win-x64
@@ -62,8 +58,16 @@ jobs:
             install: git make mingw-w64-x86_64-gcc mingw-w64-x86_64-tools unzip zip
 
       - name: Get Rack-SDK
-        shell: ${{ matrix.config.build_shell }}
+        if: runner.os == 'Windows'
+        shell: 'msys2 {0}'
         run: |
+          curl -o Rack-SDK.zip https://vcvrack.com/downloads/Rack-SDK-${{ env.rack-sdk-version }}-${{ matrix.config.postfix }}.zip
+          unzip Rack-SDK.zip
+      - name: Get Rack-SDK
+        if: runner.os != 'Windows'
+        shell: 'bash'
+        run: |
+          pushd $HOME
           curl -o Rack-SDK.zip https://vcvrack.com/downloads/Rack-SDK-${{ env.rack-sdk-version }}-${{ matrix.config.postfix }}.zip
           unzip Rack-SDK.zip
       - name: Patch plugin.mk, use 7zip on Windows
@@ -83,12 +87,22 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-      - name: Build plugin
-        shell: ${{ matrix.config.build_shell }}
+      - name: Build plugin Windows
+        if: runner.os == 'Windows'
+        shell: 'msys2 {0}'
         run: |
           ${{ matrix.config.prepare-os }}
           ${{ matrix.config.prepare-os2 }}
           export RACK_DIR=$(pwd)/Rack-SDK
+          make -j dep
+          make -j dist
+      - name: Build plugin Non-Windows
+        if: runner.os != 'Windows'
+        shell: 'bash'
+        run: |
+          ${{ matrix.config.prepare-os }}
+          ${{ matrix.config.prepare-os2 }}
+          export RACK_DIR=$HOME/Rack-SDK
           make -j dep
           make -j dist
       - name: Upload artifact
