@@ -56,8 +56,6 @@ void Sjip::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 
-	//TODO: Need anti-aliasing.
-
 	if (!outputs[OSC_OUTPUT].isConnected()) {
 		return;
 	}
