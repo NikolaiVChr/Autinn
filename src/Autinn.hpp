@@ -73,9 +73,10 @@ struct AutinnSliderShort : app::SvgSlider {
 
 struct RoundMediumAutinnKnob : RoundKnob {
 	RoundMediumAutinnKnob() {
-		if (!pluginInstance) return;
-		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobLargeAutinn.svg")));
-		//box.size = Vec(38, 38);
+		if (pluginInstance) {
+			setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/KnobLargeAutinn.svg")));
+			//box.size = Vec(38, 38);
+		}
 	}
 };
 
@@ -155,23 +156,25 @@ struct ScrewStarAutinn : ThemedSvgScrew {
 
 struct OutPortAutinn : SVGPort {
 	OutPortAutinn() {
-		if (!pluginInstance) return;
-		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg")));
-		shadow->opacity = 0.0;
-		//background->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg"));
-		//background->wrap();
-		//box.size = background->box.size;
+		if (pluginInstance) {
+			setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg")));
+			shadow->opacity = 0.0;
+			//background->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg"));
+			//background->wrap();
+			//box.size = background->box.size;
+		}
 	}
 };
 
 struct InPortAutinn : SVGPort {
 	InPortAutinn() {
-		if (!pluginInstance) return;
-		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg")));
-		shadow->opacity = 0.0;
-		//background->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg"));
-		//background->wrap();
-		//box.size = background->box.size;
+		if (pluginInstance) {
+			setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg")));
+			shadow->opacity = 0.0;
+			//background->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg"));
+			//background->wrap();
+			//box.size = background->box.size;
+		}
 	}
 };
 
