@@ -66,7 +66,7 @@ jobs:
           echo "Set plugin version from $pluginversion to $pluginversion-$gitrev"
           cat <<< `jq --arg VERSION "$pluginversion" '.version=$VERSION' plugin.json` > plugin.json
       - name: Initialize CodeQL
-        if: runner.os == 'Linux'
+        if: matrix.config.name == 'Linux'
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
@@ -75,9 +75,16 @@ jobs:
           ${{ matrix.config.prepare-os }}
           ${{ matrix.config.prepare-os2 }}
           export RACK_DIR=$HOME/Rack-SDK
+          # Setup Windows Cross-Compiler variables
           if [ "${{ matrix.config.postfix }}" == "win-x64" ]; then
+            # Define the prefix
             export CROSS_COMPILE=x86_64-w64-mingw32-
-            echo "Cross-compiling for Windows..."
+            # Force the compilers to use that prefix (Overriding GitHub defaults)
+            export CC=${CROSS_COMPILE}gcc
+            export CXX=${CROSS_COMPILE}g++
+            # Force linker as well
+            export LD=${CROSS_COMPILE}ld
+            echo "Configured for Windows Cross-Compilation"
           fi
           make -j dep
           make -j dist
