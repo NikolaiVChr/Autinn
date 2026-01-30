@@ -747,6 +747,7 @@ void Bass::vcf_lights(float attack, float sustain, float decay, float end) {
 }
 
 float Bass::acid_filter(float in, float r, float F_c, int oversample_protected) {// from diagram of resonance of TB-303
+	in += 1e-16f;
 	float voltage_drive = VCV_TO_MOOG*INPUT_TO_CAPACITOR;// 0.18 to convert from VCV audio rate voltages. 0.035 to convert from input to voltage over first capacitor.
 	in *= voltage_drive;
 	F_s   = APP->engine->getSampleRate()*oversample_protected;
@@ -812,6 +813,9 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected) 
 	}
 	if(!std::isfinite(out)) {
 		out = 0.0f;
+		y_a = 0.0f; y_b = 0.0f; y_c = 0.0f; y_d = 0.0f;
+    	y_a_prev = 0.0f; y_b_prev = 0.0f; y_c_prev = 0.0f; y_d_prev = 0.0f; y_d_prev_prev = 0.0f;
+    	W_a_prev = 0.0f; W_b_prev = 0.0f; W_c_prev = 0.0f;
 	}
 	return out/voltage_drive;
 }
@@ -828,6 +832,12 @@ struct OversampleBassMenuItem : MenuItem {
 
 	void onAction(const event::Action &e) override {
 		_module->current_oversample = _os;
+		
+		// Reset all resamplers to clear stale buffer data
+        _module->upsampler2.reset();
+        _module->decimator2.reset();
+        _module->upsampler4.reset();
+        _module->decimator4.reset();
 	}
 
 	void step() override {
