@@ -104,7 +104,7 @@ struct Chord : Module {
 	void dataFromJson(json_t *rootJ) override {
 		json_t *ext3 = json_object_get(rootJ, "chordIndex");
 		if (ext3) {
-			chordIndex = json_integer_value(ext3);
+			chordIndex = clamp(json_integer_value(ext3), 0, NUM_CHORDS - 1);
 		}
 	}
 
@@ -119,14 +119,16 @@ void Chord::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 
-	if (!outputs[CHORD_OUTPUT].isConnected() || !outputs[ROOT_INPUT].isConnected()) {
+	if (!outputs[CHORD_OUTPUT].isConnected() || !inputs[ROOT_INPUT].isConnected()) {
 		return;
 	}
 
 	bool trig = inputs[TRIGGER_INPUT].getVoltage() >= 1.0f;
 
 	if (trig && !trig_prev) {
-		chordIndex = (rand() % static_cast<int>(NUM_CHORDS));
+		chordIndex = (int)random::uniform() * NUM_CHORDS;
+		// Ensure it doesn't hit NUM_CHORDS exactly:
+		if (chordIndex >= NUM_CHORDS) chordIndex = NUM_CHORDS - 1;
 	}
 
 	for (int light = 0; light < NUM_CHORDS; light++) {
