@@ -66,14 +66,14 @@ struct Nap : Module {
 		configLight(LOW_LIGHT, "Trying to fall asleep.. ");
 	}
 
-	float out_prev = 0.1f;
+	float out_prev[16] = {0.1f};
 
 	int current_oversample = 2;
 
-	dsp::Upsampler<oversample2, 10> upsampler2;
-	dsp::Decimator<oversample2, 10> decimator2;
-	dsp::Upsampler<oversample4, 10> upsampler4;
-	dsp::Decimator<oversample4, 10> decimator4;
+	dsp::Upsampler<oversample2, 10> upsampler2[16];
+	dsp::Decimator<oversample2, 10> decimator2[16];
+	dsp::Upsampler<oversample4, 10> upsampler4[16];
+	dsp::Decimator<oversample4, 10> decimator4[16];
 
 	json_t *dataToJson() override {
 		json_t *root = json_object();
@@ -109,37 +109,42 @@ void Nap::process(const ProcessArgs &args) {
 		return;
 	}
 
-	float pre = inputs[NAP_INPUT].getVoltage() * (params[SNORING_PARAM].getValue() * (SNORING_MAX - SNORING_MIN) + SNORING_MIN);
+	int channels = std::max(1, inputs[NAP_INPUT].getChannels());
+	outputs[NAP_OUTPUT].setChannels(channels);
 
-	float inInter [current_oversample];
-	float outBuf  [current_oversample];
+	for (int c = 0; c < channels; c++) {
+		float pre = inputs[NAP_INPUT].getPolyVoltage(c) * (params[SNORING_PARAM].getValue() * (SNORING_MAX - SNORING_MIN) + SNORING_MIN);
 
-	if (current_oversample == oversample2) {
-		upsampler2.process(clamp(pre, -4.5f, 4.5f), inInter);
-	} else if (current_oversample == oversample4) {
-		upsampler4.process(clamp(pre, -4.5f, 4.5f), inInter);
+		float inInter [4];
+		float outBuf  [4];
+
+		if (current_oversample == oversample2) {
+			upsampler2[c].process(pre, inInter);
+		} else if (current_oversample == oversample4) {
+			upsampler4[c].process(pre, inInter);
+		}
+
+		for (int i = 0; i < current_oversample; i++) {
+			float out = this->fwdEuler(out_prev[c], inInter[i]);
+			outBuf[i] = non_lin_func(out/12.0f);
+			out_prev[c] = out;
+		}
+		float final;
+		if (current_oversample == oversample2) {
+			final = decimator2[c].process(outBuf);
+		} else {
+			final = decimator4[c].process(outBuf);
+		}
+
+		outputs[NAP_OUTPUT].setVoltage(final*12.0f, c);
+
+		if (c == 0) {
+			float pre_abs = fabs(pre);
+			lights[HIGH_LIGHT].value = fmax(0,(pre_abs-18.0f)*4.0f);
+			lights[MID_LIGHT].value = fmax(0,(pre_abs-4.5f)*2.0f);
+			lights[LOW_LIGHT].value = fmax(0,rescale(pre_abs, 0.0f, 4.5f, 1.0f, 0.0f));
+		}
 	}
-
-	for (int i = 0; i < current_oversample; i++) {
-		float out = this->fwdEuler(out_prev, inInter[i]);
-		outBuf[i] = non_lin_func(out/12.0f);
-		out_prev = out;
-	}
-	float final;
-	if (current_oversample == oversample2) {
-		final = decimator2.process(outBuf);
-	} else {
-		final = decimator4.process(outBuf);
-	}
-
-	//outputs[NAP_OUTPUT].setChannels(2);
-    //outputs[NAP_OUTPUT].setVoltage(pre, 1);
-    outputs[NAP_OUTPUT].setVoltage(final*12.0f, 0);
-
-    float pre_abs = fabs(pre);
-	lights[HIGH_LIGHT].value = fmax(0,(pre_abs-18.0f)*4.0f);
-	lights[MID_LIGHT].value = fmax(0,(pre_abs-4.5f)*2.0f);
-	lights[LOW_LIGHT].value = fmax(0,rescale(pre_abs, 0.0f, 4.5f, 1.0f, 0.0f));
 }
 
 float Nap::fwdEuler(float out_prv, float in) {
