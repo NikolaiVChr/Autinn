@@ -130,7 +130,7 @@ struct RoundTinyAutinnKnob : RoundKnob {
 
 struct ScrewStarAutinn : SVGScrew {
 	ScrewStarAutinn() {
-		if (!pluginInstance) return;
+		//if (!pluginInstance) return;
 		//setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
 		std::shared_ptr<Svg> s = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg"));
 		if (s) {
