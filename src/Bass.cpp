@@ -101,6 +101,7 @@ struct Bass : Module {
 	};
 
 	float V_t = 0.026f*2.0f;
+	float inv_Vt = 1.0f / V_t;
 	float x = 0.0f;
 	float Gres = 1.0f;
 	float input_cutoff = 0.0f;
@@ -781,16 +782,16 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected) 
 		x   = inInter[i] - 2.0f*Gres*r*(y_d_prev+y_d_prev_prev-priority*inInter[i]);//unit and a half feedback delay. -inInter[i] is Gcomp, to make passband gain not decrease too much when turning up resonance.
 
 		// 1st transistor stage:
-		y_a = y_a_prev+g2*(non_lin_func( x/V_t )-W_a_prev);
-		W_a = non_lin_func( y_a/V_t );
+		y_a = y_a_prev+g2*(non_lin_func( x*inv_Vt )-W_a_prev);
+		W_a = non_lin_func( y_a*inv_Vt );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
-		W_b = non_lin_func( y_b/V_t );
+		W_b = non_lin_func( y_b*inv_Vt );
 		// 3rd transistor stage:
 		y_c = y_c_prev+g*(W_b-W_c_prev);
-		W_c = non_lin_func( y_c/V_t );
+		W_c = non_lin_func( y_c*inv_Vt );
 		// 4th transistor stage:
-		y_d = y_d_prev+g*(W_c-non_lin_func( y_d_prev/V_t ));
+		y_d = y_d_prev+g*(W_c-non_lin_func( y_d_prev*inv_Vt ));
 
 		// record stuff for next step
 		y_d_prev_prev = y_d_prev;
