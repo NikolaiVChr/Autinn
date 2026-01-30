@@ -109,8 +109,8 @@ void Fil::process(const ProcessArgs &args) {
 		float in = 0.20f * inputs[FIL_INPUT].getPolyVoltage(c) * (params[DIAL_PARAM].getValue() * (DRIVE_MAX - DRIVE_MIN) + DRIVE_MIN);
 		float out = 0.0f;
 
-		float inInter [current_oversample];
-		float outBuf  [current_oversample];
+		float inInter [8];// max oversample size
+		float outBuf  [8];
 		if (current_oversample == oversample2) {
 			upsampler2[c].process(in, inInter);
 		} else if (current_oversample == oversample4) {
@@ -118,40 +118,31 @@ void Fil::process(const ProcessArgs &args) {
 		} else {
 			upsampler8[c].process(in, inInter);
 		}
-
+		
 		for (int i = 0; i < current_oversample; i++) {
-			if (fabs(inInter[i]) < th) {
-				out = 2.0f*inInter[i];
-				if (c == 0 && i==0) {
-					lights[LOW_LIGHT].value = fabs(out)/(th*2.0f);
-					lights[MID_LIGHT].value = 0.0f;
-					lights[HIGH_LIGHT].value = 0.0f;
-				}
-			} else if (fabs(inInter[i]) <= 2.0f*th) {
-				if (inInter[i] > 0.0f) {
-					out = (3.0f-(2.0f-inInter[i]*3.0f)*(2.0f-inInter[i]*3.0f))/3.0f;
-				} else {
-					out = -(3.0f-(2.0f-fabs(inInter[i])*3.0f)*(2.0f-fabs(inInter[i])*3.0f))/3.0f;
-				}
-				if (c == 0 && i==0) {
-					lights[MID_LIGHT].value = (fabs(out)-th*2.0f)*3.0f;
-					lights[LOW_LIGHT].value = 0.0f;
-					lights[HIGH_LIGHT].value = 0.0f;
-				}
-			} else {
-				if (inInter[i] > 0.0f) {
-					out =  1.0f;
-				} else {
-					out = -1.0f;
-				}
-				if (c == 0 && i==0) {
-					lights[HIGH_LIGHT].value = (fabs(inInter[i])-th*2.0f)*2.0f;
-					lights[MID_LIGHT].value = 0.0f;
-					lights[LOW_LIGHT].value = 0.0f;
-				}
+			float x = inInter[i];
+
+			// Asymmetric Tube Bias
+			// Adding x*x creates Even Harmonics (Warmth).
+			// At high volumes, large negative values will 'fold' back positive (Grit).
+			float tube_bias = x + 0.25f * x * x;
+
+			// Soft Saturation (The Tube Limit)
+			// non_lin handles the clipping smoothly like a vacuum tube.
+			outBuf[i] = non_lin_func(tube_bias);
+
+			// Update Lights based on saturation intensity
+			if (c == 0 && i == 0) {
+				float signal_abs = std::fabs(x);
+				// Green: Signal present
+				lights[LOW_LIGHT].value  = (signal_abs > 0.1f) ? 1.0f : 0.0f;
+				// Yellow: Tube is warming up (saturation starting)
+				lights[MID_LIGHT].value  = (signal_abs > 1.5f) ? 1.0f : 0.0f;
+				// Red: The "Grit" zone (Foldover/Hard clipping)
+				lights[HIGH_LIGHT].value = (signal_abs > 3.0f) ? 1.0f : 0.0f;
 			}
-			outBuf[i] = non_lin_func(out);
 		}
+
 		if (current_oversample == oversample2) {
 			out = decimator2[c].process(outBuf);
 		} else if (current_oversample == oversample4) {
@@ -160,7 +151,7 @@ void Fil::process(const ProcessArgs &args) {
 			out = decimator8[c].process(outBuf);
 		}
 
-		outputs[FIL_OUTPUT].setVoltage(out*5.0f, c);
+		outputs[FIL_OUTPUT].setVoltage(out*6.0f, c);
 	}
 }
 
