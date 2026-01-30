@@ -364,6 +364,15 @@ void Bass::process(const ProcessArgs &args) {
 	if (gate && !gate_prev) {
 		accentBool = accent >= 1.0f;
 		//std::cout <<     "       ACCENT CHANGED "+std::to_string(accentBool)+"\n";
+	} else if (gate && !accentBool && accent >= 1.0f && mode_cutoff == 0) {
+		// Late Accent Fix: Catch accent if it arrives slightly late (during Attack phase only)
+		accentBool = true;
+
+		// Momentarily force gate_prev to false.
+		// This tells vca_env and filter_env to "Re-Trigger" this frame.
+		// They will automatically set 'accentAttackBase = current_cutoff'
+		// and smooth out the VCA transition.
+		gate_prev = false;
 	}
 	lights[E_LIGHT].value = accentBool;
 
@@ -770,8 +779,8 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected) 
 		g2 = g;
 	}
 
-	float inInter [oversample_protected];
-	float outBuf  [oversample_protected];
+	float inInter[4];// max oversample size
+	float outBuf[4];
 	if (oversample_protected == oversample2) {
 		upsampler2.process(in, inInter);
 	} else {
