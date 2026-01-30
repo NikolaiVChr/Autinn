@@ -103,6 +103,7 @@ struct AmpWidget : ModuleWidget {
 		INFO("AmpWidget: Resolved path: %s", panelSvg.c_str());
 
 		setPanel(createPanel(panelSvg));
+		/*
 		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 		INFO("AmpWidget: Adding Screw Widget 1");
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
@@ -116,8 +117,10 @@ struct AmpWidget : ModuleWidget {
 		addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Amp::AMP_OUTPUT));
 		INFO("AmpWidget: Adding knob Widgets");
 		addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Amp::DIAL_PARAM));
+		*/
 		INFO("AmpWidget: Adding light Widgets");
 		addChild(createLight<MediumLight<YellowLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Amp::BLINK_LIGHT));
+
 		INFO("AmpWidget: Constructor Finished Successfully");
 	}
 };
