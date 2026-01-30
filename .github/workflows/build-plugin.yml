@@ -75,6 +75,10 @@ jobs:
           ${{ matrix.config.prepare-os }}
           ${{ matrix.config.prepare-os2 }}
           export RACK_DIR=$HOME/Rack-SDK
+          if [ "${{ matrix.config.postfix }}" == "win-x64" ]; then
+            export CROSS_COMPILE=x86_64-w64-mingw32-
+            echo "Cross-compiling for Windows..."
+          fi
           make -j dep
           make -j dist
       - name: Upload artifact
