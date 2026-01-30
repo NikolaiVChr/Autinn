@@ -41,7 +41,7 @@
 #define GAP_NORMAL 0.87f
 #define GAP_LEGATO 0.99f
 #define GLIDE_MAXIMUM 0.060f
-#define NUMBER_OF_MODES 12
+#define NUMBER_OF_MODES 13
 #define REST_MAX 10
 #define TONIC_MIN 60
 #define TONIC_MAX 71
@@ -87,7 +87,7 @@ struct Melody : Module {
 		configSwitch(Melody::TONIC_PARAM, TONIC_MIN, TONIC_MAX, 62, "Tonic", {"C", "C#", "D", "D#","E","F","F#","G","G#","A","A#","B"});
 		configSwitch(Melody::MODE_PARAM, 0, NUMBER_OF_MODES-1, 4, "Mode", { "I: Major", "II: Dorian", "III: Phrygian", "IV: Lydian", "V: Mixolydian",
 															"VI: Minor", "VII: Locrian", "Double Harmonic Major", "Double Harmonic Minor",
-															"Hexatonic Blues", "Bebop Dominant", "Major Pentatonic"});
+															"Hexatonic Blues", "Bebop Dominant", "Major Pentatonic", "Chromatic"});
 		configSwitch(Melody::GAP_PARAM, 0, 3, 2.50f, "Expression", {"Staccatissimo", "Staccato", "Normal", "Legato"});
 		configButton(Melody::BUTTON_GENERATE_PARAM, "Generate new phrase from settings (will start when current phrase ends)");
 		configParam(Melody::GLIDE_PARAM, 0, 100, 0, "Each note's chance of glide"," %", 0.0f, 1.0f);
@@ -256,6 +256,7 @@ struct Melody : Module {
 												{3,2,1,1,3,2},    //   Hexatonic Blues
 												{2,2,1,2,2,1,1,1},//   Bebop dominant
 												{2,2,3,2,3}       //   Major Pentatonic
+												{1,1,1,1,1,1,1,1,1,1,1,1} //   Chromatic
 											  };
 
 	int phrase_length = 6;
