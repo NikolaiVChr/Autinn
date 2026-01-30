@@ -129,6 +129,12 @@ struct Mixer6 : Module {
 
 		std::fill_n(mute_solo_button_prev, num_mono_channels, false);
 		std::fill_n(mute_solo_state, num_mono_channels, 0);
+
+		for (int i = 0; i < num_mono_channels; i++) {
+			low_prev[i] = -100.0f; // Force update on first frame
+			mid_prev[i] = -100.0f;
+			high_prev[i] = -100.0f;
+		}
 	}
 
 	json_t *dataToJson() override {
@@ -152,7 +158,9 @@ struct Mixer6 : Module {
 			json_t *json_int;
 
 			json_array_foreach(mute_json_array, i, json_int) {
-			    mute_solo_state[i] = json_integer_value(json_int);
+				if (i < num_mono_channels) {
+					mute_solo_state[i] = json_integer_value(json_int);
+				}
 			}
 	    }
 	}
@@ -215,6 +223,11 @@ void Mixer6::process(const ProcessArgs &args) {
 			fx_send_B += params[FX_B_SEND_PARAM+ch].getValue() * in;
 			main_left  += cos(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * in;
 			main_right += sin(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * in;
+
+			// must run the filters to keep their state uptodate
+			float out1 = lowS[ch].process(in);
+			float out2 = midP[ch].process(in);
+			float out3 = highS[ch].process(in);
 		}
 	}
 	
