@@ -212,7 +212,7 @@ px=mm*75.0/25.4=mm*2.95
 //inlined
 static float non_lin_func(float parm) {
 	// 7 divisions in continued fraction series expansion
-	float x = std::clamp(parm, -4.97f, 4.97f);
+	float x = clamp(parm, -4.97f, 4.97f);
 	float x2 = x * x;
 	float a = x * (135135.0f + x2 * (17325.0f + x2 * (378.0f + x2)));
 	float b = 135135.0f + x2 * (62370.0f + x2 * (3150.0f + x2 * 28.0f));
