@@ -255,7 +255,7 @@ struct Melody : Module {
 												{2,1,3,1,1,3,1},  //   Double Harmonic Minor
 												{3,2,1,1,3,2},    //   Hexatonic Blues
 												{2,2,1,2,2,1,1,1},//   Bebop dominant
-												{2,2,3,2,3}       //   Major Pentatonic
+												{2,2,3,2,3},      //   Major Pentatonic
 												{1,1,1,1,1,1,1,1,1,1,1,1} //   Chromatic
 											  };
 
