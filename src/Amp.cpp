@@ -94,8 +94,15 @@ struct AmpWidget : ModuleWidget {
 	AmpWidget(Amp *module) {
 		INFO("AmpWidget: Starting constructor. Module is %s", module ? "VALID" : "NULL");
 		setModule(module);
+		if (!pluginInstance) {
+			DEBUG("AmpWidget: pluginInstance is NULL!");
+			return;
+		}
 		INFO("AmpWidget: Loading Panel SVG");
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/AmpModule.svg")));
+		auto panelSvg = asset::plugin(pluginInstance, "res/AmpModule.svg");
+		INFO("AmpWidget: Resolved path: %s", panelSvg.c_str());
+
+		setPanel(createPanel(panelSvg));
 		//box.size = Vec(3 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 		INFO("AmpWidget: Adding Screw Widgets");
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
