@@ -41,12 +41,12 @@ struct AutinnSlider : app::SvgSlider {
 	AutinnSlider() {
 		maxHandlePos = Vec(0,   0);
 		minHandlePos = Vec(0, 270);
-		background->svg = APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderAutinn.svg"));
+		setBackgroundSvg(APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderAutinn.svg")));
 		//background->wrap();
 		background->box.pos = Vec(0, 0);
 		background->box.size = Vec(15,300);
 		box.size = background->box.size;
-		handle->svg = APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderHandleAutinn.svg"));
+		setHandleSvg(APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderHandleAutinn.svg")));
 		handle->box.size = Vec(15,30);
 		handle->box.pos = Vec(0,15);
 		//handle->wrap();
@@ -57,12 +57,12 @@ struct AutinnSliderShort : app::SvgSlider {
 	AutinnSliderShort() {
 		maxHandlePos = Vec(0,   0);
 		minHandlePos = Vec(0, 70);
-		background->svg = APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderShortAutinn.svg"));
+		setBackgroundSvg(APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderShortAutinn.svg")));
 		//background->wrap();
 		background->box.pos = Vec(0, 0);
 		background->box.size = Vec(15,100);
 		box.size = background->box.size;
-		handle->svg = APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderHandleAutinn.svg"));
+		setHandleSvg(APP->window->loadSvg(asset::plugin(pluginInstance,"res/ComponentLibrary/SliderHandleAutinn.svg")));
 		handle->box.size = Vec(15,30);
 		handle->box.pos = Vec(0,15);
 		//handle->wrap();
@@ -122,9 +122,12 @@ struct RoundTinyAutinnKnob : RoundKnob {
 struct ScrewStarAutinn : SVGScrew {
 	ScrewStarAutinn() {
 		//setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
+		setSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg")));
+		/*
 		sw->svg = APP->window->loadSvg(asset::plugin(pluginInstance, "res/ComponentLibrary/ScrewStarAutinn.svg"));
 		sw->wrap();
 		box.size = sw->box.size;
+		*/
 	}
 };
 
