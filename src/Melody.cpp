@@ -440,10 +440,18 @@ void Melody::process(const ProcessArgs &args) {
 				if(nextPhrase[c].size() > 0) {
 					newStart = 10.0f;
 					// Switching to next phrase
-					phrase[c] = nextPhrase[c]; // Vector assignment is fast IF capacity is already there
-					phraseDurations[c] = nextPhraseDurations[c];
-					phraseAccents[c] = nextPhraseAccents[c];
-					phraseGlides[c] = nextPhraseGlides[c];
+					// Safely copy data without triggering reallocation, so we can save json at same time this happens wihtout issues
+					phrase[c].resize(nextPhrase[c].size());
+					std::copy(nextPhrase[c].begin(), nextPhrase[c].end(), phrase[c].begin());
+
+					phraseDurations[c].resize(nextPhraseDurations[c].size());
+					std::copy(nextPhraseDurations[c].begin(), nextPhraseDurations[c].end(), phraseDurations[c].begin());
+
+					phraseAccents[c].resize(nextPhraseAccents[c].size());
+					std::copy(nextPhraseAccents[c].begin(), nextPhraseAccents[c].end(), phraseAccents[c].begin());
+
+					phraseGlides[c].resize(nextPhraseGlides[c].size());
+					std::copy(nextPhraseGlides[c].begin(), nextPhraseGlides[c].end(), phraseGlides[c].begin());
 
 					phrase_length[c] = next_phrase_length[c];
 					//nextPhrase.resize(0);
@@ -475,7 +483,13 @@ void Melody::process(const ProcessArgs &args) {
 			int phrase_index_prev = phrase_index[c] - 1;
 			if (phrase_index_prev < 0) phrase_index_prev = phrase_length[c] - 1;
 			float out_prev = this->note2vPoct(phrase[c][phrase_index_prev]);
-			outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount[c], 0, fmin(float(double(clockCount_last[c])*gap[c]), GLIDE_MAXIMUM/args.sampleTime), out_prev, out), out_prev, out));// 60ms glide at start of note
+			float glideTime = fmin(float(double(clockCount_last[c])*gap[c]), GLIDE_MAXIMUM/args.sampleTime);
+			if (glideTime > 0.0f) {
+				outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount[c], 0, glideTime, out_prev, out), out_prev, out), c);// 60ms glide at start of note
+			} else {
+				// prevent divide by zero
+				outputs[FREQ_OUTPUT].setVoltage(out, c);
+			}
 		}
 		outputs[ACCENT_OUTPUT].setVoltage(float(phraseAccents[c][phrase_index[c]])*10.0f, c);
 		if (resting[c] > 0 || (clockCount[c] > clockCount_last[c]*gap[c] && passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1)) {// Normal
