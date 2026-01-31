@@ -58,7 +58,7 @@ struct Kicker : Module {
     Kicker() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(FREQ_PARAM, 30.0f, 200.0f, 60.0f, "Tune", " Hz");
-        configParam(DECAY_PARAM, 0.1f, 2.0f, 1.05f, "Decay", " s");
+        configParam(DECAY_PARAM, 0.1f, 2.0f, 0.6f, "Decay", " s");
         configParam(SWEEP_PARAM, 0.0f, 1.0f, 0.2f, "Sweep", "%");
         configParam(CLICK_PARAM, 0.0f, 1.0f, 0.2f, "Click", "%");
         configParam(DRIVE_PARAM, 0.0f, 5.0f, 2.5f, "Drive", "%"); // 0 to 5x gain
@@ -98,7 +98,8 @@ void Kicker::process(const ProcessArgs &args) {
 
     float decayVal = std::max(params[DECAY_PARAM].getValue(), 0.01f);
     float decayCoeff = std::exp(-1.0f / (decayVal * args.sampleRate));
-    float pitchDecayCoeff = std::exp(-1.0f / (0.02f * args.sampleRate)); // 20ms fixed sweep
+    //float pitchDecayCoeff = std::exp(-1.0f / (0.02f * args.sampleRate)); // 20ms fixed sweep
+    float pitchDecayCoeff = std::exp(-1.0f / (0.005f * args.sampleRate));
 
     bool active = false;
 
@@ -125,8 +126,11 @@ void Kicker::process(const ProcessArgs &args) {
         float voct = inputs[VOCT_INPUT].getPolyVoltage(c);
         //float pitchMod = sweepDepth * pitchEnv[c];
         //float freq = baseFreq * powf(2.0f, voct) + pitchMod;
-        float freq = baseFreq * powf(2.0f, voct + (pitchEnv[c] * 3.0f * params[SWEEP_PARAM].getValue()));
-        
+        //float freq = baseFreq * powf(2.0f, voct + (pitchEnv[c] * 3.0f * params[SWEEP_PARAM].getValue()));
+        float mod = pitchEnv[c] * pitchEnv[c] * 5.0f * params[SWEEP_PARAM].getValue();
+        float freq = baseFreq * powf(2.0f, voct + mod);
+
+
         float deltaPhase = freq * dt;
         phase[c] += deltaPhase;
         if (phase[c] >= 1.0f) phase[c] -= 1.0f;
@@ -139,7 +143,8 @@ void Kicker::process(const ProcessArgs &args) {
         // Click (Short burst of noise or high pitch sine at start)
         // Simple trick: Add a tiny bit of squared envelope to the start
         float white = (int32_t(noiseState[c] = noiseState[c] * 1664525 + 1013904223) >> 8) * (1.0f / 8388608.0f);
-        float click = white * pitchEnv[c] * pitchEnv[c] * clickLevel;
+        //float click = white * pitchEnv[c] * pitchEnv[c] * clickLevel;
+        float click = clamp(white * 5.0f, -1.0f, 1.0f) * pitchEnv[c] * pitchEnv[c] * clickLevel;
         //float click = (std::rand() % 2000 / 1000.0f - 1.0f) * pitchEnv[c] * clickLevel;
 
         // Mix & Saturate
@@ -157,7 +162,7 @@ void Kicker::process(const ProcessArgs &args) {
 
     // Blink light if any drum triggered
     if (active) lightDecay = 1.0f;
-    float lightLambda = 1.0f - (args.sampleTime / 50.0f);
+    float lightLambda = 1.0f - (args.sampleTime / 1.0f);
     lightDecay *= std::max(0.0f, lightLambda);
     lights[ACT_LIGHT].value = lightDecay;
 }
