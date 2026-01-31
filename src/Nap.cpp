@@ -96,7 +96,7 @@ struct Nap : Module {
 		Module::onReset(e);
 	}
 
-	float fwdEuler(float out_prev, float in);
+	float fwdEuler(float out_prev, float in, int oversample);
 	float distort(float out_prev, float in);
 	void process(const ProcessArgs &args) override;
 };
@@ -125,9 +125,15 @@ void Nap::process(const ProcessArgs &args) {
 		}
 
 		for (int i = 0; i < current_oversample; i++) {
-			float out = this->fwdEuler(out_prev[c], inInter[i]);
+			float out = this->fwdEuler(out_prev[c], inInter[i], current_oversample);
+
+			if (!std::isfinite(out)) {
+				out = 0.0f;
+				out_prev[c] = 0.0f; // Reset state
+			} else {
+				out_prev[c] = out;
+			}
 			outBuf[i] = non_lin_func(out/12.0f);
-			out_prev[c] = out;
 		}
 		float final;
 		if (current_oversample == oversample2) {
@@ -147,8 +153,9 @@ void Nap::process(const ProcessArgs &args) {
 	}
 }
 
-float Nap::fwdEuler(float out_prv, float in) {
-    return out_prv + this->distort(out_prv, in)*params[DREAMING_PARAM].getValue();
+float Nap::fwdEuler(float out_prv, float in, int oversample) {
+	float step = this->distort(out_prv, in) * params[DREAMING_PARAM].getValue();
+	return out_prv + (step / (float)oversample);
 }
 
 float Nap::distort(float out_prv, float in) {
