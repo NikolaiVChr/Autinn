@@ -126,7 +126,7 @@ void Chord::process(const ProcessArgs &args) {
 	bool trig = inputs[TRIGGER_INPUT].getVoltage() >= 1.0f;
 
 	if (trig && !trig_prev) {
-		chordIndex = (int)random::uniform() * NUM_CHORDS;
+		chordIndex = (int)(random::uniform() * NUM_CHORDS);
 		// Ensure it doesn't hit NUM_CHORDS exactly:
 		if (chordIndex >= NUM_CHORDS) chordIndex = NUM_CHORDS - 1;
 	}
