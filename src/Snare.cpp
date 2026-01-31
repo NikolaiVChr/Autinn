@@ -182,7 +182,7 @@ void Snare::process(const ProcessArgs &args) {
     }
 
     if (active) lightDecay = 1.0f;
-    float lightLambda = 1.0f - (args.sampleTime / 0.2f);
+    float lightLambda = 1.0f - (args.sampleTime / 0.15f);
     lightDecay *= std::max(0.0f, lightLambda);
     lights[ACT_LIGHT].value = lightDecay;
 }

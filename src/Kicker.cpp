@@ -99,7 +99,8 @@ void Kicker::process(const ProcessArgs &args) {
     float decayVal = std::max(params[DECAY_PARAM].getValue(), 0.01f);
     float decayCoeff = std::exp(-1.0f / (decayVal * args.sampleRate));
     //float pitchDecayCoeff = std::exp(-1.0f / (0.02f * args.sampleRate)); // 20ms fixed sweep
-    float pitchDecayCoeff = std::exp(-1.0f / (0.005f * args.sampleRate));
+    float pitchTime = 0.005f + (decayVal * 0.015f);
+    float pitchDecayCoeff = std::exp(-1.0f / (pitchTime * args.sampleRate));
 
     bool active = false;
 
@@ -144,12 +145,25 @@ void Kicker::process(const ProcessArgs &args) {
         // Simple trick: Add a tiny bit of squared envelope to the start
         float white = (int32_t(noiseState[c] = noiseState[c] * 1664525 + 1013904223) >> 8) * (1.0f / 8388608.0f);
         //float click = white * pitchEnv[c] * pitchEnv[c] * clickLevel;
-        float click = clamp(white * 5.0f, -1.0f, 1.0f) * pitchEnv[c] * pitchEnv[c] * clickLevel;
+        //float click = clamp(white * 5.0f, -1.0f, 1.0f) * pitchEnv[c] * pitchEnv[c] * clickLevel;
         //float click = (std::rand() % 2000 / 1000.0f - 1.0f) * pitchEnv[c] * clickLevel;
+
+        //Adaptive Envelope
+        // If decay is short (< 0.5s), square the env to make it "Dry/Tight".
+        // If decay is long, keep it linear to preserve the "Boom".
+        float finalEnv = ampEnv[c];
+        if (decayVal < 0.5f) {
+            finalEnv = ampEnv[c] * ampEnv[c];
+        }
+
+        float click = white * (pitchEnv[c] * pitchEnv[c]) * clickLevel;
+
+        // Apply adaptive envelope to body
+        float signal = (body * finalEnv + click) * drive;
 
         // Mix & Saturate
         //float signal = (body + click) * ampEnv[c] * drive;
-        float signal = (body * ampEnv[c] + click) * ampEnv[c] * drive;
+        //float signal = (body * ampEnv[c] + click) * ampEnv[c] * drive;
 
         // Fast Tanh approximation for Analog feel
         float x = signal;
@@ -162,7 +176,7 @@ void Kicker::process(const ProcessArgs &args) {
 
     // Blink light if any drum triggered
     if (active) lightDecay = 1.0f;
-    float lightLambda = 1.0f - (args.sampleTime / 1.0f);
+    float lightLambda = 1.0f - (args.sampleTime / 0.2f);
     lightDecay *= std::max(0.0f, lightLambda);
     lights[ACT_LIGHT].value = lightDecay;
 }
