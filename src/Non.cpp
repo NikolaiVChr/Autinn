@@ -1,8 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-#include <queue>
-
-using std::queue;
 /*
 
     Autinn VCV Rack Plugin
@@ -102,9 +99,12 @@ struct Non : Module {
 	bool attack = true;
 	bool limiter = false;
 
+	// Buffer size for safety with 4x oversampling
+	static const int BUFFER_SIZE = 1024;//since lookahead is around 0.15 ms
 	unsigned D = 2;
-	queue <float> bufferL;
-	queue <float> bufferR;
+	float bufferL[BUFFER_SIZE] = {}; // Enough for >5ms at 192kHz
+	float bufferR[BUFFER_SIZE] = {};
+	int writeIndex = 0;
 
 	// these are here to optimize so not to do expensive ops every step:
 	//double ta = -150.0;
@@ -127,6 +127,10 @@ struct Non : Module {
 	//double TAV = 0.03;
 	//double k_prev = 1.0 - exp(-2.2 * 0.0000226 / 0.001 );// Just a starting value in aprox the range its going to be used in.
 
+	// Oversampling objects
+	static const int OVERSAMPLE = 4;
+	dsp::Upsampler<OVERSAMPLE, 12> upsampler[2];
+	dsp::Decimator<OVERSAMPLE, 12> decimator[2];
 
 	// VU Meter stuff
 	dsp::VuMeter2 vuMeterIn;
@@ -176,6 +180,7 @@ struct Non : Module {
 
 	double toDB(double volt);
 	double toGain(double dB);
+	double toVolt(double dB);
 	double smooth(double k, double g_prev, double f);
 	double peak(double x, double ATp, double RT);
 	double peakW(double x, double ATp, double RT);
@@ -336,7 +341,7 @@ void Non::process(const ProcessArgs &args) {
 		params[T_LIMITER_PARAM].setValue(LT);
 	}
 
-	double TS = args.sampleTime * 1000.0; //ms
+	double TS = (args.sampleTime / OVERSAMPLE) * 1000.0; //ms
 
 	//if (taKnob != params[ATTACK_PARAM].getValue() || tapKnob != params[ATTACK_PEAK_PARAM].getValue() || trKnob != params[RELEASE_PARAM].getValue() || erKnob != params[RATIO_EXPANDER_PARAM].getValue() || crKnob != params[RATIO_COMPRESSOR_PARAM].getValue() || rate != args.sampleRate || tavKnob != params[AVERAGE_TIME_PARAM].getValue() || gainKnob != params[OUT_GAIN_PARAM].getValue()) {
 	if (tapKnob != params[ATTACK_PEAK_PARAM].getValue() || trKnob != params[RELEASE_PARAM].getValue() || rate != args.sampleRate || gainKnob != params[OUT_GAIN_PARAM].getValue()) {
@@ -351,7 +356,7 @@ void Non::process(const ProcessArgs &args) {
 		//crKnob = params[RATIO_COMPRESSOR_PARAM].getValue();
 		gainKnob = params[OUT_GAIN_PARAM].getValue();
 
-		D   = (unsigned)(rate * 0.15 * 0.001);
+		D   = (unsigned)(rate * 0.15 * 0.001 * OVERSAMPLE);
 
 		//ta = this->toExp10(taKnob,  ATTACK_LOW_MS, ATTACK_HIGH_MS);
 		tap = this->toExp10(tapKnob, ATTACK_LIMITER_LOW_MS, ATTACK_LIMITER_HIGH_MS);
@@ -372,115 +377,147 @@ void Non::process(const ProcessArgs &args) {
 	//unsigned hyst_max_attack = tapKnob / args.sampleTime;
 
 	// inputs:
-	float left  = inputs[LEFT_INPUT].getVoltage();
-	float right = inputs[RIGHT_INPUT].getVoltage();
-	bufferL.push(left);
-	bufferR.push(right);
-	float pastL = bufferL.front();
-	float pastR = bufferR.front();
-	while (bufferL.size() > D) {
-		bufferL.pop();
-		bufferR.pop();
+	float leftInput  = inputs[LEFT_INPUT].getVoltage();
+	float rightInput = inputs[RIGHT_INPUT].getVoltage();
+
+	// 1. Upsample
+	float inBufL[OVERSAMPLE];
+	float inBufR[OVERSAMPLE];
+	float outBufL[OVERSAMPLE];
+	float outBufR[OVERSAMPLE];
+
+	upsampler[0].process(leftInput, inBufL);
+	upsampler[1].process(rightInput, inBufR);
+
+	// 2. Oversampled Loop
+	for (int i = 0; i < OVERSAMPLE; i++) {
+		float left = inBufL[i];
+		float right = inBufR[i];
+
+		// Write to ring buffer
+		bufferL[writeIndex] = left;
+		bufferR[writeIndex] = right;
+
+		// Read from ring buffer (Lookahead D samples behind)
+		// We add 256 to ensure the result is positive before modulo
+		int readIndex = (writeIndex - (int)D + BUFFER_SIZE) % BUFFER_SIZE;
+		float pastL = bufferL[readIndex];
+		float pastR = bufferR[readIndex];
+
+		// Increment index wrapping around 256
+		writeIndex = (writeIndex + 1) % BUFFER_SIZE;
+		double stereo = left + right;
+
+		if (inputs[SIDE_LEFT_INPUT].isConnected() || inputs[SIDE_RIGHT_INPUT].isConnected()) {
+			stereo = inputs[SIDE_LEFT_INPUT].getVoltage() + inputs[SIDE_RIGHT_INPUT].getVoltage();
+		}
+
+		// some values:
+		double LS = 1.0;
+
+		// level measurement:
+		//double peak = this->peakW(stereo, ATp, RT); // Slightly slower version
+		double peak = this->peak(stereo, ATp, RT);
+
+		// static curve:
+		double f = this->staticCurve(peak, LT, LS);
+
+		// Detect raw peaks immediately from the Lookahead Input (stereo)
+		double raw_peak = std::fabs(stereo);
+		double thresh_v = toVolt(LT); // Convert dB threshold to Volts
+		double predicted_output = raw_peak * makeupGain; // The volume AFTER makeup gain
+		if (predicted_output > thresh_v) {
+			// Calculate the exact gain needed to clamp this specific peak
+			double limit_f = thresh_v / predicted_output;
+
+			// If the Brickwall Limit demands lower gain than the Compressor, OBEY IT.
+			if (limit_f < f) {
+				f = limit_f;
+				limiter = true;
+				lights[E].value = 1.0f; // Turn on Limiter Light
+			}
+		}
+
+		// smoothing filter:
+		double k = 0.0;
+
+		// Determine if we need to Attack (reduce gain) or Release (restore gain)
+		// We bypass Hysteresis if the Limiter is active to catch the peak instantly.
+		if (f < g_prev) {
+			attack = true;
+			if (limiter) {
+				// LIMITER MODE: Instant Attack (0ms)
+				// We must drop gain NOW to catch the peak in the lookahead buffer.
+				k = 1.0;
+			} else {
+				// COMPRESSOR MODE: Standard Attack
+				// Use the knob value (ATp) to smooth the gain reduction.
+				k = ATp;
+			}
+		} else {
+			attack = false;
+			k = RT;
+			limiter = false; // Reset limiter flag when releasing
+		}
+
+		double g = this->smooth(k, g_prev, f);
+
+		// Apply Gain & Makeup
+		float processedL = pastL * g * makeupGain;
+		float processedR = pastR * g * makeupGain;
+
+		// Safety Clamp (replacing tanh)
+		processedL = clamp(processedL, -12.0f, 12.0f);
+		processedR = clamp(processedR, -12.0f, 12.0f);
+
+		// Nan Check
+		if (!std::isfinite(processedL) || !std::isfinite(processedR)) {
+			processedL = 0.0;
+			processedR = 0.0;
+			g_prev = 1.0;
+			f = 1.0;
+			peak_prev = 1.0;
+			peak = 1.0;
+			f_prev = 1.0;
+			g = 1.0;
+		}
+
+		outBufL[i] = processedL;
+		outBufR[i] = processedR;
+
+		// set previous values for next step:
+		peak_prev = peak;
+		g_prev = g;
+		f_prev = f;
+		//k_prev = k;
 	}
-	double stereo = left + right;
 
-	if (inputs[SIDE_LEFT_INPUT].isConnected() || inputs[SIDE_RIGHT_INPUT].isConnected()) {
-		stereo = inputs[SIDE_LEFT_INPUT].getVoltage() + inputs[SIDE_RIGHT_INPUT].getVoltage();
-	}
+	// Downsample
+	float outL = decimator[0].process(outBufL);
+	float outR = decimator[1].process(outBufR);
 
-	//double knee = params[KNEE_PARAM].getValue();//dB
-
-	// some values:
-	//double CS = 1.0 - 1.0 / CR;
-	//double ES = 1.0 - 1.0 / ER;
-	double LS = 1.0;
-
-	// level measurement:
-	//double peak = this->peakW(stereo, ATp, RT); // Slightly slower version
-	double peak = this->peak(stereo, ATp, RT);
-	//double rms  = this->rms(stereo);
-
-	// static curve:
-	double f = this->staticCurve(peak, LT, LS);
-
-	// smoothing filter:
-	double k = 0.0;
-	if (f >= g_prev && attack) {
-		// We are in attack and want release, hyst starts counting towards release
-		hysteresis += 1;
-	} else if (f >= g_prev && !attack) {
-		// We are in release and want to release even further, hyst not activating
-		hysteresis = 0;
-	} else if (f < g_prev && !attack) {
-		// We are in release and want attack, hyst starts counting towards attack
-		hysteresis += 1;
-	} else if (f < g_prev && attack) {
-		// We are in attack and want to keep that, hyst not activating
-		hysteresis = 0;
-	}
-	if (hysteresis > hyst_max && attack) {// _attack
-		hysteresis = 0;
-		attack = false;
-	} else if (hysteresis > hyst_max && !attack) { // _release
-		hysteresis = 0;
-		attack = true;
-	}
-	if (attack) {
-		//if (limiter) {
-			k = ATp;
-		/*} else {
-			k = AT;
-		}*/
-	} else {
-		k = RT;
-	}
-	//k = slew(k, k_prev, SMOOTH_FILTER_POLE_SLEW, args.sampleTime);
-
-	double g = this->smooth(k, g_prev, f);
-
-	// apply gain:
-	float outL = pastL * g;
-	float outR = pastR * g;
-	if (!std::isfinite(outL) || !std::isfinite(outR)) {
-		outL = 0.0;
-		outR = 0.0;
-		peak_prev = 1.0;
-		peak = 1.0;
-		//rms2_prev = 1.0;
-		g_prev = 1.0;
-		f_prev = 1.0;
-		g = 1.0;
-		f = 1.0;
-	}
-	outL *= makeupGain;
-	outL = non_lin_func(outL / 12.0f) * 12.0f;
 	outputs[LEFT_OUTPUT].setVoltage(outL);
-	outR *= makeupGain;
-	outR = non_lin_func(outR / 12.0f) * 12.0f;
 	outputs[RIGHT_OUTPUT].setVoltage(outR);
 
-
 	// VU meters
-	vuMeterIn.process(args.sampleTime, pastL * 0.1f);
-	vuMeterIn2.process(args.sampleTime, pastR * 0.1f);
-	vuMeterOut.process(args.sampleTime, outL * 0.1f);
-	vuMeterOut2.process(args.sampleTime, outR * 0.1f);
+	vuMeterIn.process(args.sampleTime, leftInput * 0.2f);
+	vuMeterIn2.process(args.sampleTime, rightInput * 0.2f);
+	vuMeterOut.process(args.sampleTime, outL * 0.2f);
+	vuMeterOut2.process(args.sampleTime, outR * 0.2f);
 	//vuMeterOut.mode = dsp::VuMeter2::RMS;
 	for (int v = 0; step == 512 && v < 15; v++) {
-		lights[VU_IN_LEFT_LIGHT + 14 - v].setBrightness(vuMeterIn.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
-		lights[VU_IN_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterIn2.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
-		lights[VU_OUT_LEFT_LIGHT + 14 - v].setBrightness(vuMeterOut.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
-		lights[VU_OUT_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterOut2.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
+		float upper = -intervalDB * v;
+		float lower = -intervalDB * (v + 1.0f);
+		lights[VU_IN_LEFT_LIGHT + 14 - v].setBrightness(vuMeterIn.getBrightness(lower, upper));
+		lights[VU_IN_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterIn2.getBrightness(lower, upper));
+		lights[VU_OUT_LEFT_LIGHT + 14 - v].setBrightness(vuMeterOut.getBrightness(lower, upper));
+		lights[VU_OUT_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterOut2.getBrightness(lower, upper));
 	}
 	if (step == 512) {
 		step = 0;
 	}
 
-	// set previous values for next step:
-	peak_prev = peak;
-	g_prev = g;
-	f_prev = f;
-	//k_prev = k;
+
 }
 
 
@@ -580,6 +617,10 @@ double Non::toDB(double volt) {
 
 double Non::toGain(double dB) {
 	return pow(10.0, (dB / 20.0)); //I don't multiply with 5v here as its a ratio.
+}
+
+double Non::toVolt(double dB) {
+	return 5.0 * pow(10.0, (dB / 20.0));
 }
 
 struct NonWidget : ModuleWidget {
