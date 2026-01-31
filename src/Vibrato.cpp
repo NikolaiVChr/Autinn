@@ -155,30 +155,25 @@ void Vibrato::process(const ProcessArgs &args) {
 		float line_m2 = getSample(i - 2);
 		float line_m3 = getSample(i - 3);
 
-		//linear
-		//float out=line*portion+line_m1*(1.0f-portion);
-		//allpass
-		//float out = (line+(1.0f-portion)*line_m1-(1.0f-portion)*out_prev);
-		//out_prev=out;
+
+
 		//Spline
-		float out = line*pow(portion,3.0f)/6.0f+line_m1*(pow(1.0f+portion,3.0f)-4.0f*pow(portion,3.0f))/6.0f+line_m2*(pow(2.0f-portion,3.0f)-4.0f*pow(1.0f-portion,3.0f))/6.0f+line_m3*pow(1.0f-portion,3.0f)/6.0f;// order: 3rd
-		/*
-		median.push_front(out);
+		float p  = portion;
+		float p1 = portion + 1.0f;
+		float p2 = 2.0f - portion;
+		float p11 = 1.0f - portion; // (1 - portion)
 
+		// Pre-calculate cubes
+		float p_3   = p * p * p;
+		float p1_3  = p1 * p1 * p1;
+		float p2_3  = p2 * p2 * p2;
+		float p11_3 = p11 * p11 * p11;
 
-		if (median.size() == 4) {
-			// this is a declicker (moving median filter with window of size 3)
-			out = median.back();
-			median.pop_back();
-			float v1 = median[0];
-			float v2 = median[1];
-			float v3 = median[2];
-			if (fabs(v2-v1) > 0.001 and fabs(v2-v3) > 0.001) {// and this->sign(v2-v1) == this->sign(v2-v3)) {
-				median[1] = (v1+v3)*0.5f;
-			}
-		} else {
-			out = 0.0f;
-		}**/
+		// B-Spline Interpolation (3rd Order)
+		float out = (line * p_3
+				   + line_m1 * (p1_3 - 4.0f * p_3)
+				   + line_m2 * (p2_3 - 4.0f * p11_3)
+				   + line_m3 * p11_3) / 6.0f;
 
 		outputs[VIBRATO_OUTPUT].setVoltage(out+in*flanger, c);
 		writeIndex[c] = (wIdx + 1) & BUFFER_MASK;
@@ -190,21 +185,6 @@ int Vibrato::sign (float x) {
 	if (x < 0.0f) return -1;
 	return 0;
 }
-
-/*
-float Vibrato::slew(float value) {//linear slew to prevent static noise when turning width knob.
-	float max_change = 12/0.003;//12V per 0.003s = 4000V/sec
-	float change = value - lastValue;
-	float change_per_sec = fabs(change)/args.sampleTime;
-	float factor = 1.0f;
-
-	if (change_per_sec>max_change and change_per_sec != 0.0f) {
-		factor = max_change/change_per_sec;
-	}
-	float newValue = lastValue+change*factor;
-	lastValue = newValue;
-	return newValue;
-}**/
 
 struct VibratoWidget : ModuleWidget {
 	VibratoWidget(Vibrato *module) {
