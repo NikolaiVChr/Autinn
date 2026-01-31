@@ -118,7 +118,7 @@ void Snare::process(const ProcessArgs &args) {
             // Use BANDPASS to isolate the 'sizzle' or PEAK to just boost it.
             float wireFreq = 2500.0f;
             float wireQ = 1.0f;     // A Q of 1.0 is broad and natural
-            wireFilter[c].setParameters(wireFilter[c].BANDPASS, wireFreq / args.sampleRate, wireQ);
+            wireFilter[c].setParameters(wireFilter[c].BANDPASS, wireFreq / args.sampleRate, wireQ, 1.0f);
         }
 
         // Envelopes
