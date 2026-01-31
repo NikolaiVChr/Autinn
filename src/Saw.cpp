@@ -249,17 +249,6 @@ struct Saw : Module {
 	dsp::Decimator<oversample, 8> decimator[16];
 
 
-
-	// Helper to bake the table
-	void bakeWaveform(int srcSize, float* srcIn, float* srcOut, float* dstBuffer) {
-		for (int i = 0; i <= TABLE_SIZE; i++) {
-			// Normalized phase 0.0 to 1.0
-			float p = (float)i / TABLE_SIZE;
-			// Use your existing slow lut() function ONE time to generate the fast table
-			dstBuffer[i] = this->lut(srcSize, srcIn, srcOut, p);
-		}
-	}
-	
 	Saw() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Saw::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);

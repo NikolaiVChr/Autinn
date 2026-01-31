@@ -21,7 +21,12 @@
 
 **/
 
-static const int oversample = 4;
+static constexpr int oversample = 4;
+
+static constexpr int TABLE_SIZE = 2048; // Power of 2 is best
+static float lutSquareLow[TABLE_SIZE + 1];
+static float lutSquareHigh[TABLE_SIZE + 1];
+static bool lutInitialized = false;
 
 struct Square : Module {
 	enum ParamIds {
@@ -192,6 +197,16 @@ struct Square : Module {
 		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
 
+		if (!lutInitialized) {
+			for (int i = 0; i <= TABLE_SIZE; i++) {
+				// (float)i ensures we get 0.0 to 1.0, not just 0
+				float p = (float)i / (float)TABLE_SIZE;
+				lutSquareLow[i]  = this->lut(szLow,  squareInLow,  squareOutLow,  p);
+				lutSquareHigh[i] = this->lut(szHigh, squareInHigh, squareOutHigh, p);
+			}
+			lutInitialized = true;
+		}
+
 		for (int c = 0; c < 16; c++) {
 			decimator[c] = dsp::Decimator<oversample, 8>(0.9f);
 		}
@@ -204,7 +219,7 @@ struct Square : Module {
 
 float Square::lut (int size, float in [], float out [], float test) {
   int i;
-  
+
   if (test > in[size - 1]) {
     return out[size - 1];
   } else if (test < in[0]) {
@@ -218,11 +233,11 @@ float Square::lut (int size, float in [], float out [], float test) {
       float i_l   = in[i];
       float i_d = in[i + 1] - in[i];
       float o_d = out[i + 1] - out[i];
-      
+
       if (i_d == 0.0f) {
         return o_l;
       }
-      
+
       return o_l + ((test - i_l) * o_d) / i_d;
     }
   }
@@ -262,12 +277,26 @@ void Square::process(const ProcessArgs &args) {
 			phase[c] += deltaPhase;
 			phase[c] = fmod(phase[c], period);
 
-			float buzzL = this->lut(szLow, squareInLow, squareOutLow, phase[c]);
-			float buzzH = this->lut(szHigh, squareInHigh, squareOutHigh, phase[c]);
+			float p = phase[c] * TABLE_SIZE;
+			int idx = (int)p;
+			float frac = p - idx;
 
-			//float lowHighValues [2] = {buzzL,buzzH};
-			//outBuf[i] = this->lut(2, lowHigh, lowHighValues, freq);
-			outBuf[i] = this->range(clamp(freq,lowHigh[0], lowHigh[1]), lowHigh[0], lowHigh[1], buzzL, buzzH);
+			// O(1) Lookup
+			float buzzL = lutSquareLow[idx] + frac * (lutSquareLow[idx + 1] - lutSquareLow[idx]);
+			float buzzH = lutSquareHigh[idx] + frac * (lutSquareHigh[idx + 1] - lutSquareHigh[idx]);
+
+			float out = 0.0f;
+			if (freq < lowHigh[0]) {
+				out = buzzL;
+			} else if (freq > lowHigh[1]) {
+				out = buzzH;
+			} else {
+				float blend = (freq - lowHigh[0]) / (lowHigh[1] - lowHigh[0]);
+				float buzz = buzzL + blend * (buzzH - buzzL);
+				out = buzz;
+			}
+
+			outBuf[i] = out;
 		}
 		outputs[BUZZ_OUTPUT].setVoltage(decimator[c].process(outBuf) * 5.0f, c);// keep its peaks within approx 5V.
 
