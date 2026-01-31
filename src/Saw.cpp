@@ -21,7 +21,7 @@
 
 **/
 
-static const int oversample = 4;
+static constexpr int oversample = 4;
 
 static constexpr int TABLE_SIZE = 2048; // Power of 2 is best
 static float lutSawLow[TABLE_SIZE + 1];
@@ -331,15 +331,20 @@ void Saw::process(const ProcessArgs &args) {
 
 	float pitchBase = params[PITCH_PARAM].getValue();
 
+	float deltaTime = args.sampleTime / oversample;
+
 	for (int c = 0; c < channels; c++) {
 		float pitch = pitchBase + inputs[PITCH_INPUT].getPolyVoltage(c);
 		pitch = clamp(pitch, -4.0f, 5.0f);
 		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
 
+		float deltaPhase = freq * deltaTime;
 
 		float outBuf  [oversample];
 
 		for (int i = 0; i < oversample; i++) {
+			phase[c] += deltaPhase;
+
 			if (phase[c] >= 1.0f) phase[c] -= 1.0f;
 
 			float p = phase[c] * TABLE_SIZE;
