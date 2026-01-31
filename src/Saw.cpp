@@ -315,7 +315,6 @@ void Saw::process(const ProcessArgs &args) {
 		return;
 	}
 
-	float deltaTime = args.sampleTime/oversample;
 
 	int channels = std::max(1, inputs[PITCH_INPUT].getChannels());
 	outputs[BUZZ_OUTPUT].setChannels(channels);
@@ -327,7 +326,6 @@ void Saw::process(const ProcessArgs &args) {
 		pitch = clamp(pitch, -4.0f, 5.0f);
 		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
 
-		float period = 1.0f;
 
 		float outBuf  [oversample];
 

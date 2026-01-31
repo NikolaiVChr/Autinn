@@ -68,7 +68,6 @@ struct Flora : Module {
 	float r = 0.0f;
 	float Gres = 1.0f;
 	float input_cutoff = 0.0f;
-	float F_c = 0.0f;
 	float F_s = 0.0f;
 	float g = 0.0f; // tuning parameter
 	int current_oversample = 2;

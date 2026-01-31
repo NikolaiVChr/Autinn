@@ -105,7 +105,6 @@ struct Bass : Module {
 	float x = 0.0f;
 	float Gres = 1.0f;
 	float input_cutoff = 0.0f;
-	float F_c = 0.0f;
 	float F_s = 0.0f;
 	float g = 0.0f; // tuning parameter
 	float y_a = 0.0f;
@@ -444,13 +443,13 @@ void Bass::process(const ProcessArgs &args) {
 	lights[GAIN_LIGHT].value = clamp(fabs(osc)-EXPECTED_PEAK_INPUT,0.0f,1.0f)*1.0f;//OSC input has too much gain. (7V+)
 }
 
-float Bass::attackCurve(float x, unsigned target) {
-	return log10(x/target+1.0f)*3.321928f;
+float Bass::attackCurve(float xx, unsigned target) {
+	return log10(xx/target+1.0f)*3.321928f;
 }
 
-float Bass::accentAttackCurve(float x) {
+float Bass::accentAttackCurve(float xx) {
 	// x and y is normalized. Quadratic rise to 1 from zero.
-	return -(x-1.0f)*(x-1.0f)+1.0f;
+	return -(xx-1.0f)*(xx-1.0f)+1.0f;
 }
 
 float Bass::accentAttackCurveInverse(float y) {
@@ -461,9 +460,9 @@ float Bass::accentAttackCurveInverse(float y) {
 	return 1.0f-sqrt(1.0f-y);
 }
 
-float Bass::toExp(float x, float min, float max) {
+float Bass::toExp(float xx, float min, float max) {
 	// 0 to 1 to exp range
-	return min * exp( x*log(max/min) );
+	return min * exp( xx*log(max/min) );
 }
 
 
@@ -480,13 +479,13 @@ float Bass::accent_env(bool gate, float note, bool accent, float knob_accent) {
 		}
 	}
 
-	float x = ((float)noteSteps)*dt;
+	float xx = ((float)noteSteps)*dt;
 
 	float value;
-	if (x < 0.0291f) {
-		value = -200.0f*(x+0.023f)*(x+0.023f)+18.0f*(x+0.023f)+0.595f;
+	if (xx < 0.0291f) {
+		value = -200.0f*(xx+0.023f)*(xx+0.023f)+18.0f*(xx+0.023f)+0.595f;
 	} else {
-		value = powf(20.0f, 0.02572f-x);
+		value = powf(20.0f, 0.02572f-xx);
 	}
 	return knob_accent*clamp(value, 0.0f, 1.0f);
 }

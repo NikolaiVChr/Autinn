@@ -159,7 +159,7 @@ void Kicker::process(const ProcessArgs &args) {
         // When Knob < 0.4, factor is 0.0 (Pure Squared/Dry)
         // When Knob > 0.6, factor is 1.0 (Pure Linear/Boomy)
         // Between 0.4 and 0.6, it blends smoothly.
-        float blend = std::clamp((decayVal - 0.4f) * 5.0f, 0.0f, 1.0f);
+        float blend = clamp((decayVal - 0.4f) * 5.0f, 0.0f, 1.0f);
         // no clicking when turn the knob.
         float finalEnv = squaredEnv + (linearEnv - squaredEnv) * blend;
 
