@@ -26,9 +26,9 @@ const static int num_mono_channels = 6;
 
 struct Mixer6 : Module {
 	enum ParamIds {
-		ENUMS(LOW_PARAM, num_mono_channels),
-		ENUMS(MID_PARAM, num_mono_channels),
-		ENUMS(HIGH_PARAM, num_mono_channels),
+		ENUMS(LOW_PARAM_OLD, num_mono_channels),
+		ENUMS(MID_PARAM_OLD, num_mono_channels),
+		ENUMS(HIGH_PARAM_OLD, num_mono_channels),
 		ENUMS(CHANNEL_LEVEL_PARAM, num_mono_channels),
 		ENUMS(PAN_PARAM, num_mono_channels),
 		ENUMS(FX_A_SEND_PARAM, num_mono_channels),
@@ -37,6 +37,9 @@ struct Mixer6 : Module {
 		FX_B_TO_MAIN_PARAM,
 		LEVEL_MAIN,
 		ENUMS(MUTE_BUTTON_PARAM, num_mono_channels),
+		ENUMS(LOW_PARAM, num_mono_channels),
+		ENUMS(MID_PARAM, num_mono_channels),
+		ENUMS(HIGH_PARAM, num_mono_channels),
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -104,9 +107,9 @@ struct Mixer6 : Module {
 
 		for (int ch = 0; ch < num_mono_channels; ch++) {
 			configInput(INPUT+ch, "Channel "+std::to_string(ch+1)+" Audio");
-			configParam(HIGH_PARAM+ch, 1/Pm, Pm, 1, "Channel "+std::to_string(ch+1)+" EQ High", " dB", -10.0f, 20.0f, 0);
-			configParam(MID_PARAM+ch, 1/Pm, Pm, 1, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", -10.0f, 20.0f, 0);
-			configParam(LOW_PARAM+ch, 1/Pm, Pm, 1, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", -10.0f, 20.0f, 0);
+			configParam(HIGH_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ High", " dB", -10.0f, 20.0f, 0);
+			configParam(MID_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", -10.0f, 20.0f, 0);
+			configParam(LOW_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", -10.0f, 20.0f, 0);
 			configParam(FX_A_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX A Send", " dB", -10, 20);
 			configParam(FX_B_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX B Send", " dB", -10, 20);
 			configParam(CHANNEL_LEVEL_PARAM+ch, 0.0f, 2.0f, 1.0f, "Channel "+std::to_string(ch+1)+" Level", " dB", -10, 20);
@@ -193,7 +196,9 @@ void Mixer6::process(const ProcessArgs &args) {
 		float low    = params[LOW_PARAM+ch].getValue();
 		float mid    = params[MID_PARAM+ch].getValue();
 		float high   = params[HIGH_PARAM+ch].getValue();
-		
+		low = std::max(0.001f, low);
+		mid = std::max(0.001f, mid);
+		high = std::max(0.001f, high);
 
 		// Update Coefficients (Only if changed)
 		if (low != low_prev[ch] || mid != mid_prev[ch] || high != high_prev[ch] || rate != rate_prev) {
