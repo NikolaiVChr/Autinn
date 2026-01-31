@@ -14,7 +14,14 @@ jobs:
     runs-on: ${{ matrix.config.os }}
     strategy:
       matrix:
-        config:        
+        config:
+        - {
+            name: Windows,
+            os: windows-latest,
+            prepare-os: export CC=gcc,
+            prepare-os2: "",
+            postfix: win-x64
+          }
         - {
             name: Linux,
             os: ubuntu-latest,
@@ -35,13 +42,6 @@ jobs:
             prepare-os: "",
             prepare-os2: "",
             postfix: mac-arm64
-          }
-        - {
-            name: Windows,
-            os: windows-latest,
-            prepare-os: export CC=gcc,
-            prepare-os2: "",
-            postfix: win-x64
           }
         language: [ 'cpp' ]
     steps:
