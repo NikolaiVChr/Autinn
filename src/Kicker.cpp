@@ -53,6 +53,7 @@ struct Kicker : Module {
     float pitchEnv[MAX_CHANNELS] = {};
     dsp::SchmittTrigger triggers[MAX_CHANNELS];
     float lightDecay = 0.0f;
+    uint32_t noiseState[16] = {};
 
     Kicker() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -65,6 +66,10 @@ struct Kicker : Module {
         configInput(TRIG_INPUT, "Trigger");
         configInput(VOCT_INPUT, "V/Oct");
         configOutput(AUDIO_OUTPUT, "Audio");
+
+        for (int i = 0; i < 16; i++) {
+            noiseState[i] = 0x12345678 + (i * 0xdeadbeef);
+        }
     }
 
     void process(const ProcessArgs &args) override;
@@ -84,12 +89,16 @@ void Kicker::process(const ProcessArgs &args) {
     
     // envelope decay by 60dB (factor of 0.001) over 'decayTime' seconds.
     // Coefficient = exp(-6.9 / (decayTime * SampleRate))
-    float decayParam = params[DECAY_PARAM].getValue();
-    float decayCoeff = 1.0f - (6.9f * dt / decayParam);
-    decayCoeff = clamp(decayCoeff, 0.999f, 0.99999f); // Safety limits
+    //float decayParam = params[DECAY_PARAM].getValue();
+    //float decayCoeff = 1.0f - (6.9f * dt / decayParam);
+    //decayCoeff = clamp(decayCoeff, 0.999f, 0.99999f); // Safety limits
 
     // Pitch envelope creates the "Thump" - needs to be faster than amp envelope
-    float pitchDecayCoeff = 1.0f - (20.0f * dt); // Fixed fast decay for punch
+    //float pitchDecayCoeff = 1.0f - (20.0f * dt); // Fixed fast decay for punch
+
+    float decayVal = std::max(params[DECAY_PARAM].getValue(), 0.01f);
+    float decayCoeff = std::exp(-1.0f / (decayVal * args.sampleRate));
+    float pitchDecayCoeff = std::exp(-1.0f / (0.02f * args.sampleRate)); // 20ms fixed sweep
 
     bool active = false;
 
@@ -99,7 +108,7 @@ void Kicker::process(const ProcessArgs &args) {
         if (triggers[c].process(trigVoltage)) {
             ampEnv[c] = 1.0f;
             pitchEnv[c] = 1.0f;
-            phase[c] = 0.0f; // Reset phase for consistent punch
+            phase[c] = 0.25f; // Reset phase for consistent punch
             active = true;
         }
 
@@ -114,8 +123,9 @@ void Kicker::process(const ProcessArgs &args) {
         // Oscillator
         // Pitch = Base + V/Oct + SweepEnvelope
         float voct = inputs[VOCT_INPUT].getPolyVoltage(c);
-        float pitchMod = sweepDepth * pitchEnv[c];
-        float freq = baseFreq * powf(2.0f, voct) + pitchMod;
+        //float pitchMod = sweepDepth * pitchEnv[c];
+        //float freq = baseFreq * powf(2.0f, voct) + pitchMod;
+        float freq = baseFreq * powf(2.0f, voct + (pitchEnv[c] * 3.0f * params[SWEEP_PARAM].getValue()));
         
         float deltaPhase = freq * dt;
         phase[c] += deltaPhase;
@@ -128,11 +138,14 @@ void Kicker::process(const ProcessArgs &args) {
         
         // Click (Short burst of noise or high pitch sine at start)
         // Simple trick: Add a tiny bit of squared envelope to the start
-        float click = (std::rand() % 2000 / 1000.0f - 1.0f) * pitchEnv[c] * clickLevel;
+        float white = (int32_t(noiseState[c] = noiseState[c] * 1664525 + 1013904223) >> 8) * (1.0f / 8388608.0f);
+        float click = white * pitchEnv[c] * pitchEnv[c] * clickLevel;
+        //float click = (std::rand() % 2000 / 1000.0f - 1.0f) * pitchEnv[c] * clickLevel;
 
         // Mix & Saturate
-        float signal = (body + click) * ampEnv[c] * drive;
-        
+        //float signal = (body + click) * ampEnv[c] * drive;
+        float signal = (body * ampEnv[c] + click) * ampEnv[c] * drive;
+
         // Fast Tanh approximation for Analog feel
         float x = signal;
         if (x < -3.0f) x = -1.0f;
@@ -144,7 +157,8 @@ void Kicker::process(const ProcessArgs &args) {
 
     // Blink light if any drum triggered
     if (active) lightDecay = 1.0f;
-    lightDecay *= 0.95f;
+    float lightLambda = 1.0f - (args.sampleTime / 50.0f);
+    lightDecay *= std::max(0.0f, lightLambda);
     lights[ACT_LIGHT].value = lightDecay;
 }
 

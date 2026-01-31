@@ -158,18 +158,6 @@ void Snare::process(const ProcessArgs &args) {
         // Using a float cast on the raw bits for a fast [-1.0, 1.0] range
         float white = (int32_t(s) >> 8) * (1.0f / 8388608.0f);
 
-        /*
-        // One-pole Highpass Filter
-        noiseHp[c] = alpha * (noiseHp[c] + white - white);
-        // Actually, simpler HPF: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
-        // Let's just use a raw random value, it's 'white' enough, 
-        // but highpassing makes it sound less muddy.
-        // Let's do a simple "Previous Sample Difference" for crude HPF:
-        float hpfNoise = white - noiseHp[c];
-        noiseHp[c] = white; // Save for next frame
-        */
-
-
         // Process the noise through the filter
         float hpfNoise = wireFilter[c].process(white);
 
@@ -194,7 +182,8 @@ void Snare::process(const ProcessArgs &args) {
     }
 
     if (active) lightDecay = 1.0f;
-    lightDecay *= 0.95f;
+    float lightLambda = 1.0f - (args.sampleTime / 500.0f);
+    lightDecay *= std::max(0.0f, lightLambda);
     lights[ACT_LIGHT].value = lightDecay;
 }
 
