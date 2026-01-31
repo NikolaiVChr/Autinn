@@ -1,8 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-#include <deque>
-
-using std::deque;
 
 /*
 
@@ -65,12 +62,16 @@ struct Vibrato : Module {
 		configOutput(VIBRATO_OUTPUT, "Audio");
 	}
 
-	float phase = 0.0f;
-	float out_prev = 0.0f;
-	deque <float> buffer;
-	//deque <float> median;
+	// 16 Channels, 16384 samples (Power of 2 for fast masking)
+	static const int MAX_CHANNELS = 16;
+	static const int BUFFER_SIZE = 16384;
+	static const int BUFFER_MASK = BUFFER_SIZE - 1;
 
-	//float lastValue = 0.0f;
+	float phase[MAX_CHANNELS] = {};
+	float buffer[MAX_CHANNELS][BUFFER_SIZE] = {};
+	int writeIndex[MAX_CHANNELS] = {};
+
+	float smoothedWidth[MAX_CHANNELS] = {};
 
 	void process(const ProcessArgs &args) override;
 	//float slew(float value);
@@ -84,77 +85,104 @@ void Vibrato::process(const ProcessArgs &args) {
 	if (!outputs[VIBRATO_OUTPUT].isConnected()) {
 		return;
 	}
-	float in = inputs[VIBRATO_INPUT].getVoltage();
 
-	float freq    = clamp(params[FREQ_PARAM].getValue()+params[CV_FREQ_PARAM].getValue()*inputs[FREQ_INPUT].getVoltage()*19.0f, 1.0f,20.0f);//Hz
-	float width   = clamp(params[WIDTH_PARAM].getValue()+params[CV_WIDTH_PARAM].getValue()*inputs[WIDTH_INPUT].getVoltage()*0.019f, 0.001f,0.020f);//ms
-	float flanger = clamp(params[FLANGER_PARAM].getValue()+params[CV_FLANGER_PARAM].getValue()*inputs[FLANGER_INPUT].getVoltage(), 0.0f,1.0f);//ratio
+	int channels = std::max(1, inputs[VIBRATO_INPUT].getChannels());
+	outputs[VIBRATO_OUTPUT].setChannels(channels);
+
+	float freqParam = params[FREQ_PARAM].getValue();
+	float widthParam = params[WIDTH_PARAM].getValue();
+	float flangerParam = params[FLANGER_PARAM].getValue();
+
+	float cvFreqDepth = params[CV_FREQ_PARAM].getValue() * 19.0f;
+	float cvWidthDepth = params[CV_WIDTH_PARAM].getValue() * 0.019f;
+	float cvFlangerDepth = params[CV_FLANGER_PARAM].getValue();
+
 	float rate = args.sampleRate;
-	float width_samples = width*rate; // samples
-	float delay_samples = width_samples; // samples
 	if (rate == 0.0f) {
-		outputs[VIBRATO_OUTPUT].setVoltage(0.0f);
+		for (int c = 0; c < channels; c++) {
+			outputs[VIBRATO_OUTPUT].setVoltage(0.0f, c);
+		}
 		return;
 	}
-	//int bufferSize = 4+delay_samples+width_samples*2;// max going to be 11524
-	int bufferSize_max = 12000;//a little larger than max, then we dont have to shrink it when dialing knobs or changing rate.
 
 	float period = 2.0f*M_PI;
-	float deltaPhase = freq * args.sampleTime * period;
-	phase += deltaPhase;
-	phase = fmod(phase, period);
 
-	float modulationFactor = sin(phase);
-	float tapper = 4.0f+delay_samples+width_samples*modulationFactor;//1 changed to 4 to give room for spline.
-	int i = floor(tapper);
-	float portion=tapper-i;
-	buffer.push_front(in);
+	for (int c = 0; c < channels; c++) {
+		// If CV cable is Monophonic, apply it to all Polyphonic voices.
+		float freqCV = (inputs[FREQ_INPUT].getChannels() == 1) ? inputs[FREQ_INPUT].getVoltage() : inputs[FREQ_INPUT].getPolyVoltage(c);
+		float widthCV = (inputs[WIDTH_INPUT].getChannels() == 1) ? inputs[WIDTH_INPUT].getVoltage() : inputs[WIDTH_INPUT].getPolyVoltage(c);
+		float flangerCV = (inputs[FLANGER_INPUT].getChannels() == 1) ? inputs[FLANGER_INPUT].getVoltage() : inputs[FLANGER_INPUT].getPolyVoltage(c);
 
-	while (int(buffer.size()) > bufferSize_max) {
-		buffer.pop_back();
-	}
-	float line    = 0.0f;
-	float line_m1 = 0.0f;
-	float line_m2 = 0.0f;
-	float line_m3 = 0.0f;
-	if (int(buffer.size()) >= i-2 && i-3 >= 0) {
-		line_m3 = buffer[i-3];
-	}
-	if (int(buffer.size()) >= i-1 && i-2 >= 0) {
-		line_m2 = buffer[i-2];
-	}
-	if (int(buffer.size()) >= i && i-1 >= 0) {
-		line_m1 = buffer[i-1];
-	}
-	if (int(buffer.size()) > i && i >= 0) {
-		line = buffer[i];
-	}
-	//linear
-	//float out=line*portion+line_m1*(1.0f-portion);
-	//allpass
-	//float out = (line+(1.0f-portion)*line_m1-(1.0f-portion)*out_prev);
-	//out_prev=out;
-	//Spline		
-	float out = line*pow(portion,3.0f)/6.0f+line_m1*(pow(1.0f+portion,3.0f)-4.0f*pow(portion,3.0f))/6.0f+line_m2*(pow(2.0f-portion,3.0f)-4.0f*pow(1.0f-portion,3.0f))/6.0f+line_m3*pow(1.0f-portion,3.0f)/6.0f;// order: 3rd 
-	/*
-	median.push_front(out);
-	
+		float in = inputs[VIBRATO_INPUT].getPolyVoltage(c);
 
-	if (median.size() == 4) {
-		// this is a declicker (moving median filter with window of size 3)
-		out = median.back();
-		median.pop_back();
-		float v1 = median[0];
-		float v2 = median[1];
-		float v3 = median[2];
-		if (fabs(v2-v1) > 0.001 and fabs(v2-v3) > 0.001) {// and this->sign(v2-v1) == this->sign(v2-v3)) {
-			median[1] = (v1+v3)*0.5f;
-		}
-	} else {
-		out = 0.0f;
-	}**/
+		float freq = clamp(freqParam + cvFreqDepth * freqCV, 1.0f, 20.0f);
+		float widthRaw = clamp(widthParam + cvWidthDepth * widthCV, 0.001f, 0.020f);
+		float flanger = clamp(flangerParam + cvFlangerDepth * flangerCV, 0.0f, 1.0f);
 
-	outputs[VIBRATO_OUTPUT].setVoltage(out+in*flanger);//this->slew(out+in*params[FLANGER_PARAM].getValue());
+		// Initialize on first run to avoid starting at 0.0 width
+		if (smoothedWidth[c] == 0.0f) smoothedWidth[c] = widthRaw;
+
+		// Calculate smoothing coefficient (Lower Hz = Slower)
+		// 5.0f Hz is fast enough to be responsive, but slow enough to kill zipper noise.
+		float slew = 5.0f * args.sampleTime;
+
+		// Apply the One-Pole Filter
+		smoothedWidth[c] += (widthRaw - smoothedWidth[c]) * slew;
+
+		float width_samples = smoothedWidth[c]*rate; // samples
+		float delay_samples = width_samples; // samples
+
+		float deltaPhase = freq * args.sampleTime * period;
+		phase[c] += deltaPhase;
+		phase[c] = fmod(phase[c], period);
+
+		// Ring Buffer Write
+		int wIdx = writeIndex[c];
+		buffer[c][wIdx] = in;
+
+		float modulationFactor = sin(phase[c]);
+		float tapper = 4.0f+delay_samples+width_samples*modulationFactor;//1 changed to 4 to give room for spline.
+		int i = floor(tapper);
+		float portion=tapper-i;
+
+
+		auto getSample = [&](int delay) -> float {
+			return buffer[c][(wIdx - delay + BUFFER_SIZE) & BUFFER_MASK];
+		};
+
+		float line    = getSample(i);
+		float line_m1 = getSample(i - 1);
+		float line_m2 = getSample(i - 2);
+		float line_m3 = getSample(i - 3);
+
+		//linear
+		//float out=line*portion+line_m1*(1.0f-portion);
+		//allpass
+		//float out = (line+(1.0f-portion)*line_m1-(1.0f-portion)*out_prev);
+		//out_prev=out;
+		//Spline
+		float out = line*pow(portion,3.0f)/6.0f+line_m1*(pow(1.0f+portion,3.0f)-4.0f*pow(portion,3.0f))/6.0f+line_m2*(pow(2.0f-portion,3.0f)-4.0f*pow(1.0f-portion,3.0f))/6.0f+line_m3*pow(1.0f-portion,3.0f)/6.0f;// order: 3rd
+		/*
+		median.push_front(out);
+
+
+		if (median.size() == 4) {
+			// this is a declicker (moving median filter with window of size 3)
+			out = median.back();
+			median.pop_back();
+			float v1 = median[0];
+			float v2 = median[1];
+			float v3 = median[2];
+			if (fabs(v2-v1) > 0.001 and fabs(v2-v3) > 0.001) {// and this->sign(v2-v1) == this->sign(v2-v3)) {
+				median[1] = (v1+v3)*0.5f;
+			}
+		} else {
+			out = 0.0f;
+		}**/
+
+		outputs[VIBRATO_OUTPUT].setVoltage(out+in*flanger, c);
+		writeIndex[c] = (wIdx + 1) & BUFFER_MASK;
+	}
 }
 
 int Vibrato::sign (float x) {
