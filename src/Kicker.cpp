@@ -152,10 +152,16 @@ void Kicker::process(const ProcessArgs &args) {
         //Adaptive Envelope
         // If decay is short (< 0.5s), square the env to make it "Dry/Tight".
         // If decay is long, keep it linear to preserve the "Boom".
-        float finalEnv = ampEnv[c];
-        if (decayVal < 0.5f) {
-            finalEnv = ampEnv[c] * ampEnv[c];
-        }
+        float linearEnv = ampEnv[c];              // Boomy (Linear)
+        float squaredEnv = ampEnv[c] * ampEnv[c]; // Dry/Tight (Squared)
+
+        // mix factor based on knob position
+        // When Knob < 0.4, factor is 0.0 (Pure Squared/Dry)
+        // When Knob > 0.6, factor is 1.0 (Pure Linear/Boomy)
+        // Between 0.4 and 0.6, it blends smoothly.
+        float blend = std::clamp((decayVal - 0.4f) * 5.0f, 0.0f, 1.0f);
+        // no clicking when turn the knob.
+        float finalEnv = squaredEnv + (linearEnv - squaredEnv) * blend;
 
         float filteredClick = lastClickFilter[c] + 0.3f * (white - lastClickFilter[c]);
         lastClickFilter[c] = filteredClick;
