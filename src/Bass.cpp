@@ -405,7 +405,10 @@ void Bass::process(const ProcessArgs &args) {
 	cutoff_hz = clamp(cutoff_hz, CUTOFF_MIN, CUTOFF_MAX);
 
 	float out = this->acid_filter(osc, resonance, cutoff_hz, oversample_protected);
-	outputs[BASS_OUTPUT].setVoltage(vca_env*out, 0);//Audio output    //this->non_lin_func(vca*out/SATURATION_VOLT)*SATURATION_VOLT;
+
+	float final_out = vca_env * out;
+	final_out = clamp(final_out, -12.0f, 12.0f); // safety hard clip
+	outputs[BASS_OUTPUT].setVoltage(final_out, 0);//Audio output    //this->non_lin_func(vca*out/SATURATION_VOLT)*SATURATION_VOLT;
 	//outputs[BASS_OUTPUT].setVoltage(vca_env, 1);//VCA Envelope output (0V to 1.6V)
 	//outputs[BASS_OUTPUT].setVoltage(cutoff_env_norm-CUTOFF_ENVELOPE_BIAS, 2);//Normalized VCF cutoff envelope output (-0.31 to 3V)
 	//float ext_cutoff_voltage = log2(cutoff_hz/dsp::FREQ_C4);
