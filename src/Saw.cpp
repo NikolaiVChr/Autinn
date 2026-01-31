@@ -23,6 +23,11 @@
 
 static const int oversample = 4;
 
+static constexpr int TABLE_SIZE = 2048; // Power of 2 is best
+static float lutSawLow[TABLE_SIZE + 1];
+static float lutSawHigh[TABLE_SIZE + 1];
+static bool lutInitialized = false;
+
 struct Saw : Module {
 	enum ParamIds {
 		PITCH_PARAM,
@@ -243,10 +248,7 @@ struct Saw : Module {
 
 	dsp::Decimator<oversample, 8> decimator[16];
 
-	static constexpr int TABLE_SIZE = 2048; // Power of 2 is best
-	static float lutSawLow[TABLE_SIZE + 1];
-	static float lutSawHigh[TABLE_SIZE + 1];
-	bool lutInitialized = false;
+
 
 	// Helper to bake the table
 	void bakeWaveform(int srcSize, float* srcIn, float* srcOut, float* dstBuffer) {
