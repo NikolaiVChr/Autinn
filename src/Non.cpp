@@ -95,7 +95,6 @@ struct Non : Module {
 	double f_prev = 0.0;
 	double peak_prev = 0.0;
 	//double rms2_prev = 0.0;
-	unsigned hysteresis = 0;
 	bool attack = true;
 	bool limiter = false;
 

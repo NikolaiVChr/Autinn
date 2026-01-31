@@ -94,14 +94,13 @@ struct Zod : Module {
 	double f_prev = 0.0;
 	double peak_prev = 0.0;
 	double rms2_prev = 0.0;
-	unsigned hysteresis = 0;
 	bool attack = true;
 	bool limiter = false;
 
 	unsigned D = 2;
-	// Ring Buffer: Max delay ~350ms @ 768kHz = ~268k samples.
-	// We use 2^20 for safety and power-of-two masking if needed.
-	static const int BUFFER_SIZE = 1048576;
+	// Ring Buffer: Max delay ~350ms @ 768kHz = ~268k samples. Plus oversampling.
+	// We use 2^21 for safety and power-of-two masking if needed.
+	static const int BUFFER_SIZE = 2097152;
 	float bufferL[BUFFER_SIZE] = {};
 	float bufferR[BUFFER_SIZE] = {};
 	int writeIndex = 0;
@@ -134,6 +133,10 @@ struct Zod : Module {
 	const float vuMaxDB = 22.5f;
 	const float intervalDB = vuMaxDB/15.0f;
 	unsigned short int step = 0;
+
+	static const int OVERSAMPLE = 4;
+	dsp::Upsampler<OVERSAMPLE, 12> upsampler[2];
+	dsp::Decimator<OVERSAMPLE, 12> decimator[2];
 
 	Zod() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -318,12 +321,14 @@ void Zod::process(const ProcessArgs &args) {
 		params[T_LIMITER_PARAM].setValue(LT);
 	}
 
-	double TS = args.sampleTime * 1000.0; //ms
+	double TS = (args.sampleTime / OVERSAMPLE) * 1000.0; //ms
 
 	if (taKnob != params[ATTACK_PARAM].getValue() || tapKnob != params[ATTACK_PEAK_PARAM].getValue() || trKnob != params[RELEASE_PARAM].getValue() || erKnob != params[RATIO_EXPANDER_PARAM].getValue() || crKnob != params[RATIO_COMPRESSOR_PARAM].getValue() || rate != args.sampleRate || tavKnob != params[AVERAGE_TIME_PARAM].getValue() || gainKnob != params[OUT_GAIN_PARAM].getValue()) {
 		rate = args.sampleRate;
 		tavKnob = params[AVERAGE_TIME_PARAM].getValue();
-		D   = (unsigned)(rate * tavKnob * 0.001);
+		D   = (unsigned)(rate * tavKnob * 0.001 * OVERSAMPLE);
+		// Safety clamp to prevent buffer overflow at high sample rates
+		if (D >= BUFFER_SIZE) D = BUFFER_SIZE - 1;
 
 		taKnob = params[ATTACK_PARAM].getValue();
 		tapKnob = params[ATTACK_PEAK_PARAM].getValue();
@@ -350,118 +355,149 @@ void Zod::process(const ProcessArgs &args) {
 	unsigned hyst_max = HYSTERESIS_TIME_SEC / args.sampleTime;
 
 	// inputs:
-	float left  = inputs[LEFT_INPUT].getVoltage();
-	float right = inputs[RIGHT_INPUT].getVoltage();
+	float leftInput  = inputs[LEFT_INPUT].getVoltage();
+	float rightInput = inputs[RIGHT_INPUT].getVoltage();
 
-	// --- Ring Buffer Write ---
-	bufferL[writeIndex] = left;
-	bufferR[writeIndex] = right;
+	// Upsample
+	float inBufL[OVERSAMPLE];
+	float inBufR[OVERSAMPLE];
+	float outBufL[OVERSAMPLE];
+	float outBufR[OVERSAMPLE];
 
-	// --- Ring Buffer Read (Lookahead D) ---
-	// Read from 'D' samples behind the current write head
-	int readIndex = (writeIndex - (int)D) & (BUFFER_SIZE - 1);
+	upsampler[0].process(leftInput, inBufL);
+	upsampler[1].process(rightInput, inBufR);
 
-	float pastL = bufferL[readIndex];
-	float pastR = bufferR[readIndex];
+	// Oversampled Physics Loop
+	for (int i = 0; i < OVERSAMPLE; i++) {
+		float left = inBufL[i];
+		float right = inBufR[i];
 
-	// Increment & Wrap
-	writeIndex++;
-	if (writeIndex >= BUFFER_SIZE) writeIndex = 0;
+		// --- Ring Buffer Write ---
+		bufferL[writeIndex] = left;
+		bufferR[writeIndex] = right;
 
-	double stereo = left + right;
+		// --- Ring Buffer Read (Lookahead D) ---
+		// Read from 'D' samples behind the current write head
+		int readIndex = (writeIndex - (int)D) & (BUFFER_SIZE - 1);
 
-	if (inputs[SIDE_LEFT_INPUT].isConnected() || inputs[SIDE_RIGHT_INPUT].isConnected()) {
-		stereo = inputs[SIDE_LEFT_INPUT].getVoltage() + inputs[SIDE_RIGHT_INPUT].getVoltage();
-	}
+		float pastL = bufferL[readIndex];
+		float pastR = bufferR[readIndex];
 
-	double knee = params[KNEE_PARAM].getValue();//dB
+		// Increment & Wrap
+		writeIndex++;
+		if (writeIndex >= BUFFER_SIZE) writeIndex = 0;
 
-	// some values:
+		double stereo = left + right;
 
-	double CS = 1.0 - 1.0 / CR;
-	double ES = 1.0 - 1.0 / ER;
-	double LS = 1.0;
-
-	// level measurement:
-	double peak = this->peak(stereo, ATp, RT);
-	double rms  = this->rms(stereo);
-
-	// static curve:
-	double f = this->staticCurve(rms, peak, LT, LS, CS, CT, CR, NT, ET, ES, ER, knee);
-
-	// smoothing filter:
-	double k = 0.0;
-	if (f_prev - f > 0.0 && attack) {
-		hysteresis += 1;
-	} else if (f_prev - f > 0.0 && !attack) {
-		hysteresis = 0;
-	} else if (f_prev - f <= 0.0 && !attack) {
-		hysteresis += 1;
-	} else if (f_prev - f <= 0.0 && attack) {
-		hysteresis = 0;
-	}
-	if (hysteresis > hyst_max && attack) {
-		hysteresis = 0;
-		attack = false;
-	} else if (hysteresis > hyst_max && !attack) {
-		hysteresis = 0;
-		attack = true;
-	}
-	if (attack) {
-		if (limiter) {
-			k = ATp;
-		} else {
-			k = AT;
+		if (inputs[SIDE_LEFT_INPUT].isConnected() || inputs[SIDE_RIGHT_INPUT].isConnected()) {
+			stereo = inputs[SIDE_LEFT_INPUT].getVoltage() + inputs[SIDE_RIGHT_INPUT].getVoltage();
 		}
-	} else {
-		k = RT;
+
+		double knee = params[KNEE_PARAM].getValue();//dB
+
+		// some values:
+
+		double CS = 1.0 - 1.0 / CR;
+		double ES = 1.0 - 1.0 / ER;
+		double LS = 1.0;
+
+		// level measurement:
+		double peak = this->peak(stereo, ATp, RT);
+		double rms  = this->rms(stereo);
+		double raw_peak = std::fabs(stereo);
+
+		// static curve:
+		double f = this->staticCurve(rms, raw_peak, LT, LS, CS, CT, CR, NT, ET, ES, ER, knee);
+
+		// smoothing filter:
+		double k = 0.0;
+		if (f < g_prev) {
+			// ATTACK PHASE (Gain is dropping)
+			attack = true;
+
+			if (limiter) {
+				// LIMITER: Instant Attack (Brickwall)
+				// We bypass the smoothing filter (k=1.0) to catch the peak in the Ring Buffer.
+				k = 1.0;
+			} else {
+				// COMPRESSOR/EXPANDER: Standard Attack
+				// Use the Attack knob values.
+				k = AT;
+			}
+		} else {
+			// RELEASE PHASE (Gain is returning to 1.0)
+			attack = false;
+			k = RT;
+			limiter = false; // Reset flag
+		}
+
+		if (attack) {
+			if (limiter) {
+				k = ATp;
+			} else {
+				k = AT;
+			}
+		} else {
+			k = RT;
+		}
+
+		double g = this->smooth(k, g_prev, f);
+		g_prev = g;
+
+
+		// apply gain:
+		float processedL = pastL * g;
+		float processedR = pastR * g;
+		if (!std::isfinite(processedL) || !std::isfinite(processedR)) {
+			processedL = 0.0;
+			processedR = 0.0;
+			peak_prev = 1.0;
+			peak = 1.0;
+			rms2_prev = 1.0;
+			g_prev = 1.0;
+			f_prev = 1.0;
+			g = 1.0;
+			f = 1.0;
+		}
+		processedL *= makeupGain;
+		processedL = clamp(processedL, -12.0f, 12.0f);
+		processedR *= makeupGain;
+		processedR = clamp(processedR, -12.0f, 12.0f);
+
+		outBufL[i] = processedL;
+		outBufR[i] = processedR;
+
+		f_prev = f;
+		peak_prev = peak;
 	}
 
-	double g = this->smooth(k, g_prev, f);
+	// Downsample
+	float outL = decimator[0].process(outBufL);
+	float outR = decimator[1].process(outBufR);
 
-	//outputs[DB].setVoltage(g);
-
-	// apply gain:
-	float outL = pastL * g;
-	float outR = pastR * g;
-	if (!std::isfinite(outL) || !std::isfinite(outR)) {
-		outL = 0.0;
-		outR = 0.0;
-		peak_prev = 1.0;
-		peak = 1.0;
-		rms2_prev = 1.0;
-		g_prev = 1.0;
-		f_prev = 1.0;
-		g = 1.0;
-		f = 1.0;
-	}
-	outL *= makeupGain;
-	outL = non_lin_func(outL / 12.0f) * 12.0f;
 	outputs[LEFT_OUTPUT].setVoltage(outL);
-	outR *= makeupGain;
-	outR = non_lin_func(outR / 12.0f) * 12.0f;
 	outputs[RIGHT_OUTPUT].setVoltage(outR);
 
-
 	// VU meters
-	vuMeterIn.process(args.sampleTime, pastL * 0.1f);
-	vuMeterIn2.process(args.sampleTime, pastR * 0.1f);
-	vuMeterOut.process(args.sampleTime, outL * 0.1f);
-	vuMeterOut2.process(args.sampleTime, outR * 0.1f);
+	vuMeterIn.process(args.sampleTime, leftInput * 0.2f);
+	vuMeterIn2.process(args.sampleTime, rightInput * 0.2f);
+	vuMeterOut.process(args.sampleTime, outL * 0.2f);
+	vuMeterOut2.process(args.sampleTime, outR * 0.2f);
 	for (int v = 0; step == 512 && v < 15; v++) {
-		lights[VU_IN_LEFT_LIGHT + 14 - v].setBrightness(vuMeterIn.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
-		lights[VU_IN_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterIn2.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
-		lights[VU_OUT_LEFT_LIGHT + 14 - v].setBrightness(vuMeterOut.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
-		lights[VU_OUT_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterOut2.getBrightness(-intervalDB * (v + 1), -intervalDB * v));
+		float upper = -intervalDB * v;
+		float lower = -intervalDB * (v + 1.0f);
+		lights[VU_IN_LEFT_LIGHT + 14 - v].setBrightness(vuMeterIn.getBrightness(lower, upper));
+		lights[VU_IN_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterIn2.getBrightness(lower, upper));
+		lights[VU_OUT_LEFT_LIGHT + 14 - v].setBrightness(vuMeterOut.getBrightness(lower, upper));
+		lights[VU_OUT_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterOut2.getBrightness(lower, upper));
 	}
 	if (step == 512) {
 		step = 0;
 	}
 
 	// set previous values for next step:
-	peak_prev = peak;
-	g_prev = g;
-	f_prev = f;
+
+
 }
 
 double Zod::toExp10(double x, double min, double max) {
