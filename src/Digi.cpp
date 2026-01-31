@@ -81,16 +81,14 @@ void Digi::process(const ProcessArgs &args) {
 	for (int i = 0; i < oversample; i++) {
 		float analog  = inBuf[i];
 		float digital = 0.0f;
-		if (jump == 0.0f) {
-			digital = analog;
-		} else if (analog >= 0.0f) {
-			digital = analog-fmod(analog, jump);
+		if (jump > 0.001f) {
+			// "floor" creates the step.
+			// Adding 0.5f * jump aligns it to the center
+			digital = std::floor(analog / jump) * jump + (0.5f * jump);
 		} else {
-			analog = -analog;
-			digital = analog+(jump-fmod(analog, jump));//fmod return same sign as input value
-			digital = -digital;
+			digital = analog;
 		}
-		outBuf[i] = digital + 0.5f*jump;
+		outBuf[i] = digital;
 	}
     outputs[DIGITAL_OUTPUT].setVoltage(decimator.process(outBuf));
 }
