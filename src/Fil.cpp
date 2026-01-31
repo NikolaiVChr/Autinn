@@ -121,6 +121,7 @@ void Fil::process(const ProcessArgs &args) {
 
 		for (int i = 0; i < current_oversample; i++) {
 			float x = inInter[i];
+			if (std::abs(x) < 1e-15f) x = 0.0f; // Denormal protection
 
 			// Asymmetric Tube Bias
 			// Adding x*x creates Even Harmonics (Warmth).

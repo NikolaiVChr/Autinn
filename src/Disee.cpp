@@ -1,8 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-#include <queue>
-
-using std::queue;
 
 /*
 
@@ -44,10 +41,9 @@ struct Disee : Module {
 	};
 
 	const int SIZE = 12500;// fixed for now.
-	std::vector<float> buffer;
     int head = 0;
     float runningDC = 0.0f;
-    bool bufferFull = false;
+	float dcFilter = 0.0f;
 
 	Disee() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -57,7 +53,6 @@ struct Disee : Module {
 		configLight(DC_BLUE_LIGHT, "Negative DC");
 		configInput(AC_INPUT, "AC");
 		configOutput(DC_OUTPUT, "DC");
-		buffer.resize(SIZE, 0.0f);
 	}
 
 	void process(const ProcessArgs &args) override;
@@ -69,50 +64,32 @@ void Disee::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 
-	// TODO: Make buffer size depend on bitrate and review the time it should average over.
-	//       Right now its 0.28 seconds for 44.1KHz
-	//       Right now its 0.26 seconds for 48.0KHz
+	float in = inputs[AC_INPUT].getVoltage();
 
-	float in = inputs[AC_INPUT].getVoltage() / SIZE;
+	// Calculate a coefficient for a Lowpass filter
+	// averages the signal over ~1 second
+	float cutoffFreq = 1.0f;
+	float lambda = 2.0f * M_PI * cutoffFreq * args.sampleTime;
 
-    // Ring Buffer Logic (No allocations)
-    float oldVal = buffer[head];
-    buffer[head] = in;
-    
-    // Update Running Sum
-    runningDC = runningDC - oldVal + in;
+	// One-Pole Filter
+	dcFilter += (in - dcFilter) * lambda;
 
-    // Advance Head
-    head++;
-    if (head >= SIZE) {
-        head = 0;
-        bufferFull = true;
-    }
+	outputs[DC_OUTPUT].setVoltage(clamp(dcFilter, -10.0f, 10.0f));
 
-    // Output (Wait for buffer to fill)
-    if (!bufferFull) {
-        lights[DC_GREEN_LIGHT].value = 0.0f;
-		lights[DC_RED_LIGHT].value = 0.0f;
-		lights[DC_BLUE_LIGHT].value = 0.0f;
-        return;
-    }
-
-    float dc = runningDC; 
-    outputs[DC_OUTPUT].setVoltage(clamp(dc, -10000.0f, 10000.0f));
-	
-	if (fabs(dc) < 0.05f) {
+	// Update lights based on the filtered DC value
+	if (std::abs(dcFilter) < 0.05f) {
 		lights[DC_GREEN_LIGHT].value = 1.0f;
 		lights[DC_RED_LIGHT].value = 0.0f;
 		lights[DC_BLUE_LIGHT].value = 0.0f;
-	} else if (dc < 0.0f) {
+	} else if (dcFilter < 0.0f) {
 		lights[DC_GREEN_LIGHT].value = 0.0f;
 		lights[DC_RED_LIGHT].value = 0.0f;
-		lights[DC_BLUE_LIGHT].value = clamp(-dc,0.25f,1.0f);
+		lights[DC_BLUE_LIGHT].value = clamp(-dcFilter, 0.25f, 1.0f);
 	} else {
 		lights[DC_GREEN_LIGHT].value = 0.0f;
-		lights[DC_RED_LIGHT].value = clamp(dc,0.25f,1.0f);
+		lights[DC_RED_LIGHT].value = clamp(dcFilter, 0.25f, 1.0f);
 		lights[DC_BLUE_LIGHT].value = 0.0f;
-	}	
+	}
 }
 
 struct DiseeWidget : ModuleWidget {
