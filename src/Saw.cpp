@@ -242,12 +242,29 @@ struct Saw : Module {
 	float lowHigh [2] = {20.0f,100.0f};// use the low waveform at 20 hz, the high at 100 Hz.
 
 	dsp::Decimator<oversample, 8> decimator[16];
+
+	static const int TABLE_SIZE = 2048; // Power of 2 is best
+	float uniformSawLow[TABLE_SIZE + 1]; // +1 for easy interpolation wrap
+	float uniformSawHigh[TABLE_SIZE + 1];
+
+	// Helper to bake the table
+	void bakeWaveform(int srcSize, float* srcIn, float* srcOut, float* dstBuffer) {
+		for (int i = 0; i <= TABLE_SIZE; i++) {
+			// Normalized phase 0.0 to 1.0
+			float p = (float)i / TABLE_SIZE;
+			// Use your existing slow lut() function ONE time to generate the fast table
+			dstBuffer[i] = this->lut(srcSize, srcIn, srcOut, p);
+		}
+	}
 	
 	Saw() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Saw::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
 		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
+
+		bakeWaveform(szLow, sawInLow, sawOutLow, uniformSawLow);
+		bakeWaveform(szHigh, sawInHigh, sawOutHigh, uniformSawHigh);
 
 		for (int c = 0; c < 16; c++) {
 			decimator[c] = dsp::Decimator<oversample, 8>(0.9f);
@@ -311,28 +328,39 @@ void Saw::process(const ProcessArgs &args) {
 		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
 
 		float period = 1.0f;
-		float deltaPhase = freq * deltaTime * period;
 
 		float outBuf  [oversample];
 
 		for (int i = 0; i < oversample; i++) {
-			phase[c] += deltaPhase;
-			phase[c] = fmod(phase[c], period);
+			if (phase[c] >= 1.0f) phase[c] -= 1.0f;
 
-			// Use the Look-up Table to read the output value
-			float buzzL = this->lut(szLow, sawInLow, sawOutLow, phase[c]);
-			float buzzH = this->lut(szHigh, sawInHigh, sawOutHigh, phase[c]);
-			//	float lowHighValues [2] = {buzzL,buzzH};
-			//	float buzz = this->lut(2, lowHigh, lowHighValues, freq);
+			float p = phase[c] * TABLE_SIZE;
+			int idx = (int)p;
+			float frac = p - idx;
+
+			// O(1) Lookup
+			// Low Band
+			float L1 = uniformSawLow[idx];
+			float L2 = uniformSawLow[idx + 1];
+			float buzzL = L1 + frac * (L2 - L1);
+
+			// High Band
+			float H1 = uniformSawHigh[idx];
+			float H2 = uniformSawHigh[idx + 1];
+			float buzzH = H1 + frac * (H2 - H1);
+
 			float out = 0.0f;
 			if (freq < lowHigh[0]) {
-				out = (buzzL-meanLow);
+				out = (buzzL - meanLow);
 			} else if (freq > lowHigh[1]) {
-				out = (buzzH-meanHigh);
+				out = (buzzH - meanHigh);
 			} else {
-				float buzz = this->range(freq, lowHigh[0], lowHigh[1], buzzL, buzzH);
-				float mean = this->range(freq, lowHigh[0], lowHigh[1], meanLow, meanHigh);
-				out = (buzz-mean);
+				float blend = (freq - lowHigh[0]) / (lowHigh[1] - lowHigh[0]);
+				float buzz = buzzL + blend * (buzzH - buzzL);
+
+				// Linearly interpolate mean
+				float mean = meanLow + blend * (meanHigh - meanLow);
+				out = (buzz - mean);
 			}
 			outBuf[i] = out;
 		}
