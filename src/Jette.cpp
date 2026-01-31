@@ -127,90 +127,107 @@ void Jette::process(const ProcessArgs &args) {
 	
 	float pitchBase = params[PITCH_PARAM].getValue();
 
-	float a_raw = params[A_PARAM].getValue();
-	float b_raw = params[B_PARAM].getValue();
-	float c_raw = params[C_PARAM].getValue();
-	float d_raw = params[D_PARAM].getValue();
-	float e_raw = params[E_PARAM].getValue();
-	float f_raw = params[F_PARAM].getValue();
-	float g_raw = params[G_PARAM].getValue();
-	float h_raw = params[H_PARAM].getValue();
+	float sliders[8] = {
+		params[A_PARAM].getValue(), params[B_PARAM].getValue(),
+		params[C_PARAM].getValue(), params[D_PARAM].getValue(),
+		params[E_PARAM].getValue(), params[F_PARAM].getValue(),
+		params[G_PARAM].getValue(), params[H_PARAM].getValue()
+	};
+
+	float nyquist = args.sampleRate * 0.5f;
+	float period = 2.0f*M_PI;
 
 	for (int ch = 0; ch < channels; ch++) {
 		float pitch = pitchBase + inputs[PITCH_INPUT].getPolyVoltage(ch);
 		pitch = clamp(pitch, -4.0f, 6.0f);
 		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
 	
-		float period = 2.0f*M_PI;
+
 		float deltaPhase = freq * dt * period;
 		phase[ch] += deltaPhase;
 		//phase[ch] = fmod(phase[ch], period);
 		if (phase[ch] >= period) phase[ch] -= period; // Faster than fmod
-	
-		float a=a_raw, b=b_raw, c=c_raw, d=d_raw, e=e_raw, f=f_raw, g=g_raw, h=h_raw;
-	
-		float nyquist = args.sampleRate*0.5f;
-		if (shape < 2.0f) {
-			if (freq * 15.0f > nyquist) {
-				h = 0.0f;
-				if (freq * 13.0f > nyquist) {
-					g = 0.0f;
-					if (freq * 11.0f > nyquist) {
-						f = 0.0f;
-						if (freq * 9.0f > nyquist) {
-							e = 0.0f;
-							if (freq * 7.0f > nyquist) {
-								d = 0.0f;
-								if (freq * 5.0f > nyquist) {
-									c = 0.0f;
-									if (freq * 3.0f > nyquist) {
-										b = 0.0f;
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		} else {
-			if (freq * 8.0f > nyquist) {
-				h = 0.0f;
-				if (freq * 7.0f > nyquist) {
-					g = 0.0f;
-					if (freq * 6.0f > nyquist) {
-						f = 0.0f;
-						if (freq * 5.0f > nyquist) {
-							e = 0.0f;
-							if (freq * 4.0f > nyquist) {
-								d = 0.0f;
-								if (freq * 3.0f > nyquist) {
-									c = 0.0f;
-									if (freq * 2.0f > nyquist) {
-										b = 0.0f;
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+
 		float buzz = 0.0f;
-		if (shape == 0) {
-			// square
-			buzz = a*sin(phase[ch]) + b*sin(3.0f*phase[ch])/3.0f + c*sin(5.0f*phase[ch])/5.0f + d*sin(7.0f*phase[ch])/7.0f + e*sin(9.0f*phase[ch])/9.0f + f*sin(11.0f*phase[ch])/11.0f + g*sin(13.0f*phase[ch])/13.0f + h*sin(15.0f*phase[ch])/15.0f;
-			buzz *= 20.0f/M_PI;
-		} else if (shape == 1 ) {
-			// triangle
-			buzz = a*cos(phase[ch]) + b*cos(3.0f*phase[ch])/9.0f + c*cos(5.0f*phase[ch])/25.0f + d*cos(7.0f*phase[ch])/49.0f + e*cos(9.0f*phase[ch])/81.0f + f*cos(11.0f*phase[ch])/121.0f + g*cos(13.0f*phase[ch])/169.0f + h*cos(15.0f*phase[ch])/225.0f;
-			buzz *= 40.0f/(M_PI*M_PI);
-		} else {
-			// saw
-			buzz = a*sin(phase[ch]) - b*sin(2.0f*phase[ch])/2.0f + c*sin(3.0f*phase[ch])/3.0f - d*sin(4.0f*phase[ch])/4.0f + e*sin(5.0f*phase[ch])/5.0f - f*sin(6.0f*phase[ch])/6.0f + g*sin(7.0f*phase[ch])/7.0f - h*sin(8.0f*phase[ch])/8.0f;
-			// + sin(9*phase[ch])/9 - sin(10*phase[ch])/10 + sin(11*phase[ch])/11 - sin(12*phase[ch])/12 + sin(13*phase[ch])/13 - sin(14*phase[ch])/14;
-			buzz *= 10.0f/M_PI;
+		float p = phase[ch];
+
+		// --- Chebyshev Recursion ---
+		if (shape == 0) { // SQUARE
+			float s1 = sin(p);
+			float c1 = cos(p);
+
+			float val_curr = s1;
+			float val_prev = 0.0f; // sin(0)
+
+			// 1st Harmonic (Slider A)
+			if (freq < nyquist) buzz += sliders[0] * val_curr;
+
+			float two_c1 = 2.0f * c1;
+			for (int k = 2; k <= 15; k++) {
+				float val_next = two_c1 * val_curr - val_prev;
+				val_prev = val_curr;
+				val_curr = val_next;
+
+				if (k % 2 != 0) { // Odd harmonics only
+					float harmonicFreq = freq * (float)k;
+					if (harmonicFreq > nyquist) break; // Stop early if aliasing
+
+					int sliderIdx = (k - 1) / 2;
+					buzz += sliders[sliderIdx] * val_curr / (float)k;
+				}
+			}
+			buzz *= 20.0f / M_PI;
+		} else if (shape == 1) { // TRIANGLE
+			float c1 = cos(p);
+
+			float val_curr = c1;
+			float val_prev = 1.0f; // cos(0)
+
+			// 1st Harmonic
+			if (freq < nyquist) buzz += sliders[0] * val_curr;
+
+			float two_c1 = 2.0f * c1;
+			for (int k = 2; k <= 15; k++) {
+				float val_next = two_c1 * val_curr - val_prev;
+				val_prev = val_curr;
+				val_curr = val_next;
+
+				if (k % 2 != 0) { // Odd harmonics only
+					float harmonicFreq = freq * (float)k;
+					if (harmonicFreq > nyquist) break;
+
+					int sliderIdx = (k - 1) / 2;
+					float div = (float)(k * k); // Falls off as 1/k^2
+					buzz += sliders[sliderIdx] * val_curr / div;
+				}
+			}
+			buzz *= 40.0f / (M_PI * M_PI);
+
+		} else { // SAW
+			float s1 = sin(p);
+			float c1 = cos(p);
+
+			float val_curr = s1;
+			float val_prev = 0.0f;
+
+			// 1st Harmonic
+			if (freq < nyquist) buzz += sliders[0] * val_curr;
+
+			float two_c1 = 2.0f * c1;
+			for (int k = 2; k <= 8; k++) {
+				float val_next = two_c1 * val_curr - val_prev;
+				val_prev = val_curr;
+				val_curr = val_next;
+
+				float harmonicFreq = freq * (float)k;
+				if (harmonicFreq > nyquist) break;
+
+				float sign = (k % 2 == 0) ? -1.0f : 1.0f; // Alternating signs
+				buzz += sign * sliders[k-1] * val_curr / (float)k;
+			}
+			buzz *= 10.0f / M_PI;
 		}
-		outputs[BUZZ_OUTPUT].setVoltage(buzz, ch);//aprox 10V PP 
+		outputs[BUZZ_OUTPUT].setVoltage(buzz, ch);//approx 10V PP
 
 		if (ch == 0) {
 			blinkTime += dt;
