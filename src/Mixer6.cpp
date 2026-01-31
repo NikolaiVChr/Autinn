@@ -71,9 +71,9 @@ struct Mixer6 : Module {
 
 	
 
-	const float Gd = 30.0f;
-	const float Pm = 30.0f;
-	const float Qp = 0.40f;
+	//const float Gd = 3.0f;
+	const float Pm = 15.0f;
+	const float Qp = 0.707107f;
 	const float Qs = 0.707107f;
 	const float c1 = 250.0f;
 	const float c2 = 700.0f;
@@ -104,9 +104,9 @@ struct Mixer6 : Module {
 
 		for (int ch = 0; ch < num_mono_channels; ch++) {
 			configInput(INPUT+ch, "Channel "+std::to_string(ch+1)+" Audio");
-			configParam(HIGH_PARAM+ch, 0.5f, Pm, Pm, "Channel "+std::to_string(ch+1)+" EQ High", " dB", 0.0f, 1.0f, -Pm);
-			configParam(MID_PARAM+ch, 0.5f, Pm, Pm, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", 0.0f, 1.0f, -Pm);
-			configParam(LOW_PARAM+ch, 0.5f, Pm, Pm, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", 0.0f, 1.0f, -Pm);
+			configParam(HIGH_PARAM+ch, -Pm, Pm, 0, "Channel "+std::to_string(ch+1)+" EQ High", " dB", 0.0f, 1.0f, -Pm);
+			configParam(MID_PARAM+ch, -Pm, Pm, 0, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", 0.0f, 1.0f, -Pm);
+			configParam(LOW_PARAM+ch, -Pm, Pm, 0, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", 0.0f, 1.0f, -Pm);
 			configParam(FX_A_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX A Send", " dB", -10, 20);
 			configParam(FX_B_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX B Send", " dB", -10, 20);
 			configParam(CHANNEL_LEVEL_PARAM+ch, 0.0f, 2.0f, 1.0f, "Channel "+std::to_string(ch+1)+" Level", " dB", -10, 20);
@@ -194,41 +194,47 @@ void Mixer6::process(const ProcessArgs &args) {
 		float mid    = params[MID_PARAM+ch].getValue();
 		float high   = params[HIGH_PARAM+ch].getValue();
 		
-		if (low != Pm || mid != Pm || high != Pm) {
-			float out1;
-			float out2;
-			float out3;
 
-			if (low != low_prev[ch] || mid != mid_prev[ch] || high != high_prev[ch] || rate != rate_prev) {
-				lowS[ch].setParameters(lowS[ch].LOWSHELF, c1/rate, Qs, low);
-				midP[ch].setParameters(midP[ch].PEAK, c2/rate, Qp, mid);
-				highS[ch].setParameters(highS[ch].HIGHSHELF, c3/rate, Qs, high);
-			}
+		// Update Coefficients (Only if changed)
+		if (low != low_prev[ch] || mid != mid_prev[ch] || high != high_prev[ch] || rate != rate_prev) {
+			lowS[ch].setParameters(lowS[ch].LOWSHELF, c1/rate, Qs, low);
+			midP[ch].setParameters(midP[ch].PEAK, c2/rate, Qp, mid);
+			highS[ch].setParameters(highS[ch].HIGHSHELF, c3/rate, Qs, high);
+
 			low_prev[ch] = low;
 			mid_prev[ch] = mid;
 			high_prev[ch] = high;
-			out1 = lowS[ch].process(in);
-			out2 = midP[ch].process(in);
-			out3 = highS[ch].process(in);
-
-			if(std::isfinite(out1) && std::isfinite(out2) && std::isfinite(out3)) {
-				float out = (out1+out2+out3)/Gd;
-				fx_send_A += params[FX_A_SEND_PARAM+ch].getValue() * out;
-				fx_send_B += params[FX_B_SEND_PARAM+ch].getValue() * out;
-				main_left  += cos(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * out;
-				main_right += sin(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * out;
-			}
-		} else{
-			fx_send_A += params[FX_A_SEND_PARAM+ch].getValue() * in;
-			fx_send_B += params[FX_B_SEND_PARAM+ch].getValue() * in;
-			main_left  += cos(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * in;
-			main_right += sin(params[PAN_PARAM+ch].getValue()) * params[CHANNEL_LEVEL_PARAM+ch].getValue() * in;
-
-			// must run the filters to keep their state uptodate
-			float out1 = lowS[ch].process(in);
-			float out2 = midP[ch].process(in);
-			float out3 = highS[ch].process(in);
 		}
+
+		// --- (Daisy Chain) ---
+
+		// 1. Apply Low Shelf
+		float stage1 = lowS[ch].process(in);
+		if (!std::isfinite(stage1)) {
+			lowS[ch].reset();
+			stage1 = in; // Passthrough on crash
+		}
+
+		// 2. Apply Mid Peak (to the output of Low)
+		float stage2 = midP[ch].process(stage1);
+		if (!std::isfinite(stage2)) {
+			midP[ch].reset();
+			stage2 = stage1;
+		}
+
+		// 3. Apply High Shelf (to the output of Mid)
+		float out = highS[ch].process(stage2);
+		if (!std::isfinite(out)) {
+			highS[ch].reset();
+			out = stage2;
+		}
+
+		fx_send_A += params[FX_A_SEND_PARAM+ch].getValue() * out;
+		fx_send_B += params[FX_B_SEND_PARAM+ch].getValue() * out;
+		float pan = params[PAN_PARAM+ch].getValue();
+		float level = params[CHANNEL_LEVEL_PARAM+ch].getValue();
+		main_left  += cos(pan) * level * out;
+		main_right += sin(pan) * level * out;
 	}
 	
 	// FX
