@@ -56,6 +56,7 @@ struct Snare : Module {
 
     // Highpass filter state for the noise (Simple 1-pole)
     float noiseHp[MAX_CHANNELS] = {};
+    dsp::BiquadFilter wireFilter[MAX_CHANNELS];
 
     Snare() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -112,6 +113,12 @@ void Snare::process(const ProcessArgs &args) {
             pitchEnv[c] = 1.0f;
             phase[c] = 0.0f; 
             active = true;
+
+            // Configure the Filter (You can do this in the trigger logic to save CPU)
+            // Use BANDPASS to isolate the 'sizzle' or PEAK to just boost it.
+            float wireFreq = 2500.0f;
+            float wireQ = 1.0f;     // A Q of 1.0 is broad and natural
+            wireFilter[c].setParameters(wireFilter[c].BANDPASS, wireFreq / args.sampleRate, wireQ);
         }
 
         // Envelopes
@@ -137,15 +144,26 @@ void Snare::process(const ProcessArgs &args) {
 
         // Snappy Layer (White Noise -> Highpass)
         float white = (float)std::rand() / RAND_MAX * 2.0f - 1.0f;
-        
+
+        /*
         // One-pole Highpass Filter
         noiseHp[c] = alpha * (noiseHp[c] + white - white);
         // Actually, simpler HPF: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
         // Let's just use a raw random value, it's 'white' enough, 
         // but highpassing makes it sound less muddy.
         // Let's do a simple "Previous Sample Difference" for crude HPF:
-        float hpfNoise = white - noiseHp[c]; 
+        float hpfNoise = white - noiseHp[c];
         noiseHp[c] = white; // Save for next frame
+        */
+
+
+        // Process the noise through the filter
+        float hpfNoise = wireFilter[c].process(white);
+
+        if (!std::isfinite(hpfNoise)) {
+            hpfNoise = white;
+            wireFilter[c].reset();
+        }
 
         float snare = hpfNoise * noiseEnv[c] * snapLevel;
 
