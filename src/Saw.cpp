@@ -243,9 +243,10 @@ struct Saw : Module {
 
 	dsp::Decimator<oversample, 8> decimator[16];
 
-	static const int TABLE_SIZE = 2048; // Power of 2 is best
-	float uniformSawLow[TABLE_SIZE + 1]; // +1 for easy interpolation wrap
-	float uniformSawHigh[TABLE_SIZE + 1];
+	static constexpr int TABLE_SIZE = 2048; // Power of 2 is best
+	static float lutSawLow[TABLE_SIZE + 1];
+	static float lutSawHigh[TABLE_SIZE + 1];
+	bool lutInitialized = false;
 
 	// Helper to bake the table
 	void bakeWaveform(int srcSize, float* srcIn, float* srcOut, float* dstBuffer) {
@@ -263,8 +264,15 @@ struct Saw : Module {
 		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
 
-		bakeWaveform(szLow, sawInLow, sawOutLow, uniformSawLow);
-		bakeWaveform(szHigh, sawInHigh, sawOutHigh, uniformSawHigh);
+		if (!lutInitialized) {
+			for (int i = 0; i <= TABLE_SIZE; i++) {
+				// (float)i ensures we get 0.0 to 1.0, not just 0
+				float p = (float)i / (float)TABLE_SIZE;
+				lutSawLow[i]  = this->lut(szLow,  sawInLow,  sawOutLow,  p);
+				lutSawHigh[i] = this->lut(szHigh, sawInHigh, sawOutHigh, p);
+			}
+			lutInitialized = true;
+		}
 
 		for (int c = 0; c < 16; c++) {
 			decimator[c] = dsp::Decimator<oversample, 8>(0.9f);
@@ -337,15 +345,8 @@ void Saw::process(const ProcessArgs &args) {
 			float frac = p - idx;
 
 			// O(1) Lookup
-			// Low Band
-			float L1 = uniformSawLow[idx];
-			float L2 = uniformSawLow[idx + 1];
-			float buzzL = L1 + frac * (L2 - L1);
-
-			// High Band
-			float H1 = uniformSawHigh[idx];
-			float H2 = uniformSawHigh[idx + 1];
-			float buzzH = H1 + frac * (H2 - H1);
+			float buzzL = lutSawLow[idx] + frac * (lutSawLow[idx + 1] - lutSawLow[idx]);
+			float buzzH = lutSawHigh[idx] + frac * (lutSawHigh[idx + 1] - lutSawHigh[idx]);
 
 			float out = 0.0f;
 			if (freq < lowHigh[0]) {
