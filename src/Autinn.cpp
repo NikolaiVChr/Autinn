@@ -83,4 +83,5 @@ void init(rack::Plugin *p) {
 	p->addModel(modelNap);
 	p->addModel(modelMelody);
 	p->addModel(modelChord);
+	p->addModel(modelKicker);
 }

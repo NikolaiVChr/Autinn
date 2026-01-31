@@ -238,6 +238,15 @@
         "Utility",
         "Polyphonic"
       ]
+    },
+    {
+      "slug": "Kicker",
+      "name": "Stomp",
+      "description": "Kick drum",
+      "tags": [
+        "Drum",
+        "Polyphonic"
+      ]
     }
   ]
 }
