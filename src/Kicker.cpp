@@ -2,6 +2,26 @@
 #include <cmath>
 #include <algorithm>
 
+/*
+
+    Autinn VCV Rack Plugin
+    Copyright (C) 2021  Nikolai V. Chr.
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+**/
+
 struct Kicker : Module {
     enum ParamIds {
         FREQ_PARAM,
@@ -131,24 +151,33 @@ void Kicker::process(const ProcessArgs &args) {
 struct KickerWidget : ModuleWidget {
     KickerWidget(Kicker *module) {
         setModule(module);
-        setPanel(createPanel(asset::plugin(pluginInstance, "res/BassModule.svg"))); // You need to make this SVG
+        setPanel(createPanel(asset::plugin(pluginInstance, "res/KickerModule.svg"))); // You need to make this SVG
 
         addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-        addParam(createParam<RoundMediumAutinnKnob>(Vec(10, 50), module, Kicker::FREQ_PARAM));
-        addParam(createParam<RoundMediumAutinnKnob>(Vec(50, 50), module, Kicker::DECAY_PARAM));
-        addParam(createParam<RoundSmallAutinnKnob>(Vec(15, 110), module, Kicker::SWEEP_PARAM));
-        addParam(createParam<RoundSmallAutinnKnob>(Vec(55, 110), module, Kicker::CLICK_PARAM));
-        addParam(createParam<RoundSmallAutinnKnob>(Vec(35, 160), module, Kicker::DRIVE_PARAM));
+        float down = 20;
 
-        addInput(createInput<InPortAutinn>(Vec(10, 300), module, Kicker::TRIG_INPUT));
-        addInput(createInput<InPortAutinn>(Vec(50, 300), module, Kicker::VOCT_INPUT));
-        addOutput(createOutput<OutPortAutinn>(Vec(90, 300), module, Kicker::AUDIO_OUTPUT));
+        // Row 1 (Large knobs)
+        addParam(createParam<RoundMediumAutinnKnob>(Vec(34 - HALF_KNOB_MED, 60 + down), module, Kicker::FREQ_PARAM));
+        addParam(createParam<RoundMediumAutinnKnob>(Vec(101 - HALF_KNOB_MED, 60 + down), module, Kicker::DECAY_PARAM));
 
-        addChild(createLight<SmallLight<GreenLight>>(Vec(42, 280), module, Kicker::ACT_LIGHT));
+        // Row 2 (Small knobs)
+        addParam(createParam<RoundSmallAutinnKnob>(Vec(34 - HALF_KNOB_SMALL, 120 + down), module, Kicker::SWEEP_PARAM));
+        addParam(createParam<RoundSmallAutinnKnob>(Vec(101 - HALF_KNOB_SMALL, 120 + down), module, Kicker::CLICK_PARAM));
+
+        // Row 3 (Drive - centered)
+        addParam(createParam<RoundSmallAutinnKnob>(Vec(67.5 - HALF_KNOB_SMALL, 175 + down), module, Kicker::DRIVE_PARAM));
+
+        // Light (Next to drive)
+        addChild(createLight<SmallLight<GreenLight>>(Vec(85, 182 + down), module, Kicker::ACT_LIGHT));
+
+        // Ports (Evenly distributed: x = 23, 67.5, 112)
+        addInput(createInput<InPortAutinn>(Vec(23 - HALF_PORT, 320 + down), module, Kicker::TRIG_INPUT));
+        addInput(createInput<InPortAutinn>(Vec(67.5 - HALF_PORT, 320 + down), module, Kicker::VOCT_INPUT));
+        addOutput(createOutput<OutPortAutinn>(Vec(112 - HALF_PORT, 320 + down), module, Kicker::AUDIO_OUTPUT));
     }
 };
 
