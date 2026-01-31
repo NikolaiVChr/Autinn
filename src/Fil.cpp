@@ -118,7 +118,7 @@ void Fil::process(const ProcessArgs &args) {
 		} else {
 			upsampler8[c].process(in, inInter);
 		}
-		
+
 		for (int i = 0; i < current_oversample; i++) {
 			float x = inInter[i];
 
@@ -129,7 +129,14 @@ void Fil::process(const ProcessArgs &args) {
 
 			// Soft Saturation (The Tube Limit)
 			// non_lin handles the clipping smoothly like a vacuum tube.
-			outBuf[i] = non_lin_func(tube_bias);
+			float saturated = non_lin_func(tube_bias);
+
+			// Safety Check
+			if (!std::isfinite(saturated)) {
+				saturated = 0.0f;
+			}
+
+			outBuf[i] = saturated;
 
 			// Update Lights based on saturation intensity
 			if (c == 0 && i == 0) {
