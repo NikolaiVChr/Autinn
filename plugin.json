@@ -159,7 +159,8 @@
       "tags": [
         "Effect",
         "Delay",
-        "Flanger"
+        "Flanger",
+        "Polyphonic"
       ]
     },
     {
@@ -227,7 +228,8 @@
       "description": "Random melody sequencer with special constraints that make it sound more pleasant for the ear",
       "tags": [
         "Sequencer",
-        "Random"
+        "Random",
+        "Polyphonic"
       ]
     },
     {

@@ -107,8 +107,8 @@ struct Mixer6 : Module {
 
 		for (int ch = 0; ch < num_mono_channels; ch++) {
 			configInput(INPUT+ch, "Channel "+std::to_string(ch+1)+" Audio");
-			configParam(HIGH_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ High", " dB", -10.0f, 20.0f, 0);
-			configParam(MID_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", -10.0f, 20.0f, 0);
+			configParam(HIGH_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ High", " dB", -10.0f, 20.0f);
+			configParam(MID_PARAM+ch, 0.0f, 2.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", -10.0f, 20.0f, 0);
 			configParam(LOW_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", -10.0f, 20.0f, 0);
 			configParam(FX_A_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX A Send", " dB", -10, 20);
 			configParam(FX_B_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX B Send", " dB", -10, 20);
