@@ -159,10 +159,11 @@ struct KickerWidget : ModuleWidget {
         addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         float down = 20;
+        float up = 4 * RACK_GRID_WIDTH;
 
         // Row 1 (Large knobs)
-        addParam(createParam<RoundMediumAutinnKnob>(Vec(34 - HALF_KNOB_MED, 60 + down), module, Kicker::FREQ_PARAM));
-        addParam(createParam<RoundMediumAutinnKnob>(Vec(101 - HALF_KNOB_MED, 60 + down), module, Kicker::DECAY_PARAM));
+        addParam(createParam<RoundMediumAutinnKnob>(Vec(34 - HALF_KNOB_MED, 60 + down - RACK_GRID_WIDTH/2), module, Kicker::FREQ_PARAM));
+        addParam(createParam<RoundMediumAutinnKnob>(Vec(101 - HALF_KNOB_MED, 60 + down - RACK_GRID_WIDTH/2), module, Kicker::DECAY_PARAM));
 
         // Row 2 (Small knobs)
         addParam(createParam<RoundSmallAutinnKnob>(Vec(34 - HALF_KNOB_SMALL, 120 + down), module, Kicker::SWEEP_PARAM));
@@ -175,9 +176,9 @@ struct KickerWidget : ModuleWidget {
         addChild(createLight<SmallLight<GreenLight>>(Vec(85, 182 + down), module, Kicker::ACT_LIGHT));
 
         // Ports (Evenly distributed: x = 23, 67.5, 112)
-        addInput(createInput<InPortAutinn>(Vec(23 - HALF_PORT, 320 + down), module, Kicker::TRIG_INPUT));
-        addInput(createInput<InPortAutinn>(Vec(67.5 - HALF_PORT, 320 + down), module, Kicker::VOCT_INPUT));
-        addOutput(createOutput<OutPortAutinn>(Vec(112 - HALF_PORT, 320 + down), module, Kicker::AUDIO_OUTPUT));
+        addInput(createInput<InPortAutinn>(Vec(23 - HALF_PORT, 320 + down - up), module, Kicker::TRIG_INPUT));
+        addInput(createInput<InPortAutinn>(Vec(67.5 - HALF_PORT, 320 + down - up), module, Kicker::VOCT_INPUT));
+        addOutput(createOutput<OutPortAutinn>(Vec(112 - HALF_PORT, 320 + down - up), module, Kicker::AUDIO_OUTPUT));
     }
 };
 
