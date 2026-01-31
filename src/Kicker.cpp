@@ -54,11 +54,12 @@ struct Kicker : Module {
     dsp::SchmittTrigger triggers[MAX_CHANNELS];
     float lightDecay = 0.0f;
     uint32_t noiseState[16] = {};
+    float lastClickFilter[16] = {};
 
     Kicker() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(FREQ_PARAM, 30.0f, 200.0f, 60.0f, "Tune", " Hz");
-        configParam(DECAY_PARAM, 0.1f, 2.0f, 0.6f, "Decay", " s");
+        configParam(DECAY_PARAM, 0.1f, 0.8f, 0.4f, "Decay", " s");
         configParam(SWEEP_PARAM, 0.0f, 1.0f, 0.2f, "Sweep", "%");
         configParam(CLICK_PARAM, 0.0f, 1.0f, 0.2f, "Click", "%");
         configParam(DRIVE_PARAM, 0.0f, 5.0f, 2.5f, "Drive", "%"); // 0 to 5x gain
@@ -156,7 +157,13 @@ void Kicker::process(const ProcessArgs &args) {
             finalEnv = ampEnv[c] * ampEnv[c];
         }
 
-        float click = white * (pitchEnv[c] * pitchEnv[c]) * clickLevel;
+        float filteredClick = lastClickFilter[c] + 0.3f * (white - lastClickFilter[c]);
+        lastClickFilter[c] = filteredClick;
+
+        // Short envelope
+        float click = filteredClick * (pitchEnv[c] * pitchEnv[c]) * clickLevel;
+
+        //float click = white * (pitchEnv[c] * pitchEnv[c]) * clickLevel;
 
         // Apply adaptive envelope to body
         float signal = (body * finalEnv + click) * drive;
