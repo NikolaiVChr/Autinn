@@ -253,3 +253,4 @@ extern Model *modelNap;
 extern Model *modelMelody;
 extern Model *modelChord;
 extern Model *modelKicker;
+extern Model *modelSnare;

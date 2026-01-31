@@ -247,6 +247,15 @@
         "Drum",
         "Polyphonic"
       ]
+    },
+    {
+      "slug": "Lurer",
+      "name": "Punch",
+      "description": "Snare drum",
+      "tags": [
+        "Drum",
+        "Polyphonic"
+      ]
     }
   ]
 }

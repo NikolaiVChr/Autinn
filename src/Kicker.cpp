@@ -56,11 +56,11 @@ struct Kicker : Module {
 
     Kicker() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(FREQ_PARAM, 30.0f, 200.0f, 50.0f, "Tune", " Hz");
-        configParam(DECAY_PARAM, 0.1f, 2.0f, 0.5f, "Decay", " s");
-        configParam(SWEEP_PARAM, 0.0f, 1.0f, 0.5f, "Sweep", "%");
-        configParam(CLICK_PARAM, 0.0f, 1.0f, 0.3f, "Click", "%");
-        configParam(DRIVE_PARAM, 0.0f, 5.0f, 0.0f, "Drive", "%"); // 0 to 5x gain
+        configParam(FREQ_PARAM, 30.0f, 200.0f, 60.0f, "Tune", " Hz");
+        configParam(DECAY_PARAM, 0.1f, 2.0f, 1.05f, "Decay", " s");
+        configParam(SWEEP_PARAM, 0.0f, 1.0f, 0.2f, "Sweep", "%");
+        configParam(CLICK_PARAM, 0.0f, 1.0f, 0.2f, "Click", "%");
+        configParam(DRIVE_PARAM, 0.0f, 5.0f, 2.5f, "Drive", "%"); // 0 to 5x gain
 
         configInput(TRIG_INPUT, "Trigger");
         configInput(VOCT_INPUT, "V/Oct");

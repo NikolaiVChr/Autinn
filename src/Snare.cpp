@@ -1,0 +1,184 @@
+#include "Autinn.hpp"
+#include <cmath>
+#include <algorithm>
+
+struct Snare : Module {
+    enum ParamIds {
+        FREQ_PARAM,
+        DECAY_PARAM,
+        SWEEP_PARAM,
+        SNAP_PARAM, // Was CLICK_PARAM
+        DRIVE_PARAM,
+        NUM_PARAMS
+    };
+    enum InputIds {
+        TRIG_INPUT,
+        VOCT_INPUT,
+        NUM_INPUTS
+    };
+    enum OutputIds {
+        AUDIO_OUTPUT,
+        NUM_OUTPUTS
+    };
+    enum LightIds {
+        ACT_LIGHT,
+        NUM_LIGHTS
+    };
+
+    static const int MAX_CHANNELS = 16;
+
+    float phase[MAX_CHANNELS] = {};
+    float ampEnv[MAX_CHANNELS] = {};
+    float noiseEnv[MAX_CHANNELS] = {}; // Separate envelope for noise tail
+    float pitchEnv[MAX_CHANNELS] = {};
+    dsp::SchmittTrigger triggers[MAX_CHANNELS];
+    float lightDecay = 0.0f;
+
+    // Highpass filter state for the noise (Simple 1-pole)
+    float noiseHp[MAX_CHANNELS] = {};
+
+    Snare() {
+        config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+        configParam(FREQ_PARAM, 100.0f, 400.0f, 200.0f, "Tune", " Hz");
+        configParam(DECAY_PARAM, 0.05f, 0.8f, 0.2f, "Decay", " s");
+        configParam(SWEEP_PARAM, 0.0f, 1.0f, 0.3f, "Sweep", "%");
+        configParam(SNAP_PARAM, 0.0f, 1.0f, 0.6f, "Snappy", "%");
+        configParam(DRIVE_PARAM, 0.0f, 5.0f, 0.0f, "Drive", "%");
+
+        configInput(TRIG_INPUT, "Trigger");
+        configInput(VOCT_INPUT, "V/Oct");
+        configOutput(AUDIO_OUTPUT, "Audio");
+    }
+
+    void process(const ProcessArgs &args) override;
+};
+
+void Snare::process(const ProcessArgs &args) {
+    if (!outputs[AUDIO_OUTPUT].isConnected()) return;
+
+    int channels = std::max(1, inputs[TRIG_INPUT].getChannels());
+    outputs[AUDIO_OUTPUT].setChannels(channels);
+
+    float dt = args.sampleTime;
+    float baseFreq = params[FREQ_PARAM].getValue();
+    float sweepDepth = params[SWEEP_PARAM].getValue() * 200.0f; 
+    float snapLevel = params[SNAP_PARAM].getValue();
+    float drive = 1.0f + params[DRIVE_PARAM].getValue();
+    
+    // Decay Coefficients
+    float decayParam = params[DECAY_PARAM].getValue();
+    
+    // Body decays slightly faster than noise
+    float bodyCoeff = 1.0f - (10.0f * dt / decayParam); 
+    // Noise tail
+    float noiseCoeff = 1.0f - (5.0f * dt / decayParam);
+    
+    bodyCoeff = clamp(bodyCoeff, 0.0f, 1.0f);
+    noiseCoeff = clamp(noiseCoeff, 0.0f, 1.0f);
+
+    float pitchDecayCoeff = 1.0f - (25.0f * dt); // Very fast pitch drop
+
+    // Simple HPF Coefficient (Cutoff ~800Hz)
+    float rc = 1.0f / (2.0f * M_PI * 800.0f);
+    float alpha = rc / (rc + dt);
+
+    bool active = false;
+
+    for (int c = 0; c < channels; c++) {
+        // Trigger
+        if (triggers[c].process(inputs[TRIG_INPUT].getPolyVoltage(c))) {
+            ampEnv[c] = 1.0f;
+            noiseEnv[c] = 1.0f;
+            pitchEnv[c] = 1.0f;
+            phase[c] = 0.0f; 
+            active = true;
+        }
+
+        // Envelopes
+        ampEnv[c] *= bodyCoeff;
+        noiseEnv[c] *= noiseCoeff;
+        pitchEnv[c] *= pitchDecayCoeff;
+
+        if (ampEnv[c] < 0.001f) ampEnv[c] = 0.0f;
+        if (noiseEnv[c] < 0.001f) noiseEnv[c] = 0.0f;
+
+        // 3. Tonal Body (Triangle/Sine mix for body)
+        float voct = inputs[VOCT_INPUT].getPolyVoltage(c);
+        float pitchMod = sweepDepth * pitchEnv[c];
+        float freq = baseFreq * powf(2.0f, voct) + pitchMod;
+        
+        float deltaPhase = freq * dt;
+        phase[c] += deltaPhase;
+        if (phase[c] >= 1.0f) phase[c] -= 1.0f;
+
+        float sine = sin(phase[c] * 2.0f * M_PI);
+        // Add a bit of harmonics (Triangle-ish)
+        float body = sine + 0.2f * sin(phase[c] * 6.0f * M_PI);
+
+        // Snappy Layer (White Noise -> Highpass)
+        float white = (float)std::rand() / RAND_MAX * 2.0f - 1.0f;
+        
+        // One-pole Highpass Filter
+        noiseHp[c] = alpha * (noiseHp[c] + white - white);
+        // Actually, simpler HPF: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
+        // Let's just use a raw random value, it's 'white' enough, 
+        // but highpassing makes it sound less muddy.
+        // Let's do a simple "Previous Sample Difference" for crude HPF:
+        float hpfNoise = white - noiseHp[c]; 
+        noiseHp[c] = white; // Save for next frame
+
+        float snare = hpfNoise * noiseEnv[c] * snapLevel;
+
+        // Mix
+        float mix = (body * ampEnv[c]) + snare;
+        float signal = mix * drive;
+
+        // Saturation
+        float x = signal;
+        if (x < -3.0f) x = -1.0f;
+        else if (x > 3.0f) x = 1.0f;
+        else x = x * (27.0f + x * x) / (27.0f + 9.0f * x * x);
+
+        outputs[AUDIO_OUTPUT].setVoltage(x * 5.0f, c);
+    }
+
+    if (active) lightDecay = 1.0f;
+    lightDecay *= 0.95f;
+    lights[ACT_LIGHT].value = lightDecay;
+}
+
+struct SnareWidget : ModuleWidget {
+    SnareWidget(Snare *module) {
+        setModule(module);
+        setPanel(createPanel(asset::plugin(pluginInstance, "res/SnareModule.svg")));
+
+        addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+
+        float down = 20;
+        float up = 4 * RACK_GRID_WIDTH;
+
+        // Row 1 (Large knobs)
+        addParam(createParam<RoundMediumAutinnKnob>(Vec(34 - HALF_KNOB_MED, 60 + down - RACK_GRID_WIDTH/2), module, Snare::FREQ_PARAM));
+        addParam(createParam<RoundMediumAutinnKnob>(Vec(101 - HALF_KNOB_MED, 60 + down - RACK_GRID_WIDTH/2), module, Snare::DECAY_PARAM));
+
+        // Row 2 (Small knobs)
+        addParam(createParam<RoundSmallAutinnKnob>(Vec(34 - HALF_KNOB_SMALL, 120 + down), module, Snare::SWEEP_PARAM));
+        addParam(createParam<RoundSmallAutinnKnob>(Vec(101 - HALF_KNOB_SMALL, 120 + down), module, Snare::SNAP_PARAM));
+
+        // Row 3 (Drive - centered)
+        addParam(createParam<RoundSmallAutinnKnob>(Vec(67.5 - HALF_KNOB_SMALL, 175 + down), module, Snare::DRIVE_PARAM));
+
+        // Light (Next to drive)
+        addChild(createLight<SmallLight<GreenLight>>(Vec(85, 182 + down), module, Snare::ACT_LIGHT));
+
+        // Ports
+        addInput(createInput<InPortAutinn>(Vec(23 - HALF_PORT, 320 + down - up), module, Snare::TRIG_INPUT));
+        addInput(createInput<InPortAutinn>(Vec(67.5 - HALF_PORT, 320 + down - up), module, Snare::VOCT_INPUT));
+        addOutput(createOutput<OutPortAutinn>(Vec(112 - HALF_PORT, 320 + down - up), module, Snare::AUDIO_OUTPUT));
+    }
+};
+
+Model *modelSnare = createModel<Snare, SnareWidget>("Snare");
