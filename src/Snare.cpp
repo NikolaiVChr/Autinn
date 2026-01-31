@@ -57,6 +57,7 @@ struct Snare : Module {
     // Highpass filter state for the noise (Simple 1-pole)
     float noiseHp[MAX_CHANNELS] = {};
     dsp::BiquadFilter wireFilter[MAX_CHANNELS];
+    uint32_t noiseState[16] = {};
 
     Snare() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -69,6 +70,11 @@ struct Snare : Module {
         configInput(TRIG_INPUT, "Trigger");
         configInput(VOCT_INPUT, "V/Oct");
         configOutput(AUDIO_OUTPUT, "Audio");
+
+        for (int i = 0; i < 16; i++) {
+            // Give every channel a different starting seed
+            noiseState[i] = 0x12345678 + (i * 0xdeadbeef);
+        }
     }
 
     void process(const ProcessArgs &args) override;
@@ -143,7 +149,14 @@ void Snare::process(const ProcessArgs &args) {
         float body = sine + 0.2f * sin(phase[c] * 6.0f * M_PI);
 
         // Snappy Layer (White Noise -> Highpass)
-        float white = (float)std::rand() / RAND_MAX * 2.0f - 1.0f;
+        //float white = (float)std::rand() / RAND_MAX * 2.0f - 1.0f;
+
+        uint32_t& s = noiseState[c];
+        s ^= s << 13;
+        s ^= s >> 17;
+        s ^= s << 5;
+        // Using a float cast on the raw bits for a fast [-1.0, 1.0] range
+        float white = (int32_t(s) >> 8) * (1.0f / 8388608.0f);
 
         /*
         // One-pole Highpass Filter
