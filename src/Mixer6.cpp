@@ -192,7 +192,18 @@ void Mixer6::process(const ProcessArgs &args) {
 		if (!inputs[INPUT+ch].isConnected() || mute_solo_state[ch] == -1 || (solo && mute_solo_state[ch] != 1)) {
 			continue;
 		}
-		float in = inputs[INPUT+ch].getVoltage();
+
+		float in = 0.0f;
+		int polyChannels = inputs[INPUT + ch].getChannels();
+		if (polyChannels > 0) {
+			for (int c = 0; c < polyChannels; c++) {
+				in += inputs[INPUT + ch].getPolyVoltage(c);
+			}
+		} else {
+			in = inputs[INPUT + ch].getVoltage();
+		}
+
+
 		float low    = params[LOW_PARAM+ch].getValue();
 		float mid    = params[MID_PARAM+ch].getValue();
 		float high   = params[HIGH_PARAM+ch].getValue();
