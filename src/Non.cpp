@@ -42,6 +42,7 @@
 //#define KNEE_DEFAULT_DB                   5.0
 #define MAKEUP_GAIN_MAX                  10.0//20dB
 //#define SMOOTH_FILTER_POLE_SLEW         1000.0
+#define LOOKAHEAD_MS                     10.0
 
 struct Non : Module {
 	enum ParamIds {
@@ -100,9 +101,9 @@ struct Non : Module {
 	bool limiter = false;
 
 	// Buffer size for safety with 4x oversampling
-	static const int BUFFER_SIZE = 1024;//since lookahead is around 0.15 ms
+	static const int BUFFER_SIZE = 8192;//since lookahead is 10 ms
 	unsigned D = 2;
-	float bufferL[BUFFER_SIZE] = {}; // Enough for >5ms at 192kHz
+	float bufferL[BUFFER_SIZE] = {};
 	float bufferR[BUFFER_SIZE] = {};
 	int writeIndex = 0;
 
@@ -356,7 +357,8 @@ void Non::process(const ProcessArgs &args) {
 		//crKnob = params[RATIO_COMPRESSOR_PARAM].getValue();
 		gainKnob = params[OUT_GAIN_PARAM].getValue();
 
-		D   = (unsigned)(rate * 0.15 * 0.001 * OVERSAMPLE);
+		D   = (unsigned)(rate * LOOKAHEAD_MS * 0.001 * OVERSAMPLE);
+		if (D >= BUFFER_SIZE) D = BUFFER_SIZE - 1;       // Safety clamp
 
 		//ta = this->toExp10(taKnob,  ATTACK_LOW_MS, ATTACK_HIGH_MS);
 		tap = this->toExp10(tapKnob, ATTACK_LIMITER_LOW_MS, ATTACK_LIMITER_HIGH_MS);

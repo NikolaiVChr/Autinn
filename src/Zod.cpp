@@ -41,6 +41,7 @@
 #define KNEE_MAX_DB                      10.0
 #define KNEE_DEFAULT_DB                   5.0
 #define MAKEUP_GAIN_MAX                  10.0//20dB
+#define LOOKAHEAD_MS                     10.0
 
 struct Zod : Module {
 	enum ParamIds {
@@ -327,7 +328,8 @@ void Zod::process(const ProcessArgs &args) {
 	if (taKnob != params[ATTACK_PARAM].getValue() || tapKnob != params[ATTACK_PEAK_PARAM].getValue() || trKnob != params[RELEASE_PARAM].getValue() || erKnob != params[RATIO_EXPANDER_PARAM].getValue() || crKnob != params[RATIO_COMPRESSOR_PARAM].getValue() || rate != args.sampleRate || tavKnob != params[AVERAGE_TIME_PARAM].getValue() || gainKnob != params[OUT_GAIN_PARAM].getValue()) {
 		rate = args.sampleRate;
 		tavKnob = params[AVERAGE_TIME_PARAM].getValue();
-		D   = (unsigned)(rate * tavKnob * 0.001 * OVERSAMPLE);
+
+		D   = (unsigned)(rate * LOOKAHEAD_MS * 0.001 * OVERSAMPLE);
 		// Safety clamp to prevent buffer overflow at high sample rates
 		if (D >= BUFFER_SIZE) D = BUFFER_SIZE - 1;
 
@@ -349,7 +351,11 @@ void Zod::process(const ProcessArgs &args) {
 		AT  = 1.0 - exp(-2.2 * TS / ta );
 		ATp = 1.0 - exp(-2.2 * TS / tap);
 
-		double t_M = TS * D;
+		// Calculate RMS Window (t_M) directly from the Knob.
+		// Now RMS is 350ms, but Lookahead is only 5ms.
+		double t_M = tavKnob;
+		// Prevent division by zero
+		if (t_M < 0.1) t_M = 0.1;
 		TAV = 1.0 - exp(-2.2 * TS / t_M);
 	}
 
