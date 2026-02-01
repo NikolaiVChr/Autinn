@@ -471,10 +471,10 @@ void Zod::process(const ProcessArgs &args) {
 	outputs[RIGHT_OUTPUT].setVoltage(outR);
 
 	// VU meters
-	vuMeterIn.process(args.sampleTime, leftInput * 0.2f);
-	vuMeterIn2.process(args.sampleTime, rightInput * 0.2f);
-	vuMeterOut.process(args.sampleTime, outL * 0.2f);
-	vuMeterOut2.process(args.sampleTime, outR * 0.2f);
+	vuMeterIn.process(args.sampleTime, leftInput * 0.1f);
+	vuMeterIn2.process(args.sampleTime, rightInput * 0.1f);
+	vuMeterOut.process(args.sampleTime, outL * 0.1f);
+	vuMeterOut2.process(args.sampleTime, outR * 0.1f);
 	for (int v = 0; step == 512 && v < 15; v++) {
 		float upper = -intervalDB * v;
 		float lower = -intervalDB * (v + 1.0f);
