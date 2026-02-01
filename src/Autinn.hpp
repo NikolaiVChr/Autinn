@@ -1,3 +1,4 @@
+#pragma once
 #include <rack.hpp>
 
 /*
@@ -218,7 +219,11 @@ static float non_lin_func(float parm) {
 	float b = 135135.0f + x2 * (62370.0f + x2 * (3150.0f + x2 * 28.0f));
 	return a / b;
 }
-float non_lin_func2(float parm);//sinh
+
+static float non_lin_func2(float parm) {
+	return parm + (parm * parm * parm) * 0.16666f;// only works from -1.0 to 1.0
+	//return 2.0f * (exp(parm)-exp(-parm));//sinh
+}
 float slew(float input, float input_prev, float maxChangePerSec, float dt);
 
 ////////////////////

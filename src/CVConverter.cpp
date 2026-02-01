@@ -62,15 +62,24 @@ void CVConverter::process(const ProcessArgs &args) {
 	// VCV Rack CV is +-5V or 0V-10V
 
 	if (outputs[TEN_OUTPUT].isConnected()) {
-		float in = inputs[FIVE_INPUT].getVoltage();
-		outputs[TEN_OUTPUT].setVoltage(this->range(in,-5.0f,5.0f,0.0f,10.0f));
+		int channels = std::max(1, inputs[FIVE_INPUT].getChannels());
+		outputs[TEN_OUTPUT].setChannels(channels);
+
+		for (int c = 0; c < channels; c++) {
+			float in = inputs[FIVE_INPUT].getPolyVoltage(c);
+			outputs[TEN_OUTPUT].setVoltage(this->range(in, -5.0f, 5.0f, 0.0f, 10.0f), c);
+		}
 	}
 
 	if (outputs[FIVE_OUTPUT].isConnected()) {
-		float in = inputs[TEN_INPUT].getVoltage();
-		outputs[FIVE_OUTPUT].setVoltage(this->range(in,0.0f,10.0f,-5.0f,5.0f));
+		int channels = std::max(1, inputs[TEN_INPUT].getChannels());
+		outputs[FIVE_OUTPUT].setChannels(channels);
+
+		for (int c = 0; c < channels; c++) {
+			float in = inputs[TEN_INPUT].getPolyVoltage(c);
+			outputs[FIVE_OUTPUT].setVoltage(this->range(in, 0.0f, 10.0f, -5.0f, 5.0f), c);
+		}
 	}
-	
 }
 
 struct CVConverterWidget : ModuleWidget {

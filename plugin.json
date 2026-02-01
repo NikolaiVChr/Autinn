@@ -46,7 +46,8 @@
       "name": "Conv",
       "description": "Converts to and from uni/bi CV voltages",
       "tags": [
-        "Utility"
+        "Utility",
+        "Polyphonic"
       ]
     },
     {
