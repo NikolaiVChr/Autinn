@@ -24,8 +24,8 @@
 // Converted to real-time C++ for VCV Rack from
 // algorithm by Alex Jilkin, who wrote a non-real-time python distortion program.
 
-static const int oversample2 = 2;
-static const int oversample4 = 4;
+static constexpr int oversample2 = 2;
+static constexpr int oversample4 = 4;
 
 #define SNORING_MAX 24.0f
 #define SNORING_MIN 1.0f
@@ -64,6 +64,13 @@ struct Nap : Module {
 		configLight(HIGH_LIGHT, "Heavy snoring.. ");
 		configLight(MID_LIGHT, "REM sleep.. ");
 		configLight(LOW_LIGHT, "Trying to fall asleep.. ");
+
+		for (int c = 0; c < 16; c++) {
+			upsampler2[c] = dsp::Upsampler<oversample2, 10>(0.9f);
+			decimator2[c] = dsp::Decimator<oversample2, 10>(0.9f);
+			upsampler4[c] = dsp::Upsampler<oversample4, 10>(0.9f);
+			decimator4[c] = dsp::Decimator<oversample4, 10>(0.9f);
+		}
 	}
 
 	float out_prev[16] = {0.1f};

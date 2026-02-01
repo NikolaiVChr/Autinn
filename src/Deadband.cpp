@@ -45,8 +45,8 @@ struct Deadband : Module {
 		NUM_LIGHTS
 	};
 	
-	dsp::Upsampler<oversample, 8> upsampler = dsp::Upsampler<oversample, 8>(0.9f);
-	dsp::Decimator<oversample, 8> decimator = dsp::Decimator<oversample, 8>(0.9f);
+	dsp::Upsampler<oversample, 8> upsampler[16];
+	dsp::Decimator<oversample, 8> decimator[16];
 
 	Deadband() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -59,6 +59,11 @@ struct Deadband : Module {
 		configInput(CV_GAP_INPUT, "Gap CV");
 		configInput(DEADBAND_INPUT, "");
 		configOutput(DEADBAND_OUTPUT, "");
+
+		for (int c = 0; c < 16; c++) {
+			upsampler[c] = dsp::Upsampler<oversample, 8>(0.9f);
+			decimator[c] = dsp::Decimator<oversample, 8>(0.9f);
+		}
 	}
 
 	void process(const ProcessArgs &args) override;
@@ -71,34 +76,45 @@ void Deadband::process(const ProcessArgs &args) {
 	if (!outputs[DEADBAND_OUTPUT].isConnected()) {
 		return;
 	}
-	float input = inputs[DEADBAND_INPUT].getVoltage();
-	float width = clamp(params[WIDTH_PARAM].getValue()+params[CV_PARAM].getValue()*inputs[CV_INPUT].getVoltage(),0.0f,5.0f);
-	float gap = clamp(params[GAP_PARAM].getValue()-params[CV_GAP_PARAM].getValue()*inputs[CV_GAP_INPUT].getVoltage(),0.0f,1.0f);
-	
-	/*if (width == 0.0f) {
-		outputs[DEADBAND_OUTPUT].setVoltage(input);
-		return;
-	}*/
-	
-	float inBuf   [oversample];
-	float outBuf  [oversample];
-	
-	upsampler.process(input, inBuf);
-	
-	for (int i = 0; i < oversample; i++) {
-		float unlimit = inBuf[i];
-		float limit   = 0.0f;
-		if (width == 0.0f) {
-			// width of zero should mean bypass
-			limit = unlimit;
-		} else if (unlimit > width) {
-			limit = unlimit-width*gap;
-		} else if (unlimit < -width) {
-			limit = unlimit+width*gap;
+
+	int channels = std::max(1, inputs[DEADBAND_INPUT].getChannels());
+	outputs[DEADBAND_OUTPUT].setChannels(channels);
+
+	int widthCVChannels = inputs[CV_INPUT].getChannels();
+	int gapCVChannels = inputs[CV_GAP_INPUT].getChannels();
+
+	for (int c = 0; c < channels; c++) {
+		float input = inputs[DEADBAND_INPUT].getPolyVoltage(c);
+
+		// If CV has 1 channel, use index 0 for everyone.
+		// If CV has multiple channels, use index 'c'.
+		float modWidth = (widthCVChannels == 1) ? inputs[CV_INPUT].getVoltage() : inputs[CV_INPUT].getPolyVoltage(c);
+		float modGap   = (gapCVChannels == 1)   ? inputs[CV_GAP_INPUT].getVoltage() : inputs[CV_GAP_INPUT].getPolyVoltage(c);
+
+		float width = clamp(params[WIDTH_PARAM].getValue() + params[CV_PARAM].getValue() * modWidth, 0.0f, 5.0f);
+		float gap   = clamp(params[GAP_PARAM].getValue() - params[CV_GAP_PARAM].getValue() * modGap, 0.0f, 1.0f);
+
+		float inBuf[oversample];
+		float outBuf[oversample];
+
+		upsampler[c].process(input, inBuf);
+
+		for (int i = 0; i < oversample; i++) {
+			float unlimit = inBuf[i];
+			float limit   = 0.0f;
+
+			if (width == 0.0f) {
+				// width of zero means bypass
+				limit = unlimit;
+			} else if (unlimit > width) {
+				limit = unlimit - width * gap;
+			} else if (unlimit < -width) {
+				limit = unlimit + width * gap;
+			}
+			outBuf[i] = limit;
 		}
-		outBuf[i] = limit;
+		outputs[DEADBAND_OUTPUT].setVoltage(decimator[c].process(outBuf), c);
 	}
-    outputs[DEADBAND_OUTPUT].setVoltage(decimator.process(outBuf));;
 }
 
 struct DeadbandWidget : ModuleWidget {

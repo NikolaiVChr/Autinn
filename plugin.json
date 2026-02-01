@@ -56,7 +56,8 @@
       "description": "Constrain low voltages to zero",
       "tags": [
         "Voltage-controlled amplifier",
-        "Attenuator"
+        "Attenuator",
+        "Polyphonic"
       ]
     },
     {
