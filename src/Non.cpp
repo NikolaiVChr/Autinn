@@ -20,7 +20,7 @@
 
 **/
 
-#define HYSTERESIS_TIME_SEC               0.0003
+#define HYSTERESIS_TIME_SEC               0.001
 //#define THRESHOLD_DEFAULT_NOISEGATE_DB  -70.0
 //#define THRESHOLD_DEFAULT_EXPANDER_DB   -60.0
 //#define THRESHOLD_DEFAULT_COMPRESSOR_DB  -6.0
@@ -95,6 +95,7 @@ struct Non : Module {
 	double f_prev = 0.0;
 	double peak_prev = 0.0;
 	//double rms2_prev = 0.0;
+	unsigned hysteresis = 0;
 	bool attack = true;
 	bool limiter = false;
 
@@ -372,7 +373,7 @@ void Non::process(const ProcessArgs &args) {
 		//TAV = 1.0 - exp(-2.2 * TS / t_M);
 	}
 
-	unsigned hyst_max = HYSTERESIS_TIME_SEC / args.sampleTime;
+	unsigned hyst_max = (unsigned)((HYSTERESIS_TIME_SEC / args.sampleTime) * OVERSAMPLE);
 	//unsigned hyst_max_attack = tapKnob / args.sampleTime;
 
 	// inputs:
@@ -388,7 +389,7 @@ void Non::process(const ProcessArgs &args) {
 	upsampler[0].process(leftInput, inBufL);
 	upsampler[1].process(rightInput, inBufR);
 
-	// 2. Oversampled Loop
+	// Oversampled Loop
 	for (int i = 0; i < OVERSAMPLE; i++) {
 		float left = inBufL[i];
 		float right = inBufR[i];
@@ -421,42 +422,33 @@ void Non::process(const ProcessArgs &args) {
 		// static curve:
 		double f = this->staticCurve(peak, LT, LS);
 
-		// Detect raw peaks immediately from the Lookahead Input (stereo)
-		double raw_peak = std::fabs(stereo);
-		double thresh_v = toVolt(LT); // Convert dB threshold to Volts
-		double predicted_output = raw_peak * makeupGain; // The volume AFTER makeup gain
-		if (predicted_output > thresh_v) {
-			// Calculate the exact gain needed to clamp this specific peak
-			double limit_f = thresh_v / predicted_output;
-
-			// If the Brickwall Limit demands lower gain than the Compressor, OBEY IT.
-			if (limit_f < f) {
-				f = limit_f;
-				limiter = true;
-				lights[E].value = 1.0f; // Turn on Limiter Light
-			}
+		double k = 0.0;
+		if (f >= g_prev && attack) {
+			// We are in attack and want release, hyst starts counting towards release
+			hysteresis += 1;
+		} else if (f >= g_prev && !attack) {
+			// We are in release and want to release even further, hyst not activating
+			hysteresis = 0;
+		} else if (f < g_prev && !attack) {
+			// We are in release and want attack, hyst starts counting towards attack
+			hysteresis += 1;
+		} else if (f < g_prev && attack) {
+			// We are in attack and want to keep that, hyst not activating
+			hysteresis = 0;
+		}
+		if (hysteresis > hyst_max) {
+			hysteresis = 0;
+			attack = !attack;
 		}
 
-		// smoothing filter:
-		double k = 0.0;
-
-		// Determine if we need to Attack (reduce gain) or Release (restore gain)
-		// We bypass Hysteresis if the Limiter is active to catch the peak instantly.
-		if (f < g_prev) {
-			attack = true;
-			if (limiter) {
-				// LIMITER MODE: Instant Attack (0ms)
-				// We must drop gain NOW to catch the peak in the lookahead buffer.
-				k = 1.0;
-			} else {
-				// COMPRESSOR MODE: Standard Attack
-				// Use the knob value (ATp) to smooth the gain reduction.
-				k = ATp;
-			}
+		if (attack) {
+			//if (limiter) {
+			k = ATp;
+			/*} else {
+				k = AT;
+			}*/
 		} else {
-			attack = false;
 			k = RT;
-			limiter = false; // Reset limiter flag when releasing
 		}
 
 		double g = this->smooth(k, g_prev, f);
@@ -611,7 +603,10 @@ double Non::smooth(double k, double g_prev, double f) {
 }
 
 double Non::toDB(double volt) {
-	return 20.0 * log10(volt / 5.0);
+	// Safety Check. Prevent log10(0) or log10(negative).
+	// 0.000001 is -134dB, which is effectively silence in 32-bit float.
+	double v = std::max(std::fabs(volt), 0.000001);
+	return 20.0 * log10(v / 5.0);
 }
 
 double Non::toGain(double dB) {

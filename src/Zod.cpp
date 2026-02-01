@@ -20,7 +20,7 @@
 
 **/
 
-#define HYSTERESIS_TIME_SEC               0.0003
+#define HYSTERESIS_TIME_SEC               0.001
 #define THRESHOLD_DEFAULT_NOISEGATE_DB  -70.0
 #define THRESHOLD_DEFAULT_EXPANDER_DB   -60.0
 #define THRESHOLD_DEFAULT_COMPRESSOR_DB  -6.0
@@ -94,6 +94,7 @@ struct Zod : Module {
 	double f_prev = 0.0;
 	double peak_prev = 0.0;
 	double rms2_prev = 0.0;
+	unsigned hysteresis = 0;
 	bool attack = true;
 	bool limiter = false;
 
@@ -352,7 +353,7 @@ void Zod::process(const ProcessArgs &args) {
 		TAV = 1.0 - exp(-2.2 * TS / t_M);
 	}
 
-	unsigned hyst_max = HYSTERESIS_TIME_SEC / args.sampleTime;
+	unsigned hyst_max = (unsigned)((HYSTERESIS_TIME_SEC / args.sampleTime) * OVERSAMPLE);
 
 	// inputs:
 	float leftInput  = inputs[LEFT_INPUT].getVoltage();
@@ -404,33 +405,25 @@ void Zod::process(const ProcessArgs &args) {
 		// level measurement:
 		double peak = this->peak(stereo, ATp, RT);
 		double rms  = this->rms(stereo);
-		double raw_peak = std::fabs(stereo);
 
 		// static curve:
-		double f = this->staticCurve(rms, raw_peak, LT, LS, CS, CT, CR, NT, ET, ES, ER, knee);
+		double f = this->staticCurve(rms, peak, LT, LS, CS, CT, CR, NT, ET, ES, ER, knee);
 
-		// smoothing filter:
-		double k = 0.0;
-		if (f < g_prev) {
-			// ATTACK PHASE (Gain is dropping)
-			attack = true;
-
-			if (limiter) {
-				// LIMITER: Instant Attack (Brickwall)
-				// We bypass the smoothing filter (k=1.0) to catch the peak in the Ring Buffer.
-				k = 1.0;
-			} else {
-				// COMPRESSOR/EXPANDER: Standard Attack
-				// Use the Attack knob values.
-				k = AT;
-			}
-		} else {
-			// RELEASE PHASE (Gain is returning to 1.0)
-			attack = false;
-			k = RT;
-			limiter = false; // Reset flag
+		if (f_prev - f > 0.0 && attack) {
+			hysteresis += 1;
+		} else if (f_prev - f > 0.0 && !attack) {
+			hysteresis = 0;
+		} else if (f_prev - f <= 0.0 && !attack) {
+			hysteresis += 1;
+		} else if (f_prev - f <= 0.0 && attack) {
+			hysteresis = 0;
+		}
+		if (hysteresis > hyst_max) {
+			hysteresis = 0;
+			attack = !attack;
 		}
 
+		double k = 0.0;
 		if (attack) {
 			if (limiter) {
 				k = ATp;
@@ -442,8 +435,6 @@ void Zod::process(const ProcessArgs &args) {
 		}
 
 		double g = this->smooth(k, g_prev, f);
-		g_prev = g;
-
 
 		// apply gain:
 		float processedL = pastL * g;
@@ -468,6 +459,7 @@ void Zod::process(const ProcessArgs &args) {
 		outBufR[i] = processedR;
 
 		f_prev = f;
+		g_prev = g;
 		peak_prev = peak;
 	}
 
@@ -519,7 +511,12 @@ double Zod::staticCurve(double rms, double peak, double LT, double LS, double CS
 	lights[E].value  = 0.0;
 	if (peak_dB > LT) {// hard knee:
 		// limiter
-		G = (peak_dB - LT) * (-LS) - CS * (LT - CT);
+		double comp_offset = 0.0;
+		if (LT > CT) {
+			comp_offset = -CS * (LT - CT);
+		}
+
+		G = (peak_dB - LT) * (-LS) + comp_offset;
 		lights[E].value = 1.0;
 		limiter = true;
 	} else {
@@ -559,6 +556,7 @@ double Zod::staticCurve(double rms, double peak, double LT, double LS, double CS
 }
 
 double Zod::rms(double x) {
+	// note that this method is missing sqrt(), thats on purpose, we do that outside it.
 	double rms2 = (1.0 - TAV) * rms2_prev + TAV * x * x;
 	rms2_prev = rms2;
 	return rms2;
@@ -577,7 +575,10 @@ double Zod::smooth(double k, double g_prev, double f) {
 }
 
 double Zod::toDB(double volt) {
-	return 20.0 * log10(volt / 5.0);
+	// Safety Check. Prevent log10(0) or log10(negative).
+	// 0.000001 is -134dB, which is effectively silence in 32-bit float.
+	double v = std::max(std::fabs(volt), 0.000001);
+	return 20.0 * log10(v / 5.0);
 }
 
 double Zod::toGain(double dB) {
