@@ -43,7 +43,7 @@ struct Disee : Module {
 	const int SIZE = 12500;// fixed for now.
     int head = 0;
     float runningDC = 0.0f;
-	float dcFilter = 0.0f;
+	float dcFilter[16] = {};
 
 	Disee() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -64,31 +64,36 @@ void Disee::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 
-	float in = inputs[AC_INPUT].getVoltage();
+	int channels = std::max(1, inputs[AC_INPUT].getChannels());
+	outputs[DC_OUTPUT].setChannels(channels);
 
 	// Calculate a coefficient for a Lowpass filter
 	// averages the signal over ~1 second
 	float cutoffFreq = 1.0f;
 	float lambda = 2.0f * M_PI * cutoffFreq * args.sampleTime;
 
-	// One-Pole Filter
-	dcFilter += (in - dcFilter) * lambda;
+	for (int c = 0; c < channels; c++) {
+		// One-Pole Filter
+		dcFilter[c] += (inputs[AC_INPUT].getPolyVoltage(c) - dcFilter[c]) * lambda;
 
-	outputs[DC_OUTPUT].setVoltage(clamp(dcFilter, -10.0f, 10.0f));
+		outputs[DC_OUTPUT].setVoltage(clamp(dcFilter[c], -10.0f, 10.0f));
 
-	// Update lights based on the filtered DC value
-	if (std::abs(dcFilter) < 0.05f) {
-		lights[DC_GREEN_LIGHT].value = 1.0f;
-		lights[DC_RED_LIGHT].value = 0.0f;
-		lights[DC_BLUE_LIGHT].value = 0.0f;
-	} else if (dcFilter < 0.0f) {
-		lights[DC_GREEN_LIGHT].value = 0.0f;
-		lights[DC_RED_LIGHT].value = 0.0f;
-		lights[DC_BLUE_LIGHT].value = clamp(-dcFilter, 0.25f, 1.0f);
-	} else {
-		lights[DC_GREEN_LIGHT].value = 0.0f;
-		lights[DC_RED_LIGHT].value = clamp(dcFilter, 0.25f, 1.0f);
-		lights[DC_BLUE_LIGHT].value = 0.0f;
+		if (c == 0) {
+			// Update lights based on the filtered DC value
+			if (std::abs(dcFilter[c]) < 0.05f) {
+				lights[DC_GREEN_LIGHT].value = 1.0f;
+				lights[DC_RED_LIGHT].value = 0.0f;
+				lights[DC_BLUE_LIGHT].value = 0.0f;
+			} else if (dcFilter[c] < 0.0f) {
+				lights[DC_GREEN_LIGHT].value = 0.0f;
+				lights[DC_RED_LIGHT].value = 0.0f;
+				lights[DC_BLUE_LIGHT].value = clamp(-dcFilter[c], 0.25f, 1.0f);
+			} else {
+				lights[DC_GREEN_LIGHT].value = 0.0f;
+				lights[DC_RED_LIGHT].value = clamp(dcFilter[c], 0.25f, 1.0f);
+				lights[DC_BLUE_LIGHT].value = 0.0f;
+			}
+		}
 	}
 }
 
