@@ -73,10 +73,7 @@ struct Mixer6 : Module {
 	dsp::BiquadFilter highS[num_mono_channels];
 
 	
-
-	//const float Gd = 3.0f;
-	const float Pm = 15.0f;
-	const float Qp = 0.707107f;
+	const float Qp = 0.8f;
 	const float Qs = 0.707107f;
 	const float c1 = 250.0f;
 	const float c2 = 700.0f;
@@ -107,9 +104,9 @@ struct Mixer6 : Module {
 
 		for (int ch = 0; ch < num_mono_channels; ch++) {
 			configInput(INPUT+ch, "Channel "+std::to_string(ch+1)+" Audio");
-			configParam(HIGH_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ High", " dB", -10.0f, 20.0f, 0);
-			configParam(MID_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", -10.0f, 20.0f, 0);
-			configParam(LOW_PARAM+ch, 0, 2, 1, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", -10.0f, 20.0f, 0);
+			configParam(HIGH_PARAM+ch, 0.25f, 4.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ High", " dB", -10.0f, 20.0f, 0);
+			configParam(MID_PARAM+ch, 0.25f, 4.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", -10.0f, 20.0f, 0);
+			configParam(LOW_PARAM+ch, 0.25f, 4.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", -10.0f, 20.0f, 0);
 			configParam(FX_A_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX A Send", " dB", -10, 20);
 			configParam(FX_B_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX B Send", " dB", -10, 20);
 			configParam(CHANNEL_LEVEL_PARAM+ch, 0.0f, 2.0f, 1.0f, "Channel "+std::to_string(ch+1)+" Level", " dB", -10, 20);
@@ -207,9 +204,6 @@ void Mixer6::process(const ProcessArgs &args) {
 		float low    = params[LOW_PARAM+ch].getValue();
 		float mid    = params[MID_PARAM+ch].getValue();
 		float high   = params[HIGH_PARAM+ch].getValue();
-		low = std::max(0.01f, low);
-		mid = std::max(0.01f, mid);
-		high = std::max(0.01f, high);
 
 		// Update Coefficients (Only if changed)
 		if (low != low_prev[ch] || mid != mid_prev[ch] || high != high_prev[ch] || rate != rate_prev) {
@@ -224,21 +218,21 @@ void Mixer6::process(const ProcessArgs &args) {
 
 		// --- (Daisy Chain) ---
 
-		// 1. Apply Low Shelf
+		// Apply Low Shelf
 		float stage1 = lowS[ch].process(in);
 		if (!std::isfinite(stage1)) {
 			lowS[ch].reset();
 			stage1 = in; // Passthrough on crash
 		}
 
-		// 2. Apply Mid Peak (to the output of Low)
+		// Apply Mid Peak (to the output of Low)
 		float stage2 = midP[ch].process(stage1);
 		if (!std::isfinite(stage2)) {
 			midP[ch].reset();
 			stage2 = stage1;
 		}
 
-		// 3. Apply High Shelf (to the output of Mid)
+		// Apply High Shelf (to the output of Mid)
 		float out = highS[ch].process(stage2);
 		if (!std::isfinite(out)) {
 			highS[ch].reset();
@@ -289,7 +283,7 @@ void Mixer6::process(const ProcessArgs &args) {
 		lights[VU_OUT_LEFT_LIGHT + 14 - v].setBrightness(vuMeterOut.getBrightness(-intervalDB_main * (v + 1), -intervalDB_main * v));
 		lights[VU_OUT_RIGHT_LIGHT + 14 - v].setBrightness(vuMeterOut2.getBrightness(-intervalDB_main * (v + 1), -intervalDB_main * v));
 	}
-	if (step == 512) {
+	if (step >= 512) {
 		step = 0;
 	}
 }

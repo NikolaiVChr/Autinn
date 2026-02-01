@@ -180,7 +180,8 @@
       "name": "Imp",
       "description": "Simple Triple Band Equalizer",
       "tags": [
-        "Equalizer"
+        "Equalizer",
+        "Polyphonic"
       ]
     },
     {

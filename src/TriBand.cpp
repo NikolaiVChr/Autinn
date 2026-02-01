@@ -40,28 +40,26 @@ struct TriBand : Module {
 		NUM_LIGHTS
 	};
 
-	dsp::BiquadFilter lowS;
-	dsp::BiquadFilter midP;
-	dsp::BiquadFilter highS;
+	dsp::BiquadFilter lowS[16];
+	dsp::BiquadFilter midP[16];
+	dsp::BiquadFilter highS[16];
 
-	const float Gd = 30.0f;
-	const float Pm = 0.30f;
-	const float Qp = 0.40f;
-	const float Qs = 0.707107f;
-	const float c1 = 250.0f;
-	const float c2 = 700.0f;
-	const float c3 = 2000.0f;
+	const float Qp = 0.8f;
+	const float Qs = 0.707107f; // Butterworth Q for shelves
+	const float c1 = 250.0f;    // Low
+	const float c2 = 700.0f;    // Mid
+	const float c3 = 2000.0f;   // High
 
-	float low_prev = -1;
-	float mid_prev = -1;
-	float high_prev = -1;
-	float rate_prev = -1;
+	float low_prev = -1.0f;
+	float mid_prev = -1.0f;
+	float high_prev = -1.0f;
+	float rate_prev = -1.0f;
 
 	TriBand() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(TriBand::LOW_PARAM, 0.5f, 100.0f*Pm, 100.0f*Pm, "Low", " dB", 0.0f, 1.0f, -100.0f*Pm);
-		configParam(TriBand::MID_PARAM, 0.5f, 100.0f*Pm, 100.0f*Pm, "Mid", " dB", 0.0f, 1.0f, -100.0f*Pm);
-		configParam(TriBand::HIGH_PARAM, 0.5f, 100.0f*Pm, 100.0f*Pm, "High", " dB", 0.0f, 1.0f, -100.0f*Pm);
+		configParam(TriBand::LOW_PARAM, 0.25f, 4.0f, 1.0f, "Low", " dB", -10.0f, 20.0f, 0);
+		configParam(TriBand::MID_PARAM, 0.25f, 4.0f, 1.0f, "Mid", " dB", -10.0f, 20.0f, 0);
+		configParam(TriBand::HIGH_PARAM, 0.25f, 4.0f, 1.0f, "High", " dB", -10.0f, 20.0f, 0);
 		configBypass(TRIBAND_INPUT, TRIBAND_OUTPUT);
 		configInput(TRIBAND_INPUT, "Audio");
 		configOutput(TRIBAND_OUTPUT, "Audio");
@@ -77,34 +75,44 @@ void TriBand::process(const ProcessArgs &args) {
 	if (!outputs[TRIBAND_OUTPUT].isConnected()) {
 		return;
 	}
-	float in = inputs[TRIBAND_INPUT].getVoltage();
-	float low    = params[LOW_PARAM].getValue();
-	float mid    = params[MID_PARAM].getValue();
-	float high   = params[HIGH_PARAM].getValue();
-	float rate   = args.sampleRate;
-	float out1;
-	float out2;
-	float out3;
+
+	float low  = params[LOW_PARAM].getValue();
+	float mid  = params[MID_PARAM].getValue();
+	float high = params[HIGH_PARAM].getValue();
+	float rate = args.sampleRate;
 
 	if (low != low_prev || mid != mid_prev || high != high_prev || rate != rate_prev) {
-		lowS.setParameters(lowS.LOWSHELF, c1/rate, Qs, low);
-		midP.setParameters(midP.PEAK, c2/rate, Qp, mid);
-		highS.setParameters(highS.HIGHSHELF, c3/rate, Qs, high);
+		for (int c = 0; c < 16; c++) {
+			lowS[c].setParameters(dsp::BiquadFilter::LOWSHELF, c1 / rate, Qs, low);
+			midP[c].setParameters(dsp::BiquadFilter::PEAK,     c2 / rate, Qp, mid);
+			highS[c].setParameters(dsp::BiquadFilter::HIGHSHELF, c3 / rate, Qs, high);
+		}
+		low_prev = low;
+		mid_prev = mid;
+		high_prev = high;
+		rate_prev = rate;
 	}
-	out1 = lowS.process(in);
-	out2 = midP.process(in);
-	out3 = highS.process(in);
-	if(!std::isfinite(out1) || !std::isfinite(out2) || !std::isfinite(out3)) {
-		out1 = 0.0f;
-		out2 = 0.0f;
-		out3 = 0.0f;
-	}
-	outputs[TRIBAND_OUTPUT].setVoltage((out1+out2+out3)/Gd);
 
-	low_prev = low;
-	mid_prev = mid;
-	high_prev = high;
-	rate_prev = rate;
+	int channels = std::max(1, inputs[TRIBAND_INPUT].getChannels());
+	outputs[TRIBAND_OUTPUT].setChannels(channels);
+
+	for (int c = 0; c < channels; c++) {
+		float sample = inputs[TRIBAND_INPUT].getPolyVoltage(c);
+
+		// Input -> LowShelf -> Peak -> HighShelf -> Output
+		sample = lowS[c].process(sample);
+		sample = midP[c].process(sample);
+		sample = highS[c].process(sample);
+
+		if (!std::isfinite(sample)) {
+			sample = 0.0f;
+			lowS[c].reset();
+			midP[c].reset();
+			highS[c].reset();
+		}
+
+		outputs[TRIBAND_OUTPUT].setVoltage(sample, c);
+	}
 }
 
 struct TriBandWidget : ModuleWidget {
