@@ -57,20 +57,31 @@ jobs:
             update: false
             install: git make tar unzip zip mingw-w64-x86_64-gcc libtool mingw-w64-x86_64-jq zstd
             #install: git make tar unzip zip mingw-w64-x86_64-gcc mingw-w64-x86_64-gdb mingw-w64-x86_64-cmake autoconf automake libtool mingw-w64-x86_64-jq python zstd mingw-w64-x86_64-pkgconf
-
-      - name: Get Rack-SDK Win
-        if: runner.os == 'Windows'
+      # Try to get SDK from GitHub's internal cache
+      - name: Cache Rack SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: Rack-SDK
+          # The key includes the version AND the OS, so each platform gets its own cache
+          key: rack-sdk-${{ env.rack-sdk-version }}-${{ matrix.config.postfix }}
+      # Download ONLY if cache missed (cache-hit is not 'true')
+      - name: Download Rack-SDK (Windows)
+        if: runner.os == 'Windows' && steps.cache-sdk.outputs.cache-hit != 'true'
         shell: 'msys2 {0}'
         run: |
           curl -o Rack-SDK.zip https://vcvrack.com/downloads/Rack-SDK-${{ env.rack-sdk-version }}-${{ matrix.config.postfix }}.zip
           unzip Rack-SDK.zip
-      - name: Get Rack-SDK Non-win
-        if: runner.os != 'Windows' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/'))
+      - name: Download Rack-SDK (Non-Windows)
+        # Check condition: Not Windows, Cache Missed, AND (Push or Tag or Dispatch)
+        if: runner.os != 'Windows' && steps.cache-sdk.outputs.cache-hit != 'true' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/'))
         shell: 'bash'
         run: |
           pushd $HOME
           curl -o Rack-SDK.zip https://vcvrack.com/downloads/Rack-SDK-${{ env.rack-sdk-version }}-${{ matrix.config.postfix }}.zip
           unzip Rack-SDK.zip
+          # Move it to expected folder if unzip creates a nested dir, or ensure it sits where cache expects it
+          # usually unzip creates "Rack-SDK" folder in current dir.
       - name: Patch plugin.mk, use 7zip on Windows
         if: runner.os == 'Windows2'
         run: |
