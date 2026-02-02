@@ -261,18 +261,18 @@ struct CoilWidget : ModuleWidget {
 
         float down = 50;
         float div3 = 10.0f * RACK_GRID_WIDTH * 0.25f;
-        float hp = RACK_GRID_WIDTH;
+        float hp = RACK_GRID_WIDTH*0.5f;
 
         // --- Knobs ---
         // Row 1: Exciter
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3-hp, 40+down), module, Coil::DRIVE_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*2, 40+down), module, Coil::FEEDBACK_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*3+hp, 40+down), module, Coil::MIX_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3-hp, 40+down), module, Coil::DRIVE_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*2, 40+down), module, Coil::FEEDBACK_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*3+hp, 40+down), module, Coil::MIX_PARAM));
 
         // Row 2: Physics
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3-hp, 100+down), module, Coil::TENSION_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*2, 100+down), module, Coil::INERTIA_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*3+hp, 100+down), module, Coil::DAMP_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3-hp, 100+down), module, Coil::TENSION_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*2, 100+down), module, Coil::INERTIA_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*3+hp, 100+down), module, Coil::DAMP_PARAM));
 
         // Row 3: CVs
         addInput(createInputCentered<InPortAutinn>(Vec(div3*1, 160+down), module, Coil::DRIVE_CV));
