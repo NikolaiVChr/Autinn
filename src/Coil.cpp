@@ -1,5 +1,9 @@
 #include "Autinn.hpp"
 
+
+float FREQ_MAX = 10000.0f;
+float FREQ_MIN = 100.0f;
+
 // 1st Order All-Pass Filter for Dispersion
 struct AllPassFilter {
     float x1 = 0.f; // Previous input
@@ -147,7 +151,7 @@ struct Coil : Module {
 
         configParam(TENSION_PARAM, 0.1f, 0.9f, 0.4f, "Tension", "");
         configParam(INERTIA_PARAM, 20.f, 80.f, 50.f, "Inertia", " ms");
-        configParam(DAMP_PARAM, 100.f, 10000.f, 3000.f, "Damp", " Hz", -10,1,0);
+        configParam(DAMP_PARAM, 100.f, 10000.f, 3000.f, "Damp", " Hz", FREQ_MAX/FREQ_MIN, FREQ_MIN);
 
         configInput(DRIVE_CV, "Drive CV");
         configInput(FEEDBACK_CV, "Feedback CV");
@@ -167,6 +171,13 @@ struct Coil : Module {
         tankR.init(-0.02f, 0.03f);
     }
 
+    static const float LOG_FREQ_RANGE = float(log(FREQ_MAX/FREQ_MIN));
+
+    static float toExp(float x) {
+        // 0 to 1 to exp range
+        return FREQ_MIN * exp( x*LOG_FREQ_RANGE );
+    }
+
     void process(const ProcessArgs& args) override {
         float drive = params[DRIVE_PARAM].getValue() + (inputs[DRIVE_CV].getVoltage() / 5.f);
         drive = clamp(drive, 0.f, 3.f);
@@ -184,8 +195,8 @@ struct Coil : Module {
         inertiaMS = clamp(inertiaMS, 10.f, 150.f); // Allow wider range via CV
         float inertiaSeconds = inertiaMS / 1000.0f;
 
-        float dampFreq = params[DAMP_PARAM].getValue() + (inputs[DAMP_CV].getVoltage() * 1000.f);
-        dampFreq = clamp(dampFreq, 20.f, 20000.f);
+        float cv_damp =  powf(2.0f, inputs[DAMP_CV].getVoltage());
+        float dampFreq = clamp(this->toExp(params[DAMP_PARAM].getValue())*cv_damp, 20.f, 20000.f);
 
         // --- 2. Audio Input Processing ---
         float inL = inputs[SIGNAL_LEFT_INPUT].getVoltage();
