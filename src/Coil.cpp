@@ -37,7 +37,7 @@ struct SpringTank {
     
     // Components
     dsp::RCFilter damper;
-    AllPassFilter ap1, ap2, ap3, ap4, ap5, ap6; // 6 stages of dispersion
+    AllPassFilter ap1, ap2, ap3, ap4, ap5, ap6, ap7, ap8, ap9, ap10, ap11, ap12; // stages of dispersion
     
     // Physical Variance (Randomness for Stereo Width)
     float tensionOffset = 0.f;
@@ -65,13 +65,18 @@ struct SpringTank {
 
         // Apply Dispersion (All-Pass Chain)
         // Modulating this changes the "tightness" and creates pitch shifts
-        float t = clamp(tension + tensionOffset, 0.05f, 0.9f); 
+        float t = clamp(tension + tensionOffset, 0.05f, 0.95f);
         ap1.setTension(t);
         ap2.setTension(t);
         ap3.setTension(t);
         ap4.setTension(t);
         ap5.setTension(t);
-        ap6.setTension(t);
+        ap7.setTension(t);
+        ap8.setTension(t);
+        ap9.setTension(t);
+        ap10.setTension(t);
+        ap11.setTension(t);
+        ap12.setTension(t);
 
         float dispersed = ap1.process(delayOut);
         dispersed = ap2.process(dispersed);
@@ -79,6 +84,12 @@ struct SpringTank {
         dispersed = ap4.process(dispersed);
         dispersed = ap5.process(dispersed);
         dispersed = ap6.process(dispersed);
+        dispersed = ap7.process(dispersed);
+        dispersed = ap8.process(dispersed);
+        dispersed = ap9.process(dispersed);
+        dispersed = ap10.process(dispersed);
+        dispersed = ap11.process(dispersed);
+        dispersed = ap12.process(dispersed);
 
         // Apply Damping (Loss of high freq over time)
         damper.setCutoffFreq(dampFreq / sampleRate);
@@ -147,7 +158,7 @@ struct Coil : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         
         configParam(DRIVE_PARAM, 0.f, 2.f, 1.f, "Drive");
-        configParam(FEEDBACK_PARAM, 0.f, 1.2f, 0.7f, "Reflection"); // Goes > 1.0 for self oscillation
+        configParam(FEEDBACK_PARAM, 0.f, 1.2f, 0.85f, "Reflection"); // Goes > 1.0 for self oscillation
         configParam(MIX_PARAM, 0.f, 1.f, 1.f, "Mix");
 
         configParam(TENSION_PARAM, 0.1f, 0.95f, 0.4f, "Tension", "");
@@ -181,6 +192,9 @@ struct Coil : Module {
     }
 
     void process(const ProcessArgs& args) override {
+        // VCV Rack audio rate is +-5V
+        // VCV Rack CV is +-5V or 0V-10V
+
         if (!outputs[SIGNAL_RIGHT_OUTPUT].isConnected() && !outputs[SIGNAL_LEFT_OUTPUT].isConnected()) {
             return;
         }
@@ -188,20 +202,20 @@ struct Coil : Module {
             return;
         }
 
-        float drive = params[DRIVE_PARAM].getValue() + (inputs[DRIVE_CV].getVoltage() / 5.f);
+        float drive = params[DRIVE_PARAM].getValue() + (inputs[DRIVE_CV].getVoltage() * 0.3f);
         drive = clamp(drive, 0.f, 3.f);
 
-        float feedback = params[FEEDBACK_PARAM].getValue() + (inputs[FEEDBACK_CV].getVoltage() / 5.f);
-        feedback = clamp(feedback, 0.f, 1.5f);
+        float feedback = params[FEEDBACK_PARAM].getValue() + (inputs[FEEDBACK_CV].getVoltage() * 0.12f);
+        feedback = clamp(feedback, 0.f, 1.2f);
 
-        float mix = params[MIX_PARAM].getValue() + (inputs[MIX_CV].getVoltage() / 5.f);
+        float mix = params[MIX_PARAM].getValue() + (inputs[MIX_CV].getVoltage() * 0.1f);
         mix = clamp(mix, 0.f, 1.f);
 
-        float tension = params[TENSION_PARAM].getValue() + (inputs[TENSION_CV].getVoltage() / 10.f);
-        tension = clamp(tension, 0.05f, 0.9f);
+        float tension = params[TENSION_PARAM].getValue() + (inputs[TENSION_CV].getVoltage() * 0.1f);
+        tension = clamp(tension, 0.05f, 0.95f);
 
-        float inertiaMS = params[INERTIA_PARAM].getValue() + (inputs[INERTIA_CV].getVoltage() * 10.f);
-        inertiaMS = clamp(inertiaMS, 10.f, 150.f); // Allow wider range via CV
+        float inertiaMS = params[INERTIA_PARAM].getValue() + (inputs[INERTIA_CV].getVoltage() * 14.f);
+        inertiaMS = clamp(inertiaMS, 10.f, 150.f); // Allow a wider range via CV
         float inertiaSeconds = inertiaMS / 1000.0f;
 
         float cv_damp =  powf(2.0f, inputs[DAMP_CV].getVoltage());
