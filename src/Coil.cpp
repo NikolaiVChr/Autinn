@@ -152,7 +152,7 @@ struct Coil : Module {
 
         configParam(TENSION_PARAM, 0.1f, 0.9f, 0.4f, "Tension", "");
         configParam(INERTIA_PARAM, 20.f, 80.f, 50.f, "Inertia", " ms");
-        configParam(DAMP_PARAM, 100.f, 10000.f, 3000.f, "Damp", " Hz", FREQ_MAX/FREQ_MIN, FREQ_MIN);
+        configParam(DAMP_PARAM, 0.f, 1.f, 0.5f, "Damp", " Hz", FREQ_MAX/FREQ_MIN, FREQ_MIN);
 
         configInput(DRIVE_CV, "Drive CV");
         configInput(FEEDBACK_CV, "Feedback CV");
