@@ -289,8 +289,8 @@ struct CoilWidget : ModuleWidget {
         //addInput(createInputCentered<PJ301MPort>(Vec(90, 250), module, Coil::PLUCK_INPUT));
         //addChild(createLightCentered<MediumLight<RedLight>>(Vec(115, 240), module, Coil::PLUCK_LIGHT)); // Light next to trigger
 
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(141.2-55, 330), module, Coil::SIGNAL_LEFT_OUTPUT));
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(141.2-20, 330), module, Coil::SIGNAL_RIGHT_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(10.0f * RACK_GRID_WIDTH-55, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_LEFT_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(10.0f * RACK_GRID_WIDTH-20, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_RIGHT_OUTPUT));
     }
 };
 
