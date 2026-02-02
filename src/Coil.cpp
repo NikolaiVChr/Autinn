@@ -260,27 +260,27 @@ struct CoilWidget : ModuleWidget {
         addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         float down = 50;
-        float div = 141.2 * 0.25f;
+        float div3 = 10.0f * RACK_GRID_WIDTH * 0.25f;
 
         // --- Knobs ---
         // Row 1: Exciter
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div, 40+down), module, Coil::DRIVE_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div*2, 40+down), module, Coil::FEEDBACK_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div*3, 40+down), module, Coil::MIX_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3, 40+down), module, Coil::DRIVE_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*2, 40+down), module, Coil::FEEDBACK_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*3, 40+down), module, Coil::MIX_PARAM));
 
         // Row 2: Physics
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div, 100+down), module, Coil::TENSION_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div*2, 100+down), module, Coil::INERTIA_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div*3, 100+down), module, Coil::DAMP_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3, 100+down), module, Coil::TENSION_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*2, 100+down), module, Coil::INERTIA_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*3, 100+down), module, Coil::DAMP_PARAM));
 
         // Row 3: CVs
-        addInput(createInputCentered<InPortAutinn>(Vec(div*1, 160+down), module, Coil::DRIVE_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div*2, 160+down), module, Coil::FEEDBACK_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div*3, 160+down), module, Coil::MIX_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*1, 160+down), module, Coil::DRIVE_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*2, 160+down), module, Coil::FEEDBACK_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*3, 160+down), module, Coil::MIX_CV));
         
-        addInput(createInputCentered<InPortAutinn>(Vec(div*1, 195+down), module, Coil::TENSION_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div*2, 195+down), module, Coil::INERTIA_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div*3, 195+down), module, Coil::DAMP_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*1, 195+down), module, Coil::TENSION_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*2, 195+down), module, Coil::INERTIA_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*3, 195+down), module, Coil::DAMP_CV));
 
         // Row 4: Audio IO & Pluck
         addInput(createInputCentered<InPortAutinn>(Vec(20, 330), module, Coil::SIGNAL_LEFT_INPUT));
