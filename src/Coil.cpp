@@ -172,7 +172,7 @@ struct Coil : Module {
         configInput(MIX_CV, "Mix CV");
         configInput(TENSION_CV, "Tension CV");
         configInput(INERTIA_CV, "Inertia CV");
-        configInput(DAMP_CV, "Damp CV");
+        configInput(DAMP_CV, "1V/Oct Damp CV");
 
         configInput(SIGNAL_LEFT_INPUT, "Left");
         configInput(SIGNAL_RIGHT_INPUT, "Right");

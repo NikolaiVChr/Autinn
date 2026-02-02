@@ -93,6 +93,10 @@ struct Chord : Module {
 		for (int light = 0; light < NUM_CHORDS; light++) {
 			configLight(CHORD_LIGHT+light, chordNames[light]);
 		}
+
+		for (int i = 0; i < NUM_CHORDS; i++) {
+			lights[CHORD_LIGHT + i].setBrightness(i == chordIndex ? 1.0f : 0.0f);
+		}
 	}
 
 	json_t *dataToJson() override {
@@ -105,6 +109,9 @@ struct Chord : Module {
 		json_t *ext3 = json_object_get(rootJ, "chordIndex");
 		if (ext3) {
 			chordIndex = clamp(json_integer_value(ext3), 0, NUM_CHORDS - 1);
+			for (int i = 0; i < NUM_CHORDS; i++) {
+				lights[CHORD_LIGHT + i].setBrightness(i == chordIndex ? 1.0f : 0.0f);
+			}
 		}
 	}
 
@@ -127,7 +134,7 @@ void Chord::process(const ProcessArgs &args) {
 		chordIndex = (int)(random::uniform() * NUM_CHORDS);
 		if (chordIndex >= NUM_CHORDS) chordIndex = NUM_CHORDS - 1;
 
-		// Optimization: Only update lights when the chord actually changes
+		// Only update lights when the chord actually changes
 		for (int i = 0; i < NUM_CHORDS; i++) {
 			lights[CHORD_LIGHT + i].setBrightness(i == chordIndex ? 1.0f : 0.0f);
 		}
