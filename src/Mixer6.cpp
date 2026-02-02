@@ -192,10 +192,11 @@ void Mixer6::process(const ProcessArgs &args) {
 
 		float in = 0.0f;
 		int polyChannels = inputs[INPUT + ch].getChannels();
-		if (polyChannels > 0) {
+		if (polyChannels > 1) {
 			for (int c = 0; c < polyChannels; c++) {
 				in += inputs[INPUT + ch].getPolyVoltage(c);
 			}
+			in /= sqrt(polyChannels);
 		} else {
 			in = inputs[INPUT + ch].getVoltage();
 		}
