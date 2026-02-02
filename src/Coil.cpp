@@ -9,7 +9,7 @@
 struct AllPassFilter {
     float x1 = 0.f; // Previous input
     float y1 = 0.f; // Previous output
-    float c = 0.f;  // Coefficient (Tension)
+    float c = 0.f;  // Coefficient (tension)
 
     void setTension(float tension) {
         // Map tension to a useful coefficient range (-0.9 to 0.9)
@@ -18,7 +18,7 @@ struct AllPassFilter {
     }
 
     float process(float x) {
-        // y[n] = c * x[n] + x[n-1] - c * y[n-1]
+        // y[n] = -c * x[n] + x[n-1] - c * y[n-1]
         float y = -c * x + x1 + c * y1;
         // Denormal protection
         if (std::abs(y) < 1e-15f) y = 0.f;
@@ -37,35 +37,41 @@ struct SpringTank {
     
     // Components
     dsp::RCFilter damper;
-    static constexpr int AP_STAGES = 9; // Easy to change count later
+    static constexpr int AP_STAGES = 12; // Easy to change count later
     AllPassFilter ap[AP_STAGES];
     
-    // Physical Variance (Randomness for Stereo Width)
+    // Physical variance (Randomness for Stereo Width)
     float tensionOffset = 0.f;
-    float lengthOffset = 0.f; 
+    float lengthOffset = 0.f;
 
-    void init(float t_off, float l_off) {
+    int curr_coils = 6;
+
+    void init(float t_off, float l_off, int coils) {
         tensionOffset = t_off;
         lengthOffset = l_off;
+        curr_coils = coils;
+    }
+
+    void setCoils(int c) {
+        curr_coils = c;
     }
 
     float process(float input, float feedbackAmt, float tension, float inertia, float dampFreq, float sampleRate) {
         
-        // Determine Delay Length (Inertia)
+        // Determine delay length (Inertia)
         // Springs are usually 30ms to 70ms.
         // Apply small random variance for stereo width
         float targetDelay = inertia * (1.0f + lengthOffset);
 
         float delayOut = readBufferSmooth(targetDelay * sampleRate);
 
-        // Apply Dispersion (All-Pass Chain)
-        // Modulating this changes the "tightness" and creates pitch shifts
+        // Apply dispersion (All-Pass Chain)
+        // Modulating this changes the tightness and creates pitch shifts
         float t = clamp(tension + tensionOffset, 0.05f, 0.95f);
 
         float dispersed = delayOut;
 
-        // Loop is cleaner and safer than ap1, ap2, ap3...
-        for (int i = 0; i < AP_STAGES; i++) {
+        for (int i = 0; i < AP_STAGES && i < curr_coils; i++) {
             ap[i].setTension(t);
             dispersed = ap[i].process(dispersed);
         }
@@ -147,7 +153,8 @@ struct Coil : Module {
     dsp::SchmittTrigger pluckTrigger;
     
     // For the noise burst
-    int pluckTimer = 0; 
+    int pluckTimer = 0;
+    int curr_coils = 9;
     
     Coil() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -174,11 +181,29 @@ struct Coil : Module {
         configOutput(SIGNAL_LEFT_OUTPUT, "Left");
         configOutput(SIGNAL_RIGHT_OUTPUT, "Right");
 
+        configBypass(SIGNAL_LEFT_INPUT, SIGNAL_LEFT_OUTPUT);
+        configBypass(SIGNAL_RIGHT_INPUT, SIGNAL_RIGHT_OUTPUT);
+
         // Initialize tanks with slight variance for stereo width
         // Left: Standard
         // Right: 2% looser tension, 3% longer spring
-        tankL.init(0.0f, 0.0f);
-        tankR.init(-0.02f, 0.03f);
+        tankL.init(0.0f, 0.0f, curr_coils);
+        tankR.init(-0.02f, 0.03f, curr_coils);
+    }
+
+    json_t *dataToJson() override {
+        json_t *root = json_object();
+        json_object_set_new(root, "coils", json_integer(curr_coils));
+        return root;
+    }
+
+    void dataFromJson(json_t *rootJ) override {
+        json_t *ext = json_object_get(rootJ, "coils");
+        if (ext) {
+            curr_coils = clamp(json_integer_value(ext), 6 ,12);
+            tankL.setCoils(curr_coils);
+            tankR.setCoils(curr_coils);
+        }
     }
 
     static float toExp(float x) {
@@ -214,7 +239,7 @@ struct Coil : Module {
         float inertiaSeconds = inertiaMS / 1000.0f;
 
         float cv_damp =  powf(2.0f, inputs[DAMP_CV].getVoltage());
-        float dampFreq = clamp(this->toExp(params[DAMP_PARAM].getValue())*cv_damp, 20.f, 20000.f);
+        float dampFreq = clamp(this->toExp(params[DAMP_PARAM].getValue())*cv_damp, 20.f, 10000.f);
 
         // --- Audio Input Processing ---
         float inL = inputs[SIGNAL_LEFT_INPUT].isConnected() ? inputs[SIGNAL_LEFT_INPUT].getVoltage() : inputs[SIGNAL_RIGHT_INPUT].getVoltage();
@@ -261,15 +286,36 @@ struct Coil : Module {
 };
 
 
+struct CoilsNumberMenuItem : MenuItem {
+    Coil* _module;
+    int _os;
+
+    CoilsNumberMenuItem(Coil* module, const char* label, int os)
+    : _module(module), _os(os)
+    {
+        this->text = label;
+    }
+
+    void onAction(const event::Action &e) override {
+        _module->curr_coils = _os;
+        _module->tankL.setCoils(_os);
+        _module->tankR.setCoils(_os);
+    }
+
+    void step() override {
+        rightText = _module->curr_coils == _os ? "✔" : "";
+    }
+};
+
 struct CoilWidget : ModuleWidget {
     CoilWidget(Coil* module) {
         setModule(module);
         setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/CoilModule.svg")));
 
-        addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, 0)));
-        addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
-        addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-        addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         float down = 50;
         float div3 = 10.0f * RACK_GRID_WIDTH * 0.25f;
@@ -304,6 +350,17 @@ struct CoilWidget : ModuleWidget {
 
         addOutput(createOutputCentered<OutPortAutinn>(Vec(10.0f * RACK_GRID_WIDTH-55, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_LEFT_OUTPUT));
         addOutput(createOutputCentered<OutPortAutinn>(Vec(10.0f * RACK_GRID_WIDTH-20, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_RIGHT_OUTPUT));
+    }
+
+    void appendContextMenu(Menu* menu) override {
+        Coil* a = dynamic_cast<Coil*>(module);
+        assert(a);
+
+        menu->addChild(new MenuLabel());
+        menu->addChild(new CoilsNumberMenuItem(a, "Few coils", 6));
+        menu->addChild(new CoilsNumberMenuItem(a, "Mid coils", 9));
+        menu->addChild(new CoilsNumberMenuItem(a, "Many coils", 12));
+        menu->addChild(new MenuLabel());
     }
 };
 
