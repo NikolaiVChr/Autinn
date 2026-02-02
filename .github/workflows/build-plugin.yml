@@ -12,6 +12,7 @@ jobs:
   build:
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
+    if: matrix.config.name == 'Windows' || startsWith(github.ref, 'refs/tags/') || github.event_name != 'push'
     strategy:
       matrix:
         config:
