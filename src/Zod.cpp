@@ -126,6 +126,7 @@ struct Zod : Module {
 	double RT = 0.1;
 	double AT = 0.1;
 	double ATp = 0.1;
+	double ATn = 0.1;
 	double TAV = 0.03;
 
 	// VU Meter stuff
@@ -351,6 +352,7 @@ void Zod::process(const ProcessArgs &args) {
 		RT  = 1.0 - exp(-2.2 * TS / tr );
 		AT  = 1.0 - exp(-2.2 * TS / ta );
 		ATp = 1.0 - exp(-2.2 * TS / tap);
+		ATn = 1.0 - exp(-2.2 * TS / ATTACK_LIMITER_LOW_MS);
 
 		// Calculate RMS Window (t_M) directly from the Knob.
 		// Now RMS is 350ms, but Lookahead is only 5ms.
@@ -438,7 +440,7 @@ void Zod::process(const ProcessArgs &args) {
 		} else if (noisegateActive_prev) {
 			// We just switched from noisegate to Audio.
 			// Force attack time so it opens instantly
-			k = AT;
+			k = ATn;
 		} else {
 			if (attack) {
 				if (limiter) {
