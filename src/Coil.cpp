@@ -148,7 +148,18 @@ struct Coil : Module {
 
         configParam(TENSION_PARAM, 0.1f, 0.9f, 0.4f, "Tension", "");
         configParam(INERTIA_PARAM, 20.f, 80.f, 50.f, "Inertia", " ms");
-        configParam(DAMP_PARAM, 100.f, 10000.f, 3000.f, "Damp", " Hz", 10,1,0);
+        configParam(DAMP_PARAM, 100.f, 10000.f, 3000.f, "Damp", " Hz", -10,1,0);
+
+        configInput(DRIVE_CV, "Drive CV");
+        configInput(FEEDBACK_CV, "Feedback CV");
+        configOutput(MIX_CV, "Mix CV");
+        configOutput(TENSION_CV, "Tension CV");
+        configOutput(INERTIA_CV, "Inertia CV");
+        configOutput(DAMP_CV, "Damp CV");
+
+        configOutput(SIGNAL_LEFT_INPUT, "Left");
+        configOutput(SIGNAL_RIGHT_INPUT, "Right");
+        configOutput(PLUCK_INPUT, "Pluck");
 
         // Initialize tanks with slight variance for stereo width
         // Left: Standard
