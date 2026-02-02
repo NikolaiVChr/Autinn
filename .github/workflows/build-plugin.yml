@@ -12,7 +12,6 @@ jobs:
   build:
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
-    if: matrix.config.name == 'Windows' || startsWith(github.ref, 'refs/tags/') || github.event_name != 'push'
     strategy:
       matrix:
         config:
@@ -66,7 +65,7 @@ jobs:
           curl -o Rack-SDK.zip https://vcvrack.com/downloads/Rack-SDK-${{ env.rack-sdk-version }}-${{ matrix.config.postfix }}.zip
           unzip Rack-SDK.zip
       - name: Get Rack-SDK Non-win
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/'))
         shell: 'bash'
         run: |
           pushd $HOME
@@ -85,7 +84,7 @@ jobs:
           echo "Set plugin version from $pluginversion to $pluginversion-$gitrev"
           cat <<< `jq --arg VERSION "$pluginversion-$gitrev" '.version=$VERSION' plugin.json` > plugin.json
       - name: Initialize CodeQL
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/'))
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
@@ -99,7 +98,7 @@ jobs:
           make -j dep
           make -j dist
       - name: Build plugin Non-Windows
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/'))
         shell: 'bash'
         run: |
           ${{ matrix.config.prepare-os }}
@@ -108,12 +107,13 @@ jobs:
           make -j dep
           make -j dist
       - name: Upload artifact
+        if: runner.os == 'Windows' || (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/'))
         uses: actions/upload-artifact@v4
         with:
           path: dist
           name: ${{ matrix.config.name }}
       - name: Perform CodeQL Analysis
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/'))
         uses: github/codeql-action/analyze@v4
 
   publish:
