@@ -263,6 +263,14 @@
         "Drum",
         "Polyphonic"
       ]
+    },
+    {
+      "slug": "Coil",
+      "name": "Coil",
+      "description": "Spring reverb",
+      "tags": [
+        "Reverb"
+      ]
     }
   ]
 }
