@@ -1,8 +1,9 @@
 #include "Autinn.hpp"
 
 
-float FREQ_MAX = 10000.0f;
-float FREQ_MIN = 100.0f;
+#define FREQ_MAX 10000.0f
+#define FREQ_MIN 100.0f
+#define LOG_FREQ_RANGE float(log(FREQ_MAX/FREQ_MIN))
 
 // 1st Order All-Pass Filter for Dispersion
 struct AllPassFilter {
@@ -170,8 +171,6 @@ struct Coil : Module {
         tankL.init(0.0f, 0.0f);
         tankR.init(-0.02f, 0.03f);
     }
-
-    static const float LOG_FREQ_RANGE = float(log(FREQ_MAX/FREQ_MIN));
 
     static float toExp(float x) {
         // 0 to 1 to exp range
