@@ -259,37 +259,38 @@ struct CoilWidget : ModuleWidget {
         addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-        float down = 120;
+        float down = 50;
+        float div = 141.2 * 0.25f;
 
         // --- Knobs ---
         // Row 1: Exciter
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(30, 40+down), module, Coil::DRIVE_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(75, 40+down), module, Coil::FEEDBACK_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(120, 40+down), module, Coil::MIX_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div, 40+down), module, Coil::DRIVE_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div*2, 40+down), module, Coil::FEEDBACK_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div*3, 40+down), module, Coil::MIX_PARAM));
 
         // Row 2: Physics
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(30, 100+down), module, Coil::TENSION_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(75, 100+down), module, Coil::INERTIA_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(120, 100+down), module, Coil::DAMP_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div, 100+down), module, Coil::TENSION_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div*2, 100+down), module, Coil::INERTIA_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div*3, 100+down), module, Coil::DAMP_PARAM));
 
         // Row 3: CVs
-        addInput(createInputCentered<InPortAutinn>(Vec(20, 160+down), module, Coil::DRIVE_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(55, 160+down), module, Coil::FEEDBACK_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(90, 160+down), module, Coil::MIX_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div*1, 160+down), module, Coil::DRIVE_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div*2, 160+down), module, Coil::FEEDBACK_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div*3, 160+down), module, Coil::MIX_CV));
         
-        addInput(createInputCentered<InPortAutinn>(Vec(20, 195+down), module, Coil::TENSION_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(55, 195+down), module, Coil::INERTIA_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(90, 195+down), module, Coil::DAMP_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div*1, 195+down), module, Coil::TENSION_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div*2, 195+down), module, Coil::INERTIA_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div*3, 195+down), module, Coil::DAMP_CV));
 
         // Row 4: Audio IO & Pluck
-        addInput(createInputCentered<InPortAutinn>(Vec(20, 310), module, Coil::SIGNAL_LEFT_INPUT));
-        addInput(createInputCentered<InPortAutinn>(Vec(55, 310), module, Coil::SIGNAL_RIGHT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(20, 330), module, Coil::SIGNAL_LEFT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(55, 330), module, Coil::SIGNAL_RIGHT_INPUT));
         
         //addInput(createInputCentered<PJ301MPort>(Vec(90, 250), module, Coil::PLUCK_INPUT));
         //addChild(createLightCentered<MediumLight<RedLight>>(Vec(115, 240), module, Coil::PLUCK_LIGHT)); // Light next to trigger
 
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(141.2-55, 310), module, Coil::SIGNAL_LEFT_OUTPUT));
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(141.2-20, 310), module, Coil::SIGNAL_RIGHT_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(141.2-55, 330), module, Coil::SIGNAL_LEFT_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(141.2-20, 330), module, Coil::SIGNAL_RIGHT_OUTPUT));
     }
 };
 
