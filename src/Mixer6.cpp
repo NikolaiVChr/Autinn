@@ -250,10 +250,41 @@ void Mixer6::process(const ProcessArgs &args) {
 	// FX
 	outputs[FX_SEND_A].setVoltage(fx_send_A);
 	outputs[FX_SEND_B].setVoltage(fx_send_B);
-	float fx_return_left_A  = params[FX_A_TO_MAIN_PARAM].getValue() * inputs[FX_RETURN_L_A].getVoltage();
-	float fx_return_right_A = params[FX_A_TO_MAIN_PARAM].getValue() * inputs[FX_RETURN_R_A].getVoltage();
-	float fx_return_left_B  = params[FX_B_TO_MAIN_PARAM].getValue() * inputs[FX_RETURN_L_B].getVoltage();
-	float fx_return_right_B = params[FX_B_TO_MAIN_PARAM].getValue() * inputs[FX_RETURN_R_B].getVoltage();
+	float fx_return_left_A = 0.0f;
+	float fx_return_right_A = 0.0f;
+	float fx_return_left_B = 0.0f;
+	float fx_return_right_B = 0.0f;
+	const int fx_return_left_A_ch = inputs[FX_RETURN_L_A].getChannels();
+	const int fx_return_right_A_ch = inputs[FX_RETURN_R_A].getChannels();
+	const int fx_return_left_B_ch = inputs[FX_RETURN_L_B].getChannels();
+	const int fx_return_right_B_ch = inputs[FX_RETURN_R_B].getChannels();
+	for (int ch = 0; ch < fx_return_left_A_ch; ch++) {
+		fx_return_left_A += inputs[FX_RETURN_L_A].getPolyVoltage(ch);
+	}
+	for (int ch = 0; ch < fx_return_right_A_ch; ch++) {
+		fx_return_right_A += inputs[FX_RETURN_R_A].getPolyVoltage(ch);
+	}
+	for (int ch = 0; ch < fx_return_left_B_ch; ch++) {
+		fx_return_left_B += inputs[FX_RETURN_L_B].getPolyVoltage(ch);
+	}
+	for (int ch = 0; ch < fx_return_right_B_ch; ch++) {
+		fx_return_right_B += inputs[FX_RETURN_R_B].getPolyVoltage(ch);
+	}
+	if (fx_return_left_A_ch == 0 && fx_return_right_A_ch > 0) {
+		fx_return_left_A = fx_return_right_A;
+	} else if (fx_return_left_A_ch > 0 && fx_return_right_A_ch == 0) {
+		fx_return_right_A = fx_return_left_A;
+	}
+	if (fx_return_left_B_ch == 0 && fx_return_right_B_ch > 0) {
+		fx_return_left_B = fx_return_right_B;
+	} else if (fx_return_left_B_ch > 0 && fx_return_right_B_ch == 0) {
+		fx_return_right_B = fx_return_left_B;
+	}
+
+	fx_return_left_A  *= params[FX_A_TO_MAIN_PARAM].getValue();
+	fx_return_right_A *= params[FX_A_TO_MAIN_PARAM].getValue();
+	fx_return_left_B  *= params[FX_B_TO_MAIN_PARAM].getValue();
+	fx_return_right_B *= params[FX_B_TO_MAIN_PARAM].getValue();
 
 	// Main out
 	main_left  = fx_return_left_A  + fx_return_left_B  + main_left;
