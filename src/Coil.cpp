@@ -261,17 +261,18 @@ struct CoilWidget : ModuleWidget {
 
         float down = 50;
         float div3 = 10.0f * RACK_GRID_WIDTH * 0.25f;
+        float hp = RACK_GRID_WIDTH;
 
         // --- Knobs ---
         // Row 1: Exciter
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3, 40+down), module, Coil::DRIVE_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3-hp, 40+down), module, Coil::DRIVE_PARAM));
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*2, 40+down), module, Coil::FEEDBACK_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*3, 40+down), module, Coil::MIX_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*3+hp, 40+down), module, Coil::MIX_PARAM));
 
         // Row 2: Physics
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3, 100+down), module, Coil::TENSION_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3-hp, 100+down), module, Coil::TENSION_PARAM));
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*2, 100+down), module, Coil::INERTIA_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*3, 100+down), module, Coil::DAMP_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(div3*3+hp, 100+down), module, Coil::DAMP_PARAM));
 
         // Row 3: CVs
         addInput(createInputCentered<InPortAutinn>(Vec(div3*1, 160+down), module, Coil::DRIVE_CV));
@@ -283,8 +284,8 @@ struct CoilWidget : ModuleWidget {
         addInput(createInputCentered<InPortAutinn>(Vec(div3*3, 195+down), module, Coil::DAMP_CV));
 
         // Row 4: Audio IO & Pluck
-        addInput(createInputCentered<InPortAutinn>(Vec(20, 330), module, Coil::SIGNAL_LEFT_INPUT));
-        addInput(createInputCentered<InPortAutinn>(Vec(55, 330), module, Coil::SIGNAL_RIGHT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(20, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_LEFT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(55, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_RIGHT_INPUT));
         
         //addInput(createInputCentered<PJ301MPort>(Vec(90, 250), module, Coil::PLUCK_INPUT));
         //addChild(createLightCentered<MediumLight<RedLight>>(Vec(115, 240), module, Coil::PLUCK_LIGHT)); // Light next to trigger
