@@ -37,7 +37,8 @@ struct SpringTank {
     
     // Components
     dsp::RCFilter damper;
-    AllPassFilter ap1, ap2, ap3, ap4, ap5, ap6, ap7, ap8, ap9, ap10, ap11, ap12; // stages of dispersion
+    static constexpr int AP_STAGES = 9; // Easy to change count later
+    AllPassFilter ap[AP_STAGES];
     
     // Physical Variance (Randomness for Stereo Width)
     float tensionOffset = 0.f;
@@ -54,42 +55,20 @@ struct SpringTank {
         // Springs are usually 30ms to 70ms.
         // Apply small random variance for stereo width
         float targetDelay = inertia * (1.0f + lengthOffset);
-        int delaySamples = (int)(targetDelay * sampleRate);
-        if (delaySamples >= MAX_BUFFER_SIZE) delaySamples = MAX_BUFFER_SIZE - 1;
-        if (delaySamples < 10) delaySamples = 10;
 
-        // Read from Delay Line
-        int readHead = writeHead - delaySamples;
-        if (readHead < 0) readHead += MAX_BUFFER_SIZE;
-        float delayOut = buffer[readHead];
+        float delayOut = readBufferSmooth(targetDelay * sampleRate);
 
         // Apply Dispersion (All-Pass Chain)
         // Modulating this changes the "tightness" and creates pitch shifts
         float t = clamp(tension + tensionOffset, 0.05f, 0.95f);
-        ap1.setTension(t);
-        ap2.setTension(t);
-        ap3.setTension(t);
-        ap4.setTension(t);
-        ap5.setTension(t);
-        ap7.setTension(t);
-        ap8.setTension(t);
-        ap9.setTension(t);
-        ap10.setTension(t);
-        ap11.setTension(t);
-        ap12.setTension(t);
 
-        float dispersed = ap1.process(delayOut);
-        dispersed = ap2.process(dispersed);
-        dispersed = ap3.process(dispersed);
-        dispersed = ap4.process(dispersed);
-        dispersed = ap5.process(dispersed);
-        dispersed = ap6.process(dispersed);
-        dispersed = ap7.process(dispersed);
-        dispersed = ap8.process(dispersed);
-        dispersed = ap9.process(dispersed);
-        dispersed = ap10.process(dispersed);
-        dispersed = ap11.process(dispersed);
-        dispersed = ap12.process(dispersed);
+        float dispersed = delayOut;
+
+        // Loop is cleaner and safer than ap1, ap2, ap3...
+        for (int i = 0; i < AP_STAGES; i++) {
+            ap[i].setTension(t);
+            dispersed = ap[i].process(dispersed);
+        }
 
         // Apply Damping (Loss of high freq over time)
         damper.setCutoffFreq(dampFreq / sampleRate);
@@ -110,6 +89,22 @@ struct SpringTank {
         if (writeHead >= MAX_BUFFER_SIZE) writeHead = 0;
 
         return filtered;
+    }
+
+    float readBufferSmooth(float delaySamples) {
+        float readPos = (float)writeHead - delaySamples;
+        while (readPos < 0) readPos += MAX_BUFFER_SIZE;
+        while (readPos >= MAX_BUFFER_SIZE) readPos -= MAX_BUFFER_SIZE;
+
+        // Get the integer part and the fractional part
+        int indexA = (int)readPos;
+        int indexB = indexA + 1;
+        if (indexB >= MAX_BUFFER_SIZE) indexB = 0;
+
+        float frac = readPos - indexA;
+
+        // Linear Interpolation
+        return buffer[indexA] * (1.0f - frac) + buffer[indexB] * frac;
     }
 };
 
