@@ -19,7 +19,7 @@ struct AllPassFilter {
 
     float process(float x) {
         // y[n] = c * x[n] + x[n-1] - c * y[n-1]
-        float y = c * x + x1 - c * y1;
+        float y = -c * x + x1 + c * y1;
         // Denormal protection
         if (std::abs(y) < 1e-15f) y = 0.f;
         
@@ -165,6 +165,9 @@ struct Coil : Module {
         configInput(SIGNAL_RIGHT_INPUT, "Right");
         configInput(PLUCK_INPUT, "Pluck");
 
+        configOutput(SIGNAL_LEFT_OUTPUT, "Left");
+        configOutput(SIGNAL_RIGHT_OUTPUT, "Right");
+
         // Initialize tanks with slight variance for stereo width
         // Left: Standard
         // Right: 2% looser tension, 3% longer spring
@@ -198,14 +201,13 @@ struct Coil : Module {
         float dampFreq = clamp(this->toExp(params[DAMP_PARAM].getValue())*cv_damp, 20.f, 20000.f);
 
         // --- 2. Audio Input Processing ---
-        float inL = inputs[SIGNAL_LEFT_INPUT].getVoltage();
-        float inR = inputs[SIGNAL_RIGHT_INPUT].isConnected() ? inputs[SIGNAL_RIGHT_INPUT].getVoltage() : inL;
+        float inL = inputs[SIGNAL_LEFT_INPUT].isConnected() ? inputs[SIGNAL_LEFT_INPUT].getVoltage() : inputs[SIGNAL_RIGHT_INPUT].getVoltage();
+        float inR = inputs[SIGNAL_RIGHT_INPUT].isConnected() ? inputs[SIGNAL_RIGHT_INPUT].getVoltage() : inputs[SIGNAL_LEFT_INPUT].getVoltage();
 
         // Apply Drive
         // Simple soft clipper for input warmth
-        float driveGain = 5.0f;
-        inL = non_lin_func(inL * drive) * driveGain;
-        inR = non_lin_func(inR * drive) * driveGain;
+        float inL_scaled = inL * drive * 0.2f;
+        float inR_scaled = inR * drive * 0.2f;
 
         // --- 3. Pluck Exciter Logic ---
         // Generates a 10ms burst of noise when triggered
@@ -216,7 +218,7 @@ struct Coil : Module {
         float pluckSignal = 0.f;
         if (pluckTimer > 0) {
             // White Noise Burst
-            pluckSignal = (random::uniform() * 2.f - 1.f) * 10.0f; 
+            pluckSignal = (random::uniform() * 2.f - 1.f);
             pluckTimer--;
             lights[PLUCK_LIGHT].setBrightness(1.f);
         } else {
@@ -224,20 +226,19 @@ struct Coil : Module {
         }
 
         // Add Pluck to input
-        inL += pluckSignal;
-        inR += pluckSignal; // Pluck excites both springs
+        inL_scaled += pluckSignal;
+        inR_scaled += pluckSignal; // Pluck excites both springs
 
         // --- Process tank models ---
-        float wetL = tankL.process(inL, feedback, tension, inertiaSeconds, dampFreq, args.sampleRate);
-        float wetR = tankR.process(inR, feedback, tension, inertiaSeconds, dampFreq, args.sampleRate);
+        float wetL = tankL.process(inL_scaled, feedback, tension, inertiaSeconds, dampFreq, args.sampleRate);
+        float wetR = tankR.process(inR_scaled, feedback, tension, inertiaSeconds, dampFreq, args.sampleRate);
+
+        wetL *= 5.0f;
+        wetR *= 5.0f;
 
         // --- Output Mix ---
-        // Dry signal is the input (clean) or driven?
-        float cleanL = inputs[SIGNAL_LEFT_INPUT].getVoltage();
-        float cleanR = inputs[SIGNAL_RIGHT_INPUT].isConnected() ? inputs[SIGNAL_RIGHT_INPUT].getVoltage() : cleanL;
-
-        float outL = cleanL * (1.f - mix) + wetL * mix;
-        float outR = cleanR * (1.f - mix) + wetR * mix;
+        float outL = inL * (1.f - mix) + wetL * mix;
+        float outR = inR * (1.f - mix) + wetR * mix;
 
         outputs[SIGNAL_LEFT_OUTPUT].setVoltage(outL);
         outputs[SIGNAL_RIGHT_OUTPUT].setVoltage(outR);
