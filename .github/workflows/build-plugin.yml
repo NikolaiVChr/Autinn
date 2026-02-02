@@ -17,14 +17,14 @@ jobs:
         config:
         - {
             name: Windows,
-            os: windows-latest,
+            os: windows-2022,
             prepare-os: export CC=gcc,
             prepare-os2: "",
             postfix: win-x64
           }
         - {
             name: Linux,
-            os: ubuntu-latest,
+            os: ubuntu-slim,
             prepare-os: sudo apt-get -y --allow-downgrades --allow-remove-essential --allow-change-held-packages update,
             prepare-os2: sudo apt install -y libglu-dev,
             postfix: lin-x64
