@@ -93,6 +93,7 @@ struct Zod : Module {
 
 	double g_prev = 1.0;
 	double f_prev = 0.0;
+	bool noisegateActive_prev = false;
 	double peak_prev = 0.0;
 	double rms2_prev = 0.0;
 	unsigned hysteresis = 0;
@@ -430,14 +431,24 @@ void Zod::process(const ProcessArgs &args) {
 		}
 
 		double k = 0.0;
-		if (attack) {
-			if (limiter) {
-				k = ATp;
-			} else {
-				k = AT;
-			}
-		} else {
+		bool noisegateActive = (lights[A].value > 0.0f);
+		if (noisegateActive) {
+			// Force Release time so it fades out smoothly
 			k = RT;
+		} else if (noisegateActive_prev) {
+			// We just switched from noisegate to Audio.
+			// Force attack time so it opens instantly
+			k = AT;
+		} else {
+			if (attack) {
+				if (limiter) {
+					k = ATp;
+				} else {
+					k = AT;
+				}
+			} else {
+				k = RT;
+			}
 		}
 
 		double g = this->smooth(k, g_prev, f);
@@ -467,6 +478,7 @@ void Zod::process(const ProcessArgs &args) {
 		f_prev = f;
 		g_prev = g;
 		peak_prev = peak;
+		noisegateActive_prev = noisegateActive;
 	}
 
 	// Downsample
@@ -516,8 +528,9 @@ double Zod::staticCurve(double rms, double peak, double LT, double LS, double CS
 	lights[DD].value = 0.0;
 	lights[E].value  = 0.0;
 
+	bool noisegate_active = (NT > THRESHOLD_LIMIT_LOW_DB + 0.001);
 	double x_dB = this->toDB(sqrt(rms));
-	if (x_dB < NT) {// hard knee:
+	if (noisegate_active && x_dB < NT) {// hard knee:
 		// noise gate
 		lights[A].value = 1.0;
 		return 0.0;
