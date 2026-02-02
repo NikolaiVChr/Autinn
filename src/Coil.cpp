@@ -181,7 +181,10 @@ struct Coil : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        if (outputs[SIGNAL_RIGHT_OUTPUT].isConnected() || !outputs[SIGNAL_RIGHT_OUTPUT].isConnected()) {
+        if (!outputs[SIGNAL_RIGHT_OUTPUT].isConnected() && !outputs[SIGNAL_LEFT_OUTPUT].isConnected()) {
+            return;
+        }
+        if (!inputs[SIGNAL_RIGHT_INPUT].isConnected() && !inputs[SIGNAL_LEFT_INPUT].isConnected()) {
             return;
         }
 
