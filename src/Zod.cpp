@@ -41,7 +41,7 @@
 #define KNEE_MAX_DB                      10.0
 #define KNEE_DEFAULT_DB                   5.0
 #define MAKEUP_GAIN_MAX                  10.0//20dB
-#define LOOKAHEAD_MS                     10.0
+#define LOOKAHEAD_MS                     15.0// must be bigger than ATTACK_LIMITER_HIGH_MS
 
 struct Zod : Module {
 	enum ParamIds {
@@ -102,7 +102,7 @@ struct Zod : Module {
 	unsigned D = 2;
 	// Ring Buffer: Max delay ~350ms @ 768kHz = ~268k samples. Plus oversampling.
 	// We use 2^21 for safety and power-of-two masking if needed.
-	static const int BUFFER_SIZE = 2097152;
+	static const int BUFFER_SIZE = 65536;
 	float bufferL[BUFFER_SIZE] = {};
 	float bufferR[BUFFER_SIZE] = {};
 	int writeIndex = 0;
@@ -515,6 +515,13 @@ double Zod::staticCurve(double rms, double peak, double LT, double LS, double CS
 	lights[C].value  = 0.0;
 	lights[DD].value = 0.0;
 	lights[E].value  = 0.0;
+
+	double x_dB = this->toDB(sqrt(rms));
+	if (x_dB < NT) {// hard knee:
+		// noise gate
+		lights[A].value = 1.0;
+		return 0.0;
+	}
 	if (peak_dB > LT) {// hard knee:
 		// limiter
 		double comp_offset = 0.0;
@@ -526,14 +533,10 @@ double Zod::staticCurve(double rms, double peak, double LT, double LS, double CS
 		lights[E].value = 1.0;
 		limiter = true;
 	} else {
-		double x_dB = this->toDB(sqrt(rms));
+
 		double CTknee = CT - knee * 0.5;
 		double ETknee = ET - knee * 0.5;
-		if (x_dB < NT) {// hard knee:
-			// noise gate
-			lights[A].value = 1.0;
-			return 0.0;
-		} else if (x_dB < ETknee) {
+		if (x_dB < ETknee) {
 			// full expander
 			G = (x_dB - ET) * (-ES);
 			lights[B].value = 1.0;

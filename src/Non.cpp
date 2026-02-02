@@ -42,7 +42,7 @@
 //#define KNEE_DEFAULT_DB                   5.0
 #define MAKEUP_GAIN_MAX                  10.0//20dB
 //#define SMOOTH_FILTER_POLE_SLEW         1000.0
-#define LOOKAHEAD_MS                     10.0
+#define LOOKAHEAD_MS                     15.0// must be bigger than ATTACK_LIMITER_HIGH_MS
 
 struct Non : Module {
 	enum ParamIds {
@@ -101,7 +101,7 @@ struct Non : Module {
 	bool limiter = false;
 
 	// Buffer size for safety with 4x oversampling
-	static const int BUFFER_SIZE = 8192;//since lookahead is 10 ms
+	static const int BUFFER_SIZE = 65536;//since lookahead is 15 ms
 	unsigned D = 2;
 	float bufferL[BUFFER_SIZE] = {};
 	float bufferR[BUFFER_SIZE] = {};
