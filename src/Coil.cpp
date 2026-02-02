@@ -65,7 +65,7 @@ struct SpringTank {
 
         float delayOut = readBufferSmooth(targetDelay * sampleRate);
 
-        // Apply dispersion (All-Pass Chain)
+        // Apply dispersion (All-pass chain)
         // Modulating this changes the tightness and creates pitch shifts
         float t = clamp(tension + tensionOffset, 0.05f, 0.95f);
 
@@ -216,9 +216,6 @@ struct Coil : Module {
         // VCV Rack CV is +-5V or 0V-10V
 
         if (!outputs[SIGNAL_RIGHT_OUTPUT].isConnected() && !outputs[SIGNAL_LEFT_OUTPUT].isConnected()) {
-            return;
-        }
-        if (!inputs[SIGNAL_RIGHT_INPUT].isConnected() && !inputs[SIGNAL_LEFT_INPUT].isConnected()) {
             return;
         }
 
