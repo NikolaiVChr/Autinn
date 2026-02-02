@@ -113,7 +113,6 @@ struct Coil : Module {
         SIGNAL_LEFT_INPUT,
         SIGNAL_RIGHT_INPUT,
         PLUCK_INPUT,
-        // CV Inputs
         DRIVE_CV,
         FEEDBACK_CV,
         MIX_CV,
@@ -152,14 +151,14 @@ struct Coil : Module {
 
         configInput(DRIVE_CV, "Drive CV");
         configInput(FEEDBACK_CV, "Feedback CV");
-        configOutput(MIX_CV, "Mix CV");
-        configOutput(TENSION_CV, "Tension CV");
-        configOutput(INERTIA_CV, "Inertia CV");
-        configOutput(DAMP_CV, "Damp CV");
+        configInput(MIX_CV, "Mix CV");
+        configInput(TENSION_CV, "Tension CV");
+        configInput(INERTIA_CV, "Inertia CV");
+        configInput(DAMP_CV, "Damp CV");
 
-        configOutput(SIGNAL_LEFT_INPUT, "Left");
-        configOutput(SIGNAL_RIGHT_INPUT, "Right");
-        configOutput(PLUCK_INPUT, "Pluck");
+        configInput(SIGNAL_LEFT_INPUT, "Left");
+        configInput(SIGNAL_RIGHT_INPUT, "Right");
+        configInput(PLUCK_INPUT, "Pluck");
 
         // Initialize tanks with slight variance for stereo width
         // Left: Standard
@@ -181,11 +180,12 @@ struct Coil : Module {
         float tension = params[TENSION_PARAM].getValue() + (inputs[TENSION_CV].getVoltage() / 10.f);
         tension = clamp(tension, 0.05f, 0.9f);
 
-        float inertia = params[INERTIA_PARAM].getValue() + (inputs[INERTIA_CV].getVoltage() / 5.f);
-        inertia = clamp(inertia, 0.f, 1.f);
+        float inertiaMS = params[INERTIA_PARAM].getValue() + (inputs[INERTIA_CV].getVoltage() * 10.f);
+        inertiaMS = clamp(inertiaMS, 10.f, 150.f); // Allow wider range via CV
+        float inertiaSeconds = inertiaMS / 1000.0f;
 
-        float damp = params[DAMP_PARAM].getValue() + (inputs[DAMP_CV].getVoltage() / 5.f);
-        damp = clamp(damp, 0.f, 1.f);
+        float dampFreq = params[DAMP_PARAM].getValue() + (inputs[DAMP_CV].getVoltage() * 1000.f);
+        dampFreq = clamp(dampFreq, 20.f, 20000.f);
 
         // --- 2. Audio Input Processing ---
         float inL = inputs[SIGNAL_LEFT_INPUT].getVoltage();
@@ -193,8 +193,9 @@ struct Coil : Module {
 
         // Apply Drive
         // Simple soft clipper for input warmth
-        inL = non_lin_func(inL * drive * 0.5f) * 2.0f;
-        inR = non_lin_func(inR * drive * 0.5f) * 2.0f;
+        float driveGain = 5.0f;
+        inL = non_lin_func(inL * drive) * driveGain;
+        inR = non_lin_func(inR * drive) * driveGain;
 
         // --- 3. Pluck Exciter Logic ---
         // Generates a 10ms burst of noise when triggered
@@ -217,8 +218,8 @@ struct Coil : Module {
         inR += pluckSignal; // Pluck excites both springs
 
         // --- Process tank models ---
-        float wetL = tankL.process(inL, feedback, tension, inertia, damp, args.sampleRate);
-        float wetR = tankR.process(inR, feedback, tension, inertia, damp, args.sampleRate);
+        float wetL = tankL.process(inL, feedback, tension, inertiaSeconds, dampFreq, args.sampleRate);
+        float wetR = tankR.process(inR, feedback, tension, inertiaSeconds, dampFreq, args.sampleRate);
 
         // --- Output Mix ---
         // Dry signal is the input (clean) or driven?
