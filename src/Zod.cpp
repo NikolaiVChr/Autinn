@@ -31,7 +31,7 @@
 #define ATTACK_LOW_MS                     1.0//was 0.16
 #define ATTACK_HIGH_MS                 2600.0
 #define ATTACK_LIMITER_LOW_MS             0.1//was 0.02
-#define ATTACK_LIMITER_HIGH_MS           10.0
+#define ATTACK_LIMITER_HIGH_MS            2.0
 #define RELEASE_LOW_MS                    1.0
 #define RELEASE_HIGH_MS                5000.0
 #define RMS_TIME_LOW_MS                   1.0
@@ -42,7 +42,7 @@
 #define KNEE_MAX_DB                      10.0
 #define KNEE_DEFAULT_DB                   5.0
 #define MAKEUP_GAIN_MAX                  10.0//20dB
-#define LOOKAHEAD_MS                     15.0// must be bigger than ATTACK_LIMITER_HIGH_MS
+#define LOOKAHEAD_MS                      4.0// must be bigger than ATTACK_LIMITER_HIGH_MS
 
 struct Zod : Module {
 	enum ParamIds {
