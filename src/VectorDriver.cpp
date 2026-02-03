@@ -71,18 +71,25 @@ void VectorDriver::process(const ProcessArgs &args) {
 	float dt = args.sampleTime;
 	float movementSpeed = params[SPEED_PARAM].getValue(); // 2-5V/sec
 
-	// Organic Steering (Brownian Motion)
-	// Slightly nudge rotation speed randomly every frame.
-	// This creates smooth, wandering curves.
-	if (random::uniform() < 0.05f) { // 5% chance per sample to turn
-		float nudge = (random::uniform() * 2.f - 1.f) * 200.0f; // Random push
-		rotationSpeed += nudge * args.sampleTime;
+	tim += args.sampleTime;
 
-		// Clamp rotation speed so it doesn't spin uncontrollably
-		rotationSpeed = clamp(rotationSpeed, -150.0f, 150.0f);
+	// Only change steering every 0.1 seconds
+	// This allows the car to actually complete a turn before changing its mind
+	if (tim > 0.1f) {
+		tim = 0.0f;
+
+		// Randomly push the steering wheel left or right
+		// We add to the current speed rather than resetting it
+		float nudge = (random::uniform() * 2.f - 1.f) * 100.0f;
+		rotationSpeed += nudge;
+
+		// slowly return steering to center so it doesn't spin forever
+		rotationSpeed *= 0.9f;
+
+		// Hard limit on how fast it can spin (±200 degrees/sec)
+		rotationSpeed = clamp(rotationSpeed, -200.0f, 200.0f);
 	}
 
-	// Update Angle
 	angle += rotationSpeed * args.sampleTime;
 
 	// Normalize angle (0 to 360)
