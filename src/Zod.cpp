@@ -447,8 +447,8 @@ void Zod::process(const ProcessArgs &args) {
 			attack = !attack;
 		}
 
-		// We are in release and want attack, hyst switches to attack immediately
-		hysteresis = hyst_max + 1;
+		// replacement for hyst:
+		//attack = f < g_prev;
 
 		double k = 0.0;
 		bool noisegateActive = (lights[A].value > 0.0f);
