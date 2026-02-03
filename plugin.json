@@ -2,9 +2,11 @@
   "slug": "Autinn",
   "name": "Autinn",
   "version": "2.6.0",
+  "minRackVersion": "2.4.0",
   "license": "GPL-3.0-or-later",
   "brand": "Autinn",
   "author": "Nikolai V. Chr.",
+  "description": "",
   "authorEmail": "",
   "authorUrl": "",
   "pluginUrl": "",
@@ -27,6 +29,7 @@
       "slug": "Bass",
       "name": "Bass",
       "description": "Bass and Acid synth",
+      "keywords": "acid",
       "tags": [
         "Filter",
         "Physical modeling"
@@ -111,6 +114,7 @@
       "slug": "Retri",
       "name": "Flora",
       "description": "A 24dB low-pass filter emulating a 4-pole transistor ladder",
+      "keywords": "24db ladder",
       "tags": [
         "Filter",
         "Physical modeling",
@@ -147,7 +151,8 @@
       "slug": "Vector",
       "name": "Vxy",
       "description": "Random x-y generator",
-      "deprecated": true,
+      "keywords": "walk walker",
+      "deprecated": false,
       "tags": [
         "Controller",
         "Utility",
@@ -169,6 +174,7 @@
       "slug": "Zod",
       "name": "Zod",
       "description": "Dynamic range manipulator with noisegate",
+      "keywords": "noisegate noise-gate noise gate",
       "tags": [
         "Compressor",
         "Limiter",
@@ -269,7 +275,9 @@
       "name": "Coil",
       "description": "Spring reverb",
       "tags": [
-        "Reverb"
+        "Reverb",
+        "Physical modeling",
+        "Dual"
       ]
     }
   ]

@@ -1,7 +1,6 @@
 #include "Autinn.hpp"
 #include <cmath>
 #include <cstdlib>
-#include <ctime>
 
 /*
 
@@ -66,24 +65,61 @@ void VectorDriver::process(const ProcessArgs &args) {
 	}
 	if (firstRun) {
 		firstRun = false;
-		srand (static_cast <unsigned> (time(0)));
-		float ran = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);// 0-1 random number
+		float ran = random::uniform();// 0-1 random number
 		rotationSpeed = (ran*2-1.0f)*135.0f;
 	}
 	float dt = args.sampleTime;
-	float movementSpeed = params[SPEED_PARAM].getValue();// 2-5V/sec
+	float movementSpeed = params[SPEED_PARAM].getValue(); // 2-5V/sec
 
-	if (tim > 2.5f) {
-		float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);// 0-1 random number
-		rotationSpeed = (r*2-1.0f)*135*movementSpeed*0.2f;// +-135deg/s
-		tim = 0.0f;
+	// Organic Steering (Brownian Motion)
+	// Slightly nudge rotation speed randomly every frame.
+	// This creates smooth, wandering curves.
+	if (random::uniform() < 0.05f) { // 5% chance per sample to turn
+		float nudge = (random::uniform() * 2.f - 1.f) * 200.0f; // Random push
+		rotationSpeed += nudge * args.sampleTime;
+
+		// Clamp rotation speed so it doesn't spin uncontrollably
+		rotationSpeed = clamp(rotationSpeed, -150.0f, 150.0f);
 	}
 
-	angle += rotationSpeed*dt;
-	angle = fmod(angle, 360.0f);
+	// Update Angle
+	angle += rotationSpeed * args.sampleTime;
 
-	x = clamp(x+cos(angle*(M_PI/180.0f))*movementSpeed*dt,-5.0f,5.0f);
-	y = clamp(y+sin(angle*(M_PI/180.0f))*movementSpeed*dt,-5.0f,5.0f);
+	// Normalize angle (0 to 360)
+	if (angle > 360.f) angle -= 360.f;
+	if (angle < 0.f) angle += 360.f;
+
+	// Move Position
+	float rad = angle * (M_PI / 180.0f);
+	x += std::cos(rad) * movementSpeed * args.sampleTime;
+	y += std::sin(rad) * movementSpeed * args.sampleTime;
+
+	// The Fix: "Billiard Ball" Bounce
+	// Instead of clamping (sticking), we reflect the angle when hitting a wall.
+
+	// Hit Right or Left Wall? -> Flip X direction (Reflect across Y-axis)
+	if (x > 5.0f) {
+		x = 5.0f;
+		angle = 180.0f - angle;
+		rotationSpeed *= -0.5f; // Lose some turning energy on impact
+	}
+	else if (x < -5.0f) {
+		x = -5.0f;
+		angle = 180.0f - angle;
+		rotationSpeed *= -0.5f;
+	}
+
+	// Hit Top or Bottom Wall? -> Flip Y direction (Reflect across X-axis)
+	if (y > 5.0f) {
+		y = 5.0f;
+		angle = 360.0f - angle;
+		rotationSpeed *= -0.5f;
+	}
+	else if (y < -5.0f) {
+		y = -5.0f;
+		angle = 360.0f - angle;
+		rotationSpeed *= -0.5f;
+	}
 	
     outputs[X_OUTPUT].setVoltage(x);
     outputs[Y_OUTPUT].setVoltage(y);
