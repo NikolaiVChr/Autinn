@@ -20,17 +20,17 @@
 
 **/
 
-#define HYSTERESIS_TIME_SEC               0.001
+//#define HYSTERESIS_TIME_SEC               0.001
 //#define THRESHOLD_DEFAULT_NOISEGATE_DB  -70.0
 //#define THRESHOLD_DEFAULT_EXPANDER_DB   -60.0
 //#define THRESHOLD_DEFAULT_COMPRESSOR_DB  -6.0
 #define THRESHOLD_DEFAULT_LIMITER_DB      7.5
-#define THRESHOLD_LIMIT_LOW_DB           -35.0
+#define THRESHOLD_LIMIT_LOW_DB          -15.0// a little less than 1 V
 #define THRESHOLD_LIMIT_HIGH_DB           7.5//12.0V
 //#define ATTACK_LOW_MS                     1.0//was 0.16
 //#define ATTACK_HIGH_MS                 2600.0
 #define ATTACK_LIMITER_LOW_MS             0.02
-#define ATTACK_LIMITER_HIGH_MS           10.0
+#define ATTACK_LIMITER_HIGH_MS            2.0
 #define RELEASE_LOW_MS                    1.0
 #define RELEASE_HIGH_MS                5000.0
 //#define RMS_TIME_LOW_MS                   1.0
@@ -42,7 +42,7 @@
 //#define KNEE_DEFAULT_DB                   5.0
 #define MAKEUP_GAIN_MAX                  10.0//20dB
 //#define SMOOTH_FILTER_POLE_SLEW         1000.0
-#define LOOKAHEAD_MS                     15.0// must be bigger than ATTACK_LIMITER_HIGH_MS
+#define LOOKAHEAD_MS                      4.0// must be bigger than ATTACK_LIMITER_HIGH_MS
 
 struct Non : Module {
 	enum ParamIds {
@@ -339,7 +339,7 @@ void Non::process(const ProcessArgs &args) {
 	if (inputs[L_INPUT].isConnected()) {
 		if (inputs[L_INPUT].getVoltage() == 0.0f) LT = THRESHOLD_LIMIT_LOW_DB;
 		else LT = this->toDB(fabsf(inputs[L_INPUT].getVoltage()));
-		params[T_LIMITER_PARAM].setValue(LT);
+		params[T_LIMITER_PARAM].setValue(std::max(LT, THRESHOLD_LIMIT_LOW_DB));
 	}
 
 	double TS = (args.sampleTime / OVERSAMPLE) * 1000.0; //ms
@@ -375,7 +375,7 @@ void Non::process(const ProcessArgs &args) {
 		//TAV = 1.0 - exp(-2.2 * TS / t_M);
 	}
 
-	unsigned hyst_max = (unsigned)((HYSTERESIS_TIME_SEC / args.sampleTime) * OVERSAMPLE);
+	//unsigned hyst_max = (unsigned)((HYSTERESIS_TIME_SEC / args.sampleTime) * OVERSAMPLE);
 	//unsigned hyst_max_attack = tapKnob / args.sampleTime;
 
 	// inputs:
@@ -424,36 +424,19 @@ void Non::process(const ProcessArgs &args) {
 		// static curve:
 		double f = this->staticCurve(peak, LT, LS);
 
+		bool signalWantsAttack = (f < g_prev);
+
 		double k = 0.0;
-		if (f >= g_prev && attack) {
-			// We are in attack and want release, hyst starts counting towards release
-			hysteresis += 1;
-		} else if (f >= g_prev && !attack) {
-			// We are in release and want to release even further, hyst not activating
-			hysteresis = 0;
-		} else if (f < g_prev && !attack) {
-			// We are in release and want attack, hyst starts counting towards attack
-			hysteresis += 1;
 
-			// We are in release and want attack, hyst switches to attack immediatly
-			//hysteresis = hyst_max + 1;
-		} else if (f < g_prev && attack) {
-			// We are in attack and want to keep that, hyst not activating
-			hysteresis = 0;
-		}
-		if (hysteresis > hyst_max) {
-			hysteresis = 0;
-			attack = !attack;
-		}
-
+		attack = signalWantsAttack;
 		if (attack) {
-			//if (limiter) {
 			k = ATp;
-			/*} else {
-				k = AT;
-			}*/
 		} else {
-			k = RT;
+			if (f > g_prev * 1.005f) {
+				k = RT;
+			} else {
+				k = 0.0f;
+			}
 		}
 
 		double g = this->smooth(k, g_prev, f);

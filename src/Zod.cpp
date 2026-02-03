@@ -20,12 +20,12 @@
 
 **/
 
-#define HYSTERESIS_TIME_SEC               0.0003
+//#define HYSTERESIS_TIME_SEC               0.0003
 #define THRESHOLD_DEFAULT_NOISEGATE_DB  -70.0
 #define THRESHOLD_DEFAULT_EXPANDER_DB   -60.0
 #define THRESHOLD_DEFAULT_COMPRESSOR_DB  -6.0
 #define THRESHOLD_DEFAULT_LIMITER_DB      7.5
-#define THRESHOLD_LIMIT_LOW_DB_LIMITER  -70.0//1.00V
+#define THRESHOLD_LIMIT_LOW_DB_LIMITER  -15.0//1.00V
 #define THRESHOLD_LIMIT_LOW_DB          -70.0//0.05V
 #define THRESHOLD_LIMIT_HIGH_DB           7.5//12.0V
 #define ATTACK_LOW_MS                     1.0//was 0.16
@@ -363,7 +363,7 @@ void Zod::process(const ProcessArgs &args) {
 		TAV = 1.0 - exp(-2.2 * TS / t_M);
 	}
 
-	unsigned hyst_max = (unsigned)((HYSTERESIS_TIME_SEC / args.sampleTime) * OVERSAMPLE);
+	//unsigned hyst_max = (unsigned)((HYSTERESIS_TIME_SEC / args.sampleTime) * OVERSAMPLE);
 
 	// inputs:
 	float leftInput  = inputs[LEFT_INPUT].getVoltage();
