@@ -1,6 +1,26 @@
 #include "Autinn.hpp"
 
 
+/*
+
+    Autinn VCV Rack Plugin
+    Copyright (C) 2021  Nikolai V. Chr.
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+**/
+
 #define FREQ_MAX 10000.0f
 #define FREQ_MIN 100.0f
 #define LOG_FREQ_RANGE float(log(FREQ_MAX/FREQ_MIN))
@@ -206,6 +226,22 @@ struct Coil : Module {
             tankL.setCoils(curr_coils);
             tankR.setCoils(curr_coils);
         }
+    }
+
+    void onRandomize(const RandomizeEvent& e) override {
+        Module::onRandomize(e);
+        int menu = static_cast<int>(random::uniform() * 4.f);// 0,1,2 or 3
+        if (menu == 0) {
+            curr_coils = 6;
+        } else if (menu == 1) {
+            curr_coils = 9;
+        } else if (menu == 2) {
+            curr_coils = 12;
+        } else if (menu == 3) {
+            curr_coils = 24;
+        }
+        tankL.setCoils(curr_coils);
+        tankR.setCoils(curr_coils);
     }
 
     static float toExp(float x) {

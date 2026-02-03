@@ -264,7 +264,7 @@ struct Bass : Module {
 
 	void onRandomize(const RandomizeEvent& e) override {
 		Module::onRandomize(e);
-		gateInput = bool(rand() % static_cast<int>(2));// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
+		gateInput = bool(random::uniform() < 0.5f);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
 	}
 };
 

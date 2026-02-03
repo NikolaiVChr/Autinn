@@ -96,7 +96,7 @@ struct Jette : Module {
 
 	void onRandomize(const RandomizeEvent& e) override {
 		Module::onRandomize(e);
-		shape = rand() % static_cast<int>(3);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
+		shape = static_cast<int>(random::uniform() * 3.f);// 0,1 or 2
 	}
 
 };
