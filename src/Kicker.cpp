@@ -45,7 +45,7 @@ struct Kicker : Module {
         NUM_LIGHTS
     };
 
-    static const int MAX_CHANNELS = 16;
+    static constexpr int MAX_CHANNELS = 16;
 
     // Polyphonic State
     float phase[MAX_CHANNELS] = {};
@@ -150,7 +150,7 @@ void Kicker::process(const ProcessArgs &args) {
         float body = sin(phase[c] * 2.0f * M_PI);
         
         // Click (Short burst of noise or high pitch sine at start)
-        // Simple trick: Add a tiny bit of squared envelope to the start
+        // trick: Add a tiny bit of squared envelope to the start
         float white = (int32_t(noiseState[c] = noiseState[c] * 1664525 + 1013904223) >> 8) * (1.0f / 8388608.0f);
         white *= noiseGain;
         //float click = white * pitchEnv[c] * pitchEnv[c] * clickLevel;
