@@ -164,7 +164,7 @@ struct Coil : Module {
         configParam(MIX_PARAM, 0.f, 1.f, 1.f, "Mix");
 
         configParam(TENSION_PARAM, 0.1f, 0.95f, 0.4f, "Tension", "");
-        configParam(INERTIA_PARAM, 20.f, 80.f, 50.f, "Inertia", "");
+        configParam(INERTIA_PARAM, 20.f, 160.f, 50.f, "Inertia", "");
         configParam(DAMP_PARAM, 0.f, 1.f, 0.75f, "Damp", "", FREQ_MAX/FREQ_MIN, FREQ_MIN);
 
         configInput(DRIVE_CV, "Drive CV");
@@ -231,8 +231,8 @@ struct Coil : Module {
         float tension = params[TENSION_PARAM].getValue() + (inputs[TENSION_CV].getVoltage() * 0.1f);
         tension = clamp(tension, 0.05f, 0.95f);
 
-        float inertiaMS = params[INERTIA_PARAM].getValue() + (inputs[INERTIA_CV].getVoltage() * 14.f);
-        inertiaMS = clamp(inertiaMS, 10.f, 150.f); // Allow a wider range via CV
+        float inertiaMS = params[INERTIA_PARAM].getValue() + (inputs[INERTIA_CV].getVoltage() * 15.f);
+        inertiaMS = clamp(inertiaMS, 10.f, 160.f); // Allow a wider range via CV
         float inertiaSeconds = inertiaMS / 1000.0f;
 
         float cv_damp =  powf(2.0f, inputs[DAMP_CV].getVoltage());
