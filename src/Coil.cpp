@@ -4,6 +4,8 @@
 #define FREQ_MAX 10000.0f
 #define FREQ_MIN 100.0f
 #define LOG_FREQ_RANGE float(log(FREQ_MAX/FREQ_MIN))
+#define MIN_COILS 6
+#define MAX_COILS 24
 
 // 1st Order All-Pass Filter for Dispersion
 struct AllPassFilter {
@@ -31,16 +33,16 @@ struct AllPassFilter {
 
 // A helper struct to model one physical spring
 struct SpringTank {
-    static constexpr int MAX_BUFFER_SIZE = 96000; // ~2 seconds buffer
+    // 2^17. Holds ~2.7s at 48kHz, or ~170ms at 768kHz.
+    static constexpr int MAX_BUFFER_SIZE = 131072;
     float buffer[MAX_BUFFER_SIZE] = {};
     int writeHead = 0;
     
     // Components
     dsp::RCFilter damper;
-    static constexpr int AP_STAGES = 12; // Easy to change count later
-    AllPassFilter ap[AP_STAGES];
+    AllPassFilter ap[MAX_COILS];
     
-    // Physical variance (Randomness for Stereo Width)
+    // Physical variance (Randomness for stereo width)
     float tensionOffset = 0.f;
     float lengthOffset = 0.f;
 
@@ -200,7 +202,7 @@ struct Coil : Module {
     void dataFromJson(json_t *rootJ) override {
         json_t *ext = json_object_get(rootJ, "coils");
         if (ext) {
-            curr_coils = clamp(json_integer_value(ext), 6 ,12);
+            curr_coils = clamp(json_integer_value(ext), MIN_COILS ,MAX_COILS);
             tankL.setCoils(curr_coils);
             tankR.setCoils(curr_coils);
         }
@@ -356,7 +358,8 @@ struct CoilWidget : ModuleWidget {
         menu->addChild(new MenuLabel());
         menu->addChild(new CoilsNumberMenuItem(a, "Few coils", 6));
         menu->addChild(new CoilsNumberMenuItem(a, "Mid coils", 9));
-        menu->addChild(new CoilsNumberMenuItem(a, "Many coils", 12));
+        menu->addChild(new CoilsNumberMenuItem(a, "More coils", 12));
+        menu->addChild(new CoilsNumberMenuItem(a, "Most coils", 24));
         menu->addChild(new MenuLabel());
     }
 };
