@@ -20,11 +20,12 @@
 
 **/
 
-#define HYSTERESIS_TIME_SEC               0.001
+#define HYSTERESIS_TIME_SEC               0.0003
 #define THRESHOLD_DEFAULT_NOISEGATE_DB  -70.0
 #define THRESHOLD_DEFAULT_EXPANDER_DB   -60.0
 #define THRESHOLD_DEFAULT_COMPRESSOR_DB  -6.0
 #define THRESHOLD_DEFAULT_LIMITER_DB      7.5
+#define THRESHOLD_LIMIT_LOW_DB_LIMITER  -70.0//1.00V
 #define THRESHOLD_LIMIT_LOW_DB          -70.0//0.05V
 #define THRESHOLD_LIMIT_HIGH_DB           7.5//12.0V
 #define ATTACK_LOW_MS                     1.0//was 0.16
@@ -108,9 +109,6 @@ struct Zod : Module {
 	float bufferR[BUFFER_SIZE] = {};
 	int writeIndex = 0;
 
-	// envelope buffer
-	float bufferCV[BUFFER_SIZE];
-
 	// these are here to optimize so not to do expensive ops every step:
 	double ta = -150.0;
 	double tap = -150.0;
@@ -150,7 +148,7 @@ struct Zod : Module {
 		configParam(Zod::T_NOISEGATE_PARAM,  THRESHOLD_LIMIT_LOW_DB, THRESHOLD_LIMIT_HIGH_DB, THRESHOLD_DEFAULT_NOISEGATE_DB, "Noisegate", " dB", 0.0f, 1.0f);
 		configParam(Zod::T_EXPANDER_PARAM,   THRESHOLD_LIMIT_LOW_DB, THRESHOLD_LIMIT_HIGH_DB, THRESHOLD_DEFAULT_EXPANDER_DB, "Expander", " dB", 0.0f, 1.0f);
 		configParam(Zod::T_COMPRESSOR_PARAM, THRESHOLD_LIMIT_LOW_DB, THRESHOLD_LIMIT_HIGH_DB, THRESHOLD_DEFAULT_COMPRESSOR_DB, "Compressor", " dB", 0.0f, 1.0f);
-		configParam(Zod::T_LIMITER_PARAM,    THRESHOLD_LIMIT_LOW_DB, THRESHOLD_LIMIT_HIGH_DB, THRESHOLD_DEFAULT_LIMITER_DB, "Limiter", " dB", 0.0f, 1.0f);
+		configParam(Zod::T_LIMITER_PARAM,    THRESHOLD_LIMIT_LOW_DB_LIMITER, THRESHOLD_LIMIT_HIGH_DB, THRESHOLD_DEFAULT_LIMITER_DB, "Limiter", " dB", 0.0f, 1.0f);
 		configParam(Zod::AVERAGE_TIME_PARAM, RMS_TIME_LOW_MS, RMS_TIME_HIGH_MS, RMS_TIME_DEFAULT_MS, "Average", " ms", 0.0f, 1.0f);
 		configParam(Zod::ATTACK_PARAM, 0.0, 1.0, 0.5, "Attack", " ms", ATTACK_HIGH_MS / ATTACK_LOW_MS, ATTACK_LOW_MS);
 		configParam(Zod::RELEASE_PARAM, 0.0, 1.0, 0.5, "Release", " ms", RELEASE_HIGH_MS / RELEASE_LOW_MS, RELEASE_LOW_MS);
@@ -323,9 +321,9 @@ void Zod::process(const ProcessArgs &args) {
 		params[T_COMPRESSOR_PARAM].setValue(CT);
 	}
 	if (inputs[L_INPUT].isConnected()) {
-		if (inputs[L_INPUT].getVoltage() == 0.0f) LT = THRESHOLD_LIMIT_LOW_DB;
+		if (inputs[L_INPUT].getVoltage() == 0.0f) LT = THRESHOLD_LIMIT_LOW_DB_LIMITER;
 		else LT = this->toDB(fabsf(inputs[L_INPUT].getVoltage()));
-		params[T_LIMITER_PARAM].setValue(LT);
+		params[T_LIMITER_PARAM].setValue(std::max(LT, THRESHOLD_LIMIT_LOW_DB_LIMITER));
 	}
 
 	double TS = (args.sampleTime / OVERSAMPLE) * 1000.0; //ms
@@ -418,52 +416,9 @@ void Zod::process(const ProcessArgs &args) {
 		double peak = this->peak(stereo, ATp, RT);
 		double rms  = this->rms(stereo);
 
-		// static curve:
 		double f = this->staticCurve(rms, peak, LT, LS, CS, CT, CR, NT, ET, ES, ER, knee);
 
-		// Buffer the Target
-		bufferCV[writeIndex] = (float)f;
-
-		// Read the Delayed Target
-		// This corresponds to the audio currently leaving the output buffer.
-		int readIndexF = (writeIndex - (int)D) & (BUFFER_SIZE - 1);
-		double delayed_f = bufferCV[readIndexF];
-
-		f = std::min(f, delayed_f);
-/*
-		if (g_prev > f && attack) {
-			hysteresis = 0;
-		} else if (g_prev > f && !attack) {
-			//hysteresis += 1;
-			// We are in release and want attack, hyst switches to attack immediately
-			hysteresis = hyst_max + 1;
-		} else if (g_prev <= f && !attack) {
-			hysteresis = 0;
-		} else if (g_prev <= f && attack) {
-			hysteresis = +1;
-		}
-		if (hysteresis > hyst_max) {
-			hysteresis = 0;
-			attack = !attack;
-		}
-*/
-		// replacement for hyst:
-		if (f < g_prev) {
-			// Gain needs to reduce? Attack IMMEDIATELY.
-			attack = true;
-			hysteresis = 0;
-		} else if (attack) {
-			// Gain wants to rise (Release), but we are in Attack.
-			// Wait for 'hyst_max' samples before switching to Release.
-			hysteresis++;
-			if (hysteresis > hyst_max) {
-				attack = false;
-				hysteresis = 0;
-			}
-		} else {
-			// We are already in Release state.
-			hysteresis = 0;
-		}
+		bool signalWantsAttack = (f < g_prev);
 
 		double k = 0.0;
 		bool noisegateActive = (lights[A].value > 0.0f);
@@ -475,6 +430,7 @@ void Zod::process(const ProcessArgs &args) {
 			// Force attack time so it opens instantly
 			k = ATn;
 		} else {
+			attack = signalWantsAttack;
 			if (attack) {
 				if (limiter) {
 					k = ATp;
@@ -482,7 +438,11 @@ void Zod::process(const ProcessArgs &args) {
 					k = AT;
 				}
 			} else {
-				k = RT;
+				if (f > g_prev * 1.005f) {
+					k = RT;
+				} else {
+					k = 0.0f;
+				}
 			}
 		}
 
