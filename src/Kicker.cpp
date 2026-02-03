@@ -82,6 +82,13 @@ void Kicker::process(const ProcessArgs &args) {
     int channels = std::max(1, inputs[TRIG_INPUT].getChannels());
     outputs[AUDIO_OUTPUT].setChannels(channels);
 
+    // As rate goes up, we boost the noise to maintain constant Power Density
+    float noiseGain = std::sqrt(args.sampleRate / 44100.0f);
+    // We calculate a new coefficient clickAlpha that keeps the 2500Hz tone
+    // regardless of the user's sample rate.
+    float clickCutoffFreq = 2500.0f;
+    float clickAlpha = 1.0f - std::exp(-2.0f * M_PI * clickCutoffFreq * dt);
+
     float dt = args.sampleTime;
     float baseFreq = params[FREQ_PARAM].getValue();
     float sweepDepth = params[SWEEP_PARAM].getValue() * 400.0f; // 0 to 400Hz drop
@@ -145,6 +152,7 @@ void Kicker::process(const ProcessArgs &args) {
         // Click (Short burst of noise or high pitch sine at start)
         // Simple trick: Add a tiny bit of squared envelope to the start
         float white = (int32_t(noiseState[c] = noiseState[c] * 1664525 + 1013904223) >> 8) * (1.0f / 8388608.0f);
+        white *= noiseGain;
         //float click = white * pitchEnv[c] * pitchEnv[c] * clickLevel;
         //float click = clamp(white * 5.0f, -1.0f, 1.0f) * pitchEnv[c] * pitchEnv[c] * clickLevel;
         //float click = (std::rand() % 2000 / 1000.0f - 1.0f) * pitchEnv[c] * clickLevel;
@@ -163,7 +171,7 @@ void Kicker::process(const ProcessArgs &args) {
         // no clicking when turn the knob.
         float finalEnv = squaredEnv + (linearEnv - squaredEnv) * blend;
 
-        float filteredClick = lastClickFilter[c] + 0.3f * (white - lastClickFilter[c]);
+        float filteredClick = lastClickFilter[c] + clickAlpha * (white - lastClickFilter[c]);
         lastClickFilter[c] = filteredClick;
 
         // Short envelope

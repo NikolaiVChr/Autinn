@@ -151,7 +151,7 @@
       "slug": "Vector",
       "name": "Vxy",
       "description": "Random x-y generator",
-      "keywords": "walk walker",
+      "keywords": "walk walker xy",
       "deprecated": false,
       "tags": [
         "Controller",

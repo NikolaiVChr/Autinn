@@ -86,6 +86,9 @@ void Snare::process(const ProcessArgs &args) {
     int channels = std::max(1, inputs[TRIG_INPUT].getChannels());
     outputs[AUDIO_OUTPUT].setChannels(channels);
 
+    // As rate goes up, we boost the noise to maintain constant Power Density
+    float noiseGain = std::sqrt(args.sampleRate / 44100.0f);
+
     float dt = args.sampleTime;
     float baseFreq = params[FREQ_PARAM].getValue();
     float sweepDepth = params[SWEEP_PARAM].getValue() * 200.0f; 
@@ -157,6 +160,7 @@ void Snare::process(const ProcessArgs &args) {
         s ^= s << 5;
         // Using a float cast on the raw bits for a fast [-1.0, 1.0] range
         float white = (int32_t(s) >> 8) * (1.0f / 8388608.0f);
+        white *= noiseGain;
 
         // Process the noise through the filter
         float hpfNoise = wireFilter[c].process(white);
