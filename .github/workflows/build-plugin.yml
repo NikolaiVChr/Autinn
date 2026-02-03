@@ -31,7 +31,7 @@ jobs:
           }
         - {
             name: MacOS-Intel,
-            os: macos-latest,
+            os: macos-13,
             prepare-os: "",
             prepare-os2: "",
             postfix: mac-x64
