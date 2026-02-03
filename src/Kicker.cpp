@@ -82,18 +82,18 @@ void Kicker::process(const ProcessArgs &args) {
     int channels = std::max(1, inputs[TRIG_INPUT].getChannels());
     outputs[AUDIO_OUTPUT].setChannels(channels);
 
+    float dt = args.sampleTime;
+    float baseFreq = params[FREQ_PARAM].getValue();
+    float sweepDepth = params[SWEEP_PARAM].getValue() * 400.0f; // 0 to 400Hz drop
+    float clickLevel = params[CLICK_PARAM].getValue();
+    float drive = 1.0f + params[DRIVE_PARAM].getValue();
+
     // As rate goes up, we boost the noise to maintain constant Power Density
     float noiseGain = std::sqrt(args.sampleRate / 44100.0f);
     // We calculate a new coefficient clickAlpha that keeps the 2500Hz tone
     // regardless of the user's sample rate.
     float clickCutoffFreq = 2500.0f;
     float clickAlpha = 1.0f - std::exp(-2.0f * M_PI * clickCutoffFreq * dt);
-
-    float dt = args.sampleTime;
-    float baseFreq = params[FREQ_PARAM].getValue();
-    float sweepDepth = params[SWEEP_PARAM].getValue() * 400.0f; // 0 to 400Hz drop
-    float clickLevel = params[CLICK_PARAM].getValue();
-    float drive = 1.0f + params[DRIVE_PARAM].getValue();
     
     // envelope decay by 60dB (factor of 0.001) over 'decayTime' seconds.
     // Coefficient = exp(-6.9 / (decayTime * SampleRate))
