@@ -27,7 +27,7 @@ struct Snare : Module {
         FREQ_PARAM,
         DECAY_PARAM,
         SWEEP_PARAM,
-        SNAP_PARAM, // Was CLICK_PARAM
+        SNAP_PARAM,
         DRIVE_PARAM,
         NUM_PARAMS
     };
@@ -138,7 +138,7 @@ void Snare::process(const ProcessArgs &args) {
         if (ampEnv[c] < 0.001f) ampEnv[c] = 0.0f;
         if (noiseEnv[c] < 0.001f) noiseEnv[c] = 0.0f;
 
-        // 3. Tonal Body (Triangle/Sine mix for body)
+        // Tonal Body (Triangle/Sine mix for body)
         float voct = inputs[VOCT_INPUT].getPolyVoltage(c);
         float pitchMod = sweepDepth * pitchEnv[c];
         float freq = baseFreq * powf(2.0f, voct) + pitchMod;

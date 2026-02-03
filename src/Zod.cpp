@@ -421,7 +421,7 @@ void Zod::process(const ProcessArgs &args) {
 		bool signalWantsAttack = (f < g_prev);
 
 		double k = 0.0;
-		bool noisegateActive = (lights[A].value > 0.0f);
+		bool noisegateActive = lights[A].value > 0.0f;
 		if (noisegateActive) {
 			// Force Release time so it fades out smoothly
 			k = RT;

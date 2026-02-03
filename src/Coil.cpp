@@ -57,8 +57,7 @@ struct SpringTank {
     static constexpr int MAX_BUFFER_SIZE = 131072;
     float buffer[MAX_BUFFER_SIZE] = {};
     int writeHead = 0;
-    
-    // Components
+
     dsp::RCFilter damper;
     AllPassFilter ap[MAX_COILS];
     
@@ -135,8 +134,6 @@ struct SpringTank {
         return buffer[indexA] * (1.0f - frac) + buffer[indexB] * frac;
     }
 };
-
-// --- Module Definition ---
 
 struct Coil : Module {
     enum ParamIds {
