@@ -430,7 +430,7 @@ void Zod::process(const ProcessArgs &args) {
 		double delayed_f = bufferCV[readIndexF];
 
 		f = std::min(f, delayed_f);
-
+/*
 		if (g_prev > f && attack) {
 			hysteresis = 0;
 		} else if (g_prev > f && !attack) {
@@ -446,9 +446,9 @@ void Zod::process(const ProcessArgs &args) {
 			hysteresis = 0;
 			attack = !attack;
 		}
-
+*/
 		// replacement for hyst:
-		//attack = f < g_prev;
+		attack = f < g_prev;
 
 		double k = 0.0;
 		bool noisegateActive = (lights[A].value > 0.0f);
