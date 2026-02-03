@@ -448,7 +448,22 @@ void Zod::process(const ProcessArgs &args) {
 		}
 */
 		// replacement for hyst:
-		attack = f < g_prev;
+		if (f < g_prev) {
+			// Gain needs to reduce? Attack IMMEDIATELY.
+			attack = true;
+			hysteresis = 0;
+		} else if (attack) {
+			// Gain wants to rise (Release), but we are in Attack.
+			// Wait for 'hyst_max' samples before switching to Release.
+			hysteresis++;
+			if (hysteresis > hyst_max) {
+				attack = false;
+				hysteresis = 0;
+			}
+		} else {
+			// We are already in Release state.
+			hysteresis = 0;
+		}
 
 		double k = 0.0;
 		bool noisegateActive = (lights[A].value > 0.0f);
