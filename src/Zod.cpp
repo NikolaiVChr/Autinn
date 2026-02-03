@@ -108,6 +108,9 @@ struct Zod : Module {
 	float bufferR[BUFFER_SIZE] = {};
 	int writeIndex = 0;
 
+	// envelope buffer
+	float bufferCV[BUFFER_SIZE];
+
 	// these are here to optimize so not to do expensive ops every step:
 	double ta = -150.0;
 	double tap = -150.0;
@@ -418,21 +421,34 @@ void Zod::process(const ProcessArgs &args) {
 		// static curve:
 		double f = this->staticCurve(rms, peak, LT, LS, CS, CT, CR, NT, ET, ES, ER, knee);
 
-		if (f_prev - f > 0.0 && attack) {
-			hysteresis += 1;
-		} else if (f_prev - f > 0.0 && !attack) {
+		// Buffer the Target
+		bufferCV[writeIndex] = (float)f;
+
+		// Read the Delayed Target
+		// This corresponds to the audio currently leaving the output buffer.
+		int readIndexF = (writeIndex - (int)D) & (BUFFER_SIZE - 1);
+		double delayed_f = bufferCV[readIndexF];
+
+		f = std::min(f, delayed_f);
+
+		if (g_prev > f && attack) {
 			hysteresis = 0;
-		} else if (f_prev - f <= 0.0 && !attack) {
+		} else if (g_prev > f && !attack) {
 			//hysteresis += 1;
 			// We are in release and want attack, hyst switches to attack immediately
 			hysteresis = hyst_max + 1;
-		} else if (f_prev - f <= 0.0 && attack) {
+		} else if (g_prev <= f && !attack) {
 			hysteresis = 0;
+		} else if (g_prev <= f && attack) {
+			hysteresis = +1;
 		}
 		if (hysteresis > hyst_max) {
 			hysteresis = 0;
 			attack = !attack;
 		}
+
+		// We are in release and want attack, hyst switches to attack immediately
+		hysteresis = hyst_max + 1;
 
 		double k = 0.0;
 		bool noisegateActive = (lights[A].value > 0.0f);
