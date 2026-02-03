@@ -186,9 +186,9 @@ void Snare::process(const ProcessArgs &args) {
     }
 
     if (active) lightDecay = 1.0f;
-    float lightLambda = 1.0f - (args.sampleTime / 0.125f);
-    lightDecay = lightLambda > 0.1f?1.0f:0.0f;
-    lights[ACT_LIGHT].value = lightDecay;
+    float lightLambda = 1.0f - (args.sampleTime / 0.15f);
+    lightDecay *= std::max(0.0f, lightLambda);
+    lights[ACT_LIGHT].value = lightLambda > 0.1f?1.0f:0.0f;
 }
 
 struct SnareWidget : ModuleWidget {
