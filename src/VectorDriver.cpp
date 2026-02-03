@@ -74,19 +74,20 @@ void VectorDriver::process(const ProcessArgs &args) {
 
 	// Only change steering every 0.1 seconds
 	// This allows the car to actually complete a turn before changing its mind
-	if (tim > 0.1f) {
+	if (tim > 0.05f) {
 		tim = 0.0f;
 
 		// Randomly push the steering wheel left or right
 		// We add to the current speed rather than resetting it
-		float nudge = (random::uniform() * 2.f - 1.f) * 100.0f;
+		float nudge = (random::uniform() * 2.f - 1.f) * (50.0f * movementSpeed);
 		rotationSpeed += nudge;
 
 		// slowly return steering to center so it doesn't spin forever
 		rotationSpeed *= 0.9f;
 
-		// Hard limit on how fast it can spin (±200 degrees/sec)
-		rotationSpeed = clamp(rotationSpeed, -200.0f, 200.0f);
+		// Hard limit on how fast it can spin
+		float limit = 100.0f * movementSpeed;
+		rotationSpeed = clamp(rotationSpeed, -limit, limit);
 	}
 
 	angle += rotationSpeed * args.sampleTime;
@@ -129,7 +130,6 @@ void VectorDriver::process(const ProcessArgs &args) {
 	
     outputs[X_OUTPUT].setVoltage(x);
     outputs[Y_OUTPUT].setVoltage(y);
-    tim += dt;
 }
 
 struct VectorDriverWidget : ModuleWidget {
