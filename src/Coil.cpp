@@ -73,7 +73,7 @@ struct SpringTank {
 
         float dispersed = delayOut;
 
-        for (int i = 0; i < AP_STAGES && i < curr_coils; i++) {
+        for (int i = 0; i < MAX_COILS && i < curr_coils; i++) {
             ap[i].setTension(t);
             dispersed = ap[i].process(dispersed);
         }
