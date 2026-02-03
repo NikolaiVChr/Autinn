@@ -25,7 +25,7 @@
 //#define THRESHOLD_DEFAULT_EXPANDER_DB   -60.0
 //#define THRESHOLD_DEFAULT_COMPRESSOR_DB  -6.0
 #define THRESHOLD_DEFAULT_LIMITER_DB      7.5
-#define THRESHOLD_LIMIT_LOW_DB          -15.0// a little less than 1 V
+#define THRESHOLD_LIMIT_LOW_DB           -35.0
 #define THRESHOLD_LIMIT_HIGH_DB           7.5//12.0V
 //#define ATTACK_LOW_MS                     1.0//was 0.16
 //#define ATTACK_HIGH_MS                 2600.0
@@ -338,7 +338,7 @@ void Non::process(const ProcessArgs &args) {
 	}*/
 	if (inputs[L_INPUT].isConnected()) {
 		if (inputs[L_INPUT].getVoltage() == 0.0f) LT = THRESHOLD_LIMIT_LOW_DB;
-		else LT = this->toDB(fabs(inputs[L_INPUT].getVoltage()));
+		else LT = this->toDB(fabsf(inputs[L_INPUT].getVoltage()));
 		params[T_LIMITER_PARAM].setValue(LT);
 	}
 
@@ -434,6 +434,9 @@ void Non::process(const ProcessArgs &args) {
 		} else if (f < g_prev && !attack) {
 			// We are in release and want attack, hyst starts counting towards attack
 			hysteresis += 1;
+
+			// We are in release and want attack, hyst switches to attack immediatly
+			//hysteresis = hyst_max + 1;
 		} else if (f < g_prev && attack) {
 			// We are in attack and want to keep that, hyst not activating
 			hysteresis = 0;
@@ -536,8 +539,8 @@ double Non::staticCurve(double peak, double LT, double LS) {
 	if (peak_dB > LT) {// hard knee:
 		// limiter
 		G = (peak_dB - LT) * (-LS);// - CS * (LT - CT);
-		lights[E].value = 1.0;
-		lights[C].value  = 0.0;
+		lights[E].value = 1.0f;
+		lights[C].value  = 0.0f;
 		limiter = true;
 	} else {
 		/*double x_dB = this->toDB(sqrt(rms));
@@ -558,8 +561,8 @@ double Non::staticCurve(double peak, double LT, double LS) {
 			lights[C].value = 0.5;
 		} else if (x_dB < CTknee) {*/
 			// neutral
-			lights[C].value = 1.0;
-			lights[E].value  = 0.0;
+			lights[C].value = 1.0f;
+			lights[E].value  = 0.0f;
 			G = 0.0;
 		/*} else if (knee > 0.0 && x_dB < CTknee + knee) {
 			// semi compressor
@@ -607,7 +610,7 @@ double Non::smooth(double k, double g_prev, double f) {
 double Non::toDB(double volt) {
 	// Safety Check. Prevent log10(0) or log10(negative).
 	// 0.000001 is -134dB, which is effectively silence in 32-bit float.
-	double v = std::max(std::fabs(volt), 0.000001);
+	double v = std::max(std::abs(volt), 0.000001);
 	return 20.0 * log10(v / 5.0);
 }
 

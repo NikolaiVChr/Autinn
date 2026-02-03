@@ -4,7 +4,7 @@
 /*
 
     Autinn VCV Rack Plugin
-    Copyright (C) 2021  Nikolai V. Chr.
+    Copyright (C) 2026  Nikolai V. Chr.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ struct AllPassFilter {
     }
 };
 
-// A helper struct to model one physical spring
+// models a physical spring
 struct SpringTank {
     // 2^17. Holds ~2.7s at 48kHz, or ~170ms at 768kHz.
     static constexpr int MAX_BUFFER_SIZE = 131072;
@@ -119,7 +119,7 @@ struct SpringTank {
         return filtered;
     }
 
-    float readBufferSmooth(float delaySamples) {
+    float readBufferSmooth(const float delaySamples) {
         float readPos = (float)writeHead - delaySamples;
         while (readPos < 0) readPos += MAX_BUFFER_SIZE;
         while (readPos >= MAX_BUFFER_SIZE) readPos -= MAX_BUFFER_SIZE;
@@ -222,7 +222,7 @@ struct Coil : Module {
     void dataFromJson(json_t *rootJ) override {
         json_t *ext = json_object_get(rootJ, "coils");
         if (ext) {
-            curr_coils = clamp(json_integer_value(ext), MIN_COILS ,MAX_COILS);
+            curr_coils = clamp((int)json_integer_value(ext), MIN_COILS ,MAX_COILS);
             tankL.setCoils(curr_coils);
             tankR.setCoils(curr_coils);
         }
@@ -303,6 +303,17 @@ struct Coil : Module {
         // Add Pluck to input
         inL_scaled += pluckSignal;
         inR_scaled += pluckSignal; // Pluck excites both springs
+
+        /*
+        // --- Mechanical Coupling ---
+        // Simulates energy transferring through the metal chassis.
+        // 2.5% bleed is very subtle but glues the stereo image together.
+        float crosstalk = 0.025f;
+        inL_scaled += inR_scaled * crosstalk;
+        inR_scaled += inL_scaled * crosstalk;
+
+        Not 100% sure this is a good idea
+        */
 
         // --- Process tank models ---
         float wetL = tankL.process(inL_scaled, feedback, tension, inertiaSeconds, dampFreq, args.sampleRate);
@@ -395,7 +406,7 @@ struct CoilWidget : ModuleWidget {
         menu->addChild(new CoilsNumberMenuItem(a, "Few coils", 6));
         menu->addChild(new CoilsNumberMenuItem(a, "Mid coils", 9));
         menu->addChild(new CoilsNumberMenuItem(a, "More coils", 12));
-        menu->addChild(new CoilsNumberMenuItem(a, "Most coils", 24));
+        menu->addChild(new CoilsNumberMenuItem(a, "Many coils", 24));
         menu->addChild(new MenuLabel());
     }
 };

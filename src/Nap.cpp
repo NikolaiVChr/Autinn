@@ -152,7 +152,7 @@ void Nap::process(const ProcessArgs &args) {
 		outputs[NAP_OUTPUT].setVoltage(final*12.0f, c);
 
 		if (c == 0) {
-			float pre_abs = fabs(pre);
+			float pre_abs = fabsf(pre);
 			lights[HIGH_LIGHT].value = fmax(0,(pre_abs-18.0f)*4.0f);
 			lights[MID_LIGHT].value = fmax(0,(pre_abs-4.5f)*2.0f);
 			lights[LOW_LIGHT].value = fmax(0,rescale(pre_abs, 0.0f, 4.5f, 1.0f, 0.0f));

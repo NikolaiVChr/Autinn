@@ -5,7 +5,7 @@
 /*
 
     Autinn VCV Rack Plugin
-    Copyright (C) 2021  Nikolai V. Chr.
+    Copyright (C) 2026  Nikolai V. Chr.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

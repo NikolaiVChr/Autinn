@@ -210,8 +210,7 @@ light tiny         3.2126
 px=mm*75.0/25.4=mm*2.95
 **/
 
-//inlined
-static float non_lin_func(float parm) {
+inline float non_lin_func(const float parm) {
 	// 7 divisions in continued fraction series expansion
 	float x = clamp(parm, -4.97f, 4.97f);
 	float x2 = x * x;
@@ -220,11 +219,24 @@ static float non_lin_func(float parm) {
 	return a / b;
 }
 
-static float non_lin_func2(float parm) {
+inline float non_lin_func2(const float parm) {
 	return parm + (parm * parm * parm) * 0.16666f;// only works from -1.0 to 1.0
 	//return 2.0f * (exp(parm)-exp(-parm));//sinh
 }
-float slew(float input, float input_prev, float maxChangePerSec, float dt);
+
+inline float slew(const float input, float input_prev, const float maxChangePerSec, const float dt) {
+	float delta = input - input_prev;
+
+	if(maxChangePerSec*dt < delta) {
+		delta = maxChangePerSec*dt;
+	}
+	if(-maxChangePerSec*dt > delta) {
+		delta = -maxChangePerSec*dt;
+	}
+	input_prev += delta;
+
+	return input_prev;
+}
 
 ////////////////////
 // module widgets

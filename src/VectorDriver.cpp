@@ -1,6 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-#include <cstdlib>
 
 /*
 
@@ -48,7 +47,7 @@ struct VectorDriver : Module {
 
 	VectorDriver() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(VectorDriver::SPEED_PARAM, 2.0f, 5.0f, 3.5f, "");
+		configParam(VectorDriver::SPEED_PARAM, 0.25f, 5.0f, 3.5f, "");
 		configOutput(X_OUTPUT, "±5V X CV");
 		configOutput(Y_OUTPUT, "±5V Y CV");
 	}
@@ -101,10 +100,10 @@ void VectorDriver::process(const ProcessArgs &args) {
 	x += std::cos(rad) * movementSpeed * args.sampleTime;
 	y += std::sin(rad) * movementSpeed * args.sampleTime;
 
-	// The Fix: "Billiard Ball" Bounce
-	// Instead of clamping (sticking), we reflect the angle when hitting a wall.
+	// Bounce
+	// Instead of clamping, we reflect the angle when hitting a wall.
 
-	// Hit Right or Left Wall? -> Flip X direction (Reflect across Y-axis)
+	// Hit Right or Left Wall? -> Flip X direction
 	if (x > 5.0f) {
 		x = 5.0f;
 		angle = 180.0f - angle;
@@ -116,7 +115,7 @@ void VectorDriver::process(const ProcessArgs &args) {
 		rotationSpeed *= -0.5f;
 	}
 
-	// Hit Top or Bottom Wall? -> Flip Y direction (Reflect across X-axis)
+	// Hit Top or Bottom Wall? -> Flip Y direction
 	if (y > 5.0f) {
 		y = 5.0f;
 		angle = 360.0f - angle;
@@ -143,11 +142,11 @@ struct VectorDriverWidget : ModuleWidget {
 		//addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
 		//addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, VectorDriver::SPEED_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5f-HALF_KNOB_MED, 150), module, VectorDriver::SPEED_PARAM));
 
 		//addInput(createInput<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, VectorDriver::VEC_INPUT));
-		addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, VectorDriver::Y_OUTPUT));
-		addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 250), module, VectorDriver::X_OUTPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5f-HALF_PORT, 300), module, VectorDriver::Y_OUTPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5f-HALF_PORT, 250), module, VectorDriver::X_OUTPUT));
 
 	}
 };

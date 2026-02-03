@@ -180,7 +180,7 @@ struct Zod : Module {
 	}
 
 	double toDB(double volt);
-	double toGain(double dB);
+	static double toGain(double dB);
 	double smooth(double k, double g_prev, double f);
 	double peak(double x, double ATp, double RT);
 	double rms(double x);
@@ -306,22 +306,22 @@ void Zod::process(const ProcessArgs &args) {
 
 	if (inputs[N_INPUT].isConnected()) {
 		if (inputs[N_INPUT].getVoltage() == 0.0f) NT = THRESHOLD_LIMIT_LOW_DB;
-		else NT = this->toDB(fabs(inputs[N_INPUT].getVoltage()));
+		else NT = this->toDB(fabsf(inputs[N_INPUT].getVoltage()));
 		params[T_NOISEGATE_PARAM].setValue(NT);
 	}
 	if (inputs[E_INPUT].isConnected()) {
 		if (inputs[E_INPUT].getVoltage() == 0.0f) ET = THRESHOLD_LIMIT_LOW_DB;
-		else ET = this->toDB(fabs(inputs[E_INPUT].getVoltage()));
+		else ET = this->toDB(fabsf(inputs[E_INPUT].getVoltage()));
 		params[T_EXPANDER_PARAM].setValue(ET);
 	}
 	if (inputs[C_INPUT].isConnected()) {
 		if (inputs[C_INPUT].getVoltage() == 0.0f) CT = THRESHOLD_LIMIT_LOW_DB;
-		else CT = this->toDB(fabs(inputs[C_INPUT].getVoltage()));
+		else CT = this->toDB(fabsf(inputs[C_INPUT].getVoltage()));
 		params[T_COMPRESSOR_PARAM].setValue(CT);
 	}
 	if (inputs[L_INPUT].isConnected()) {
 		if (inputs[L_INPUT].getVoltage() == 0.0f) LT = THRESHOLD_LIMIT_LOW_DB;
-		else LT = this->toDB(fabs(inputs[L_INPUT].getVoltage()));
+		else LT = this->toDB(fabsf(inputs[L_INPUT].getVoltage()));
 		params[T_LIMITER_PARAM].setValue(LT);
 	}
 
@@ -423,7 +423,9 @@ void Zod::process(const ProcessArgs &args) {
 		} else if (f_prev - f > 0.0 && !attack) {
 			hysteresis = 0;
 		} else if (f_prev - f <= 0.0 && !attack) {
-			hysteresis += 1;
+			//hysteresis += 1;
+			// We are in release and want attack, hyst switches to attack immediately
+			hysteresis = hyst_max + 1;
 		} else if (f_prev - f <= 0.0 && attack) {
 			hysteresis = 0;
 		}
@@ -524,17 +526,17 @@ double Zod::staticCurve(double rms, double peak, double LT, double LS, double CS
 	double peak_dB = this->toDB(peak);
 	double G = 0.0;
 
-	lights[A].value  = 0.0;
-	lights[B].value  = 0.0;
-	lights[C].value  = 0.0;
-	lights[DD].value = 0.0;
-	lights[E].value  = 0.0;
+	lights[A].value  = 0.0f;
+	lights[B].value  = 0.0f;
+	lights[C].value  = 0.0f;
+	lights[DD].value = 0.0f;
+	lights[E].value  = 0.0f;
 
 	bool noisegate_active = (NT > THRESHOLD_LIMIT_LOW_DB + 0.001);
 	double x_dB = this->toDB(sqrt(rms));
 	if (noisegate_active && x_dB < NT) {// hard knee:
 		// noise gate
-		lights[A].value = 1.0;
+		lights[A].value = 1.0f;
 		return 0.0;
 	}
 	if (peak_dB > LT) {// hard knee:
@@ -545,7 +547,7 @@ double Zod::staticCurve(double rms, double peak, double LT, double LS, double CS
 		}
 
 		G = (peak_dB - LT) * (-LS) + comp_offset;
-		lights[E].value = 1.0;
+		lights[E].value = 1.0f;
 		limiter = true;
 	} else {
 
@@ -554,24 +556,24 @@ double Zod::staticCurve(double rms, double peak, double LT, double LS, double CS
 		if (x_dB < ETknee) {
 			// full expander
 			G = (x_dB - ET) * (-ES);
-			lights[B].value = 1.0;
+			lights[B].value = 1.0f;
 		} else if (x_dB < ETknee + knee) {
 			// semi expander
 			G = -(1.0 / ER - 1.0) * pow(x_dB - ET - knee * 0.5, 2.0) / (2.0 * knee);
-			lights[B].value = 0.5;
-			lights[C].value = 0.5;
+			lights[B].value = 0.5f;
+			lights[C].value = 0.5f;
 		} else if (x_dB < CTknee) {
 			// neutral
-			lights[C].value = 1.0;
+			lights[C].value = 1.0f;
 			G = 0.0;
 		} else if (knee > 0.0 && x_dB < CTknee + knee) {
 			// semi compressor
-			lights[DD].value = 0.5;
-			lights[C].value  = 0.5;
+			lights[DD].value = 0.5f;
+			lights[C].value  = 0.5f;
 			G = (1.0 / CR - 1.0) * pow(x_dB - CT + knee * 0.5, 2.0) / (2.0 * knee);
 		} else {
 			// full compressor
-			lights[DD].value = 1.0;
+			lights[DD].value = 1.0f;
 			G = (x_dB - CT) * (-CS);
 		}
 		// n | e | 1 | c | l
@@ -601,7 +603,7 @@ double Zod::smooth(double k, double g_prev, double f) {
 double Zod::toDB(double volt) {
 	// Safety Check. Prevent log10(0) or log10(negative).
 	// 0.000001 is -134dB, which is effectively silence in 32-bit float.
-	double v = std::max(std::fabs(volt), 0.000001);
+	double v = std::max(std::abs(volt), 0.000001);
 	return 20.0 * log10(v / 5.0);
 }
 

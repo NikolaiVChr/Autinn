@@ -4,11 +4,7 @@
 #include <vector>
 #include <algorithm> // copy(), assign()
 #include <iterator> // back_inserter()
-#include <sys/time.h>
 
-
-//#include <iostream>
-//#include <string>
 
 /*
 
@@ -645,9 +641,9 @@ int Melody::attenuvertInt(int CV, int KNOB, float min_result, float max_result) 
 
 void Melody::attenuvert(int CV, int KNOB, float min_result, float max_result) {
 	if (inputs[CV].isConnected()) {
-		int result = clamp(rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, min_result, max_result), min_result, max_result);
-		if (params[KNOB].getValue() != result) { 
-	        params[KNOB].setValue(result); 
+		int result = static_cast<int>(clamp(rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, min_result, max_result), min_result, max_result));
+		if (params[KNOB].getValue() != (float)result) {
+	        params[KNOB].setValue((float)result);
 	    }
 	}
 }

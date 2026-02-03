@@ -153,8 +153,8 @@ void Jette::process(const ProcessArgs &args) {
 
 		// --- Chebyshev Recursion ---
 		if (shape == 0) { // SQUARE
-			float s1 = sin(p);
-			float c1 = cos(p);
+			float s1 = sinf(p);
+			float c1 = cosf(p);
 
 			float val_curr = s1;
 			float val_prev = 0.0f; // sin(0)

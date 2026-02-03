@@ -141,7 +141,7 @@ void Fil::process(const ProcessArgs &args) {
 
 			// Update Lights based on saturation intensity
 			if (c == 0 && i == 0) {
-				float signal_abs = std::fabs(x);
+				float signal_abs = std::abs(x);
 				// Green: Signal present
 				lights[LOW_LIGHT].value  = (signal_abs > 0.1f) ? 1.0f : 0.0f;
 				// Yellow: Tube is warming up (saturation starting)

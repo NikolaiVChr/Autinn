@@ -84,7 +84,7 @@ void Amp::process(const ProcessArgs &args) {
 		outputs[AMP_OUTPUT].setVoltage(out, c);
 
 		if (c == 0) {
-			float light = fabs(in);
+			float light = fabsf(in);
 			lights[BLINK_LIGHT].value = (light > 10.0f) ? 1.0 : 0.0;
 		}
 	}

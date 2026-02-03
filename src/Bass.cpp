@@ -1,6 +1,5 @@
 #include "Autinn.hpp"
 #include <cmath>
-#include <iostream>
 #include <string>
 
 /*
@@ -440,7 +439,7 @@ void Bass::process(const ProcessArgs &args) {
 	note_prev = note;
 	
 	
-	lights[GAIN_LIGHT].value = clamp(fabs(osc)-EXPECTED_PEAK_INPUT,0.0f,1.0f)*1.0f;//OSC input has too much gain. (7V+)
+	lights[GAIN_LIGHT].value = clamp(fabsf(osc)-EXPECTED_PEAK_INPUT,0.0f,1.0f)*1.0f;//OSC input has too much gain. (7V+)
 }
 
 float Bass::attackCurve(float xx, unsigned target) {

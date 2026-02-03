@@ -5,7 +5,7 @@
 /*
 
     Autinn VCV Rack Plugin
-    Copyright (C) 2021  Nikolai V. Chr.
+    Copyright (C) 2026  Nikolai V. Chr.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -186,7 +186,7 @@ void Snare::process(const ProcessArgs &args) {
     }
 
     if (active) lightDecay = 1.0f;
-    float lightLambda = 1.0f - (args.sampleTime / 0.15f);
+    float lightLambda = 1.0f - (args.sampleTime / 0.1f);
     lightDecay *= std::max(0.0f, lightLambda);
     lights[ACT_LIGHT].value = lightDecay > 0.2f?1.0f:0.0f;
 }
