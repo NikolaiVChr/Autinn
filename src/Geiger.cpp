@@ -21,6 +21,12 @@
 
 **/
 
+struct RadiationQuantity : ParamQuantity {
+    int getDisplayPrecision() override {
+        return 3;
+    }
+};
+
 struct Geiger : Module {
     enum ParamIds {
         RAD_PARAM,
@@ -60,7 +66,8 @@ struct Geiger : Module {
 
     Geiger() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "mR/h", DISP_BASE, DISP_MULT, DISP_OFFSET);
+        configParam<RadiationQuantity>(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "mR/h", DISP_BASE, DISP_MULT, DISP_OFFSET);
+
         
         configInput(TRIG_INPUT, "Manual Click Trigger");
         configInput(RAD_CV_INPUT, "Radiation Level CV");
