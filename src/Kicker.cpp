@@ -141,14 +141,13 @@ void Kicker::process(const ProcessArgs &args) {
             pitchEnv[c] = 1.0f;
             phase[c] = 0.25f; // Reset phase for consistent punch
             activeState[c] = true;
+            lightActive = true;
         }
 
         if (!activeState[c]) {
             outputs[AUDIO_OUTPUT].setVoltage(0.0f, c);
             continue;
         }
-
-        lightActive = true;
 
         // Envelopes
         ampEnv[c] *= decayCoeff;
