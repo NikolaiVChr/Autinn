@@ -329,6 +329,20 @@ void Saw::process(const ProcessArgs &args) {
 
 		float deltaPhase = freq * deltaTime;
 
+		int mode = 0; // 0: Low, 1: High, 2: Blend
+		float blend = 0.0f;
+		float mean = 0.0f;
+
+		if (freq < lowHigh[0]) {
+			mode = 0;
+		} else if (freq > lowHigh[1]) {
+			mode = 1;
+		} else {
+			mode = 2;
+			blend = (freq - lowHigh[0]) / (lowHigh[1] - lowHigh[0]);
+			mean = interpolator(blend, meanLow, meanHigh);
+		}
+
 		float outBuf  [oversample];
 
 		for (int i = 0; i < oversample; i++) {
@@ -340,21 +354,17 @@ void Saw::process(const ProcessArgs &args) {
 			int idx = (int)p;
 			float frac = p - idx;
 
-			// O(1) Lookup
-			float buzzL = lutSawLow[idx] + frac * (lutSawLow[idx + 1] - lutSawLow[idx]);
-			float buzzH = lutSawHigh[idx] + frac * (lutSawHigh[idx + 1] - lutSawHigh[idx]);
-
 			float out = 0.0f;
-			if (freq < lowHigh[0]) {
+			if (mode == 0) {
+				float buzzL = interpolator(frac, lutSawLow[idx], lutSawLow[idx + 1]);
 				out = (buzzL - meanLow);
-			} else if (freq > lowHigh[1]) {
+			} else if (mode == 1) {
+				float buzzH = interpolator(frac, lutSawHigh[idx], lutSawHigh[idx + 1]);
 				out = (buzzH - meanHigh);
 			} else {
-				float blend = (freq - lowHigh[0]) / (lowHigh[1] - lowHigh[0]);
-				float buzz = buzzL + blend * (buzzH - buzzL);
-
-				// Linearly interpolate mean
-				float mean = meanLow + blend * (meanHigh - meanLow);
+				float buzzL = interpolator(frac, lutSawLow[idx], lutSawLow[idx + 1]);
+				float buzzH = interpolator(frac, lutSawHigh[idx], lutSawHigh[idx + 1]);
+				float buzz = interpolator(blend, buzzL, buzzH);
 				out = (buzz - mean);
 			}
 			outBuf[i] = out;

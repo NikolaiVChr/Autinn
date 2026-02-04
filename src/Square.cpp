@@ -271,6 +271,18 @@ void Square::process(const ProcessArgs &args) {
 		float period = 1.0f;
 		float deltaPhase = freq * deltaTime * period;
 
+		int mode = 0; // 0: Low, 1: High, 2: Blend
+		float blend = 0.0f;
+
+		if (freq < lowHigh[0]) {
+			mode = 0;
+		} else if (freq > lowHigh[1]) {
+			mode = 1;
+		} else {
+			mode = 2;
+			blend = (freq - lowHigh[0]) / (lowHigh[1] - lowHigh[0]);
+		}
+
 		float outBuf  [oversample];
 
 		for (int i = 0; i < oversample; i++) {
@@ -281,19 +293,15 @@ void Square::process(const ProcessArgs &args) {
 			int idx = (int)p;
 			float frac = p - idx;
 
-			// O(1) Lookup
-			float buzzL = lutSquareLow[idx] + frac * (lutSquareLow[idx + 1] - lutSquareLow[idx]);
-			float buzzH = lutSquareHigh[idx] + frac * (lutSquareHigh[idx + 1] - lutSquareHigh[idx]);
-
 			float out = 0.0f;
-			if (freq < lowHigh[0]) {
-				out = buzzL;
-			} else if (freq > lowHigh[1]) {
-				out = buzzH;
+			if (mode == 0) {
+				out = interpolator(frac, lutSquareLow[idx], lutSquareLow[idx + 1]);
+			} else if (mode == 1) {
+				out = interpolator(frac, lutSquareHigh[idx], lutSquareHigh[idx + 1]);
 			} else {
-				float blend = (freq - lowHigh[0]) / (lowHigh[1] - lowHigh[0]);
-				float buzz = buzzL + blend * (buzzH - buzzL);
-				out = buzz;
+				float buzzL = interpolator(frac, lutSquareLow[idx], lutSquareLow[idx + 1]);
+				float buzzH = interpolator(frac, lutSquareHigh[idx], lutSquareHigh[idx + 1]);
+				out = interpolator(blend, buzzL, buzzH);
 			}
 
 			outBuf[i] = out;

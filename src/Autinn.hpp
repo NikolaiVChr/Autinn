@@ -224,6 +224,10 @@ inline float non_lin_func2(const float parm) {
 	//return 2.0f * (exp(parm)-exp(-parm));//sinh
 }
 
+inline float interpolator(float mix, float a, float b) {
+	return a + mix * (b - a);
+}
+
 inline float slew(const float input, float input_prev, const float maxChangePerSec, const float dt) {
 	float delta = input - input_prev;
 
