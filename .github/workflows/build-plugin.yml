@@ -149,7 +149,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          #Unexpected input(s) 'release_name', valid inputs are ['body', 'body_path', 'name', 'tag_name', 'draft', 'prerelease', 'preserve_order', 'files', 'working_directory', 'overwrite_files', 'fail_on_unmatched_files', 'repository', 'token', 'target_commitish', 'discussion_category_name', 'generate_release_notes', 'append_body', 'make_latest']
+          name: Release ${{ github.ref }}
           body: |
             ${{ env.GITHUB_REPOSITORY_NAME }} VCV Rack Plugin ${{ env.CI_REF_NAME }}
           draft: false
