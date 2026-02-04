@@ -30,6 +30,9 @@ struct RadiationQuantity : ParamQuantity {
 struct Geiger : Module {
     enum ParamIds {
         RAD_PARAM,
+        HZ_LOW,
+        HZ_HIGH,
+        Q,
         NUM_PARAMS
     };
     enum InputIds {
@@ -70,7 +73,10 @@ struct Geiger : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam<RadiationQuantity>(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "mR/h", DISP_BASE, DISP_MULT, DISP_OFFSET);
 
-        
+        configParam<RadiationQuantity>(HZ_LOW, 20.0f, 400.0f, 40.0f, "LOW", "");
+        configParam<RadiationQuantity>(HZ_HIGH, 750.0f, 5000.0f, 1250.0f, "HIGH", "");
+        configParam<RadiationQuantity>(Q, 0.5f, 3.0f, 2.0f, "Q", "");
+
         configInput(TRIG_INPUT, "Manual Click Trigger");
         configInput(RAD_CV_INPUT, "Radiation Level CV");
         configOutput(AUDIO_OUTPUT, "Audio Out");
@@ -83,13 +89,17 @@ struct Geiger : Module {
         channels = std::max(channels, inputs[RAD_CV_INPUT].getChannels());
         outputs[AUDIO_OUTPUT].setChannels(channels);
 
+        float lp = params[HZ_LOW].getValue();//40
+        float hp = params[HZ_HIGH].getValue();//1250
+        float qq = params[Q].getValue();//2.0
+
         if (stepDivider++ >= 32) {
             stepDivider = 0;
 
 
             // Update Filter
             // 2.5kHz Bandpass with high Q gives that sharp plastic click sound.
-            float freq = 1250.0f;
+            float freq = hp;
             float q = 2.5f;
 
             // calculate normalized freq here.
@@ -98,7 +108,7 @@ struct Geiger : Module {
 
             // Highpass, the Spring restoring the speaker
             // This blocks the DC accumulation at high radiation levels
-            filter_hp_f = 40.0f * args.sampleTime;
+            filter_hp_f = lp * args.sampleTime;
 
             // dsp::BiquadFilter::setParameters is relatively fast but let's do it safely.
         }
@@ -147,7 +157,7 @@ struct Geiger : Module {
             // Speaker Physics
             // Update filter: Lowpass allows the low-end "pop" to pass through.
             // Q = 2.0 simulates the speaker cone ringing slightly after the hit.
-            speakerFilter[c].setParameters(dsp::BiquadFilter::LOWPASS, filter_f, 2.0f, 1.0f);
+            speakerFilter[c].setParameters(dsp::BiquadFilter::LOWPASS, filter_f, qq, 1.0f);
 
             // Drive the speaker hard
             float out = speakerFilter[c].process(raw_pulse * 10.0f);
@@ -186,6 +196,11 @@ struct GeigerWidget : ModuleWidget {
 
         // Knob
         addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Geiger::RAD_PARAM));
+
+        // debu knobs
+        addParam(createParam<RoundTinyAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 180), module, Geiger::HZ_LOW));
+        addParam(createParam<RoundTinyAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 200), module, Geiger::HZ_HIGH));
+        addParam(createParam<RoundTinyAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 220), module, Geiger::Q));
 
         // Light
         addChild(createLight<MediumLight<GreenLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Geiger::ACT_LIGHT));
