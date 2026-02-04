@@ -56,6 +56,17 @@ struct Kicker : Module {
     uint32_t noiseState[16] = {};
     float lastClickFilter[16] = {};
 
+    int stepDivider = 33;
+    float noiseGain = 1.0f;
+    float baseFreq = 60.0f;
+    float sweepDepth = 0.0f;
+    float clickLevel = 0.0f;
+    float drive = 1.0f;
+    float clickAlpha = 0.0f;
+    float decayCoeff = 0.0f;
+    float pitchDecayCoeff = 0.0f;
+    float envBlend = 0.0f;
+
     Kicker() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(FREQ_PARAM, 30.0f, 200.0f, 60.0f, "Tune", " Hz");
@@ -83,32 +94,41 @@ void Kicker::process(const ProcessArgs &args) {
     outputs[AUDIO_OUTPUT].setChannels(channels);
 
     float dt = args.sampleTime;
-    float baseFreq = params[FREQ_PARAM].getValue();
-    float sweepDepth = params[SWEEP_PARAM].getValue() * 400.0f; // 0 to 400Hz drop
-    float clickLevel = params[CLICK_PARAM].getValue();
-    float drive = 1.0f + params[DRIVE_PARAM].getValue();
 
-    // As rate goes up, we boost the noise to maintain constant Power Density
-    float noiseGain = std::sqrt(args.sampleRate / 44100.0f);
-    // We calculate a new coefficient clickAlpha that keeps the 2500Hz tone
-    // regardless of the user's sample rate.
-    float clickCutoffFreq = 2500.0f;
-    float clickAlpha = 1.0f - std::exp(-2.0f * M_PI * clickCutoffFreq * dt);
-    
-    // envelope decay by 60dB (factor of 0.001) over 'decayTime' seconds.
-    // Coefficient = exp(-6.9 / (decayTime * SampleRate))
-    //float decayParam = params[DECAY_PARAM].getValue();
-    //float decayCoeff = 1.0f - (6.9f * dt / decayParam);
-    //decayCoeff = clamp(decayCoeff, 0.999f, 0.99999f); // Safety limits
+    if (stepDivider++ >= 32) {
+        stepDivider = 0;
 
-    // Pitch envelope creates the "Thump" - needs to be faster than amp envelope
-    //float pitchDecayCoeff = 1.0f - (20.0f * dt); // Fixed fast decay for punch
+        // As rate goes up, we boost the noise to maintain constant Power Density
+        noiseGain = std::sqrt(args.sampleRate / 44100.0f);
 
-    float decayVal = std::max(params[DECAY_PARAM].getValue(), 0.01f);
-    float decayCoeff = std::exp(-1.0f / (decayVal * args.sampleRate));
-    //float pitchDecayCoeff = std::exp(-1.0f / (0.02f * args.sampleRate)); // 20ms fixed sweep
-    float pitchTime = 0.005f + (decayVal * 0.015f);
-    float pitchDecayCoeff = std::exp(-1.0f / (pitchTime * args.sampleRate));
+        baseFreq = params[FREQ_PARAM].getValue();
+        sweepDepth = params[SWEEP_PARAM].getValue() * 400.0f;
+        clickLevel = params[CLICK_PARAM].getValue();
+        drive = 1.0f + params[DRIVE_PARAM].getValue();
+
+        // We calculate a new coefficient clickAlpha that keeps the 2500Hz tone
+        // regardless of the user's sample rate.
+        float clickCutoffFreq = 2500.0f;
+        clickAlpha = 1.0f - std::exp(-2.0f * M_PI * clickCutoffFreq * dt);
+
+        // envelope decay by 60dB (factor of 0.001) over decayTime seconds.
+        // Coefficient = exp(-6.9 / (decayTime * SampleRate))
+        //float decayParam = params[DECAY_PARAM].getValue();
+        //float decayCoeff = 1.0f - (6.9f * dt / decayParam);
+        //decayCoeff = clamp(decayCoeff, 0.999f, 0.99999f); // Safety limits
+        float decayVal = std::max(params[DECAY_PARAM].getValue(), 0.01f);
+        decayCoeff = std::exp(-1.0f / (decayVal * args.sampleRate));
+
+        // Pitch envelope creates the "Thump" - needs to be faster than amp envelope
+        //float pitchDecayCoeff = 1.0f - (20.0f * dt); // Fixed fast decay for punch
+        //float pitchDecayCoeff = std::exp(-1.0f / (0.02f * args.sampleRate)); // 20ms fixed sweep
+        float pitchTime = 0.005f + (decayVal * 0.015f);
+        pitchDecayCoeff = std::exp(-1.0f / (pitchTime * args.sampleRate));
+
+        // Adaptive Envelope Blend
+        envBlend = clamp((decayVal - 0.4f) * 5.0f, 0.0f, 1.0f);
+    }
+
 
     bool active = false;
 
@@ -167,9 +187,9 @@ void Kicker::process(const ProcessArgs &args) {
         // When Knob < 0.4, factor is 0.0 (Pure Squared/Dry)
         // When Knob > 0.6, factor is 1.0 (Pure Linear/Boomy)
         // Between 0.4 and 0.6, it blends smoothly.
-        float blend = clamp((decayVal - 0.4f) * 5.0f, 0.0f, 1.0f);
+
         // no clicking when turn the knob.
-        float finalEnv = squaredEnv + (linearEnv - squaredEnv) * blend;
+        float finalEnv = squaredEnv + (linearEnv - squaredEnv) * envBlend;
 
         float filteredClick = lastClickFilter[c] + clickAlpha * (white - lastClickFilter[c]);
         lastClickFilter[c] = filteredClick;
