@@ -48,12 +48,14 @@ struct Geiger : Module {
 
     dsp::SchmittTrigger triggers[16];
     dsp::BiquadFilter speakerFilter[16];
+    dsp::BiquadFilter dcBlocker[16]; // Restores speaker to center
 
     int pulseTimer[16] = {};
 
     float lightDecay = 0.0f;
     int stepDivider = 33;
     float filter_f = 0.0f;
+    float filter_hp_f = 0.0f;
 
     // 1 mR/h ~= 1300 CPM (SBM-20 tube) -> ~21.666 Hz
     const float HZ_PER_MRH = 21.666f;
@@ -93,6 +95,10 @@ struct Geiger : Module {
             // calculate normalized freq here.
             filter_f = freq * args.sampleTime;
             // If sample rate changes, we should update.
+
+            // Highpass, the Spring restoring the speaker
+            // This blocks the DC accumulation at high radiation levels
+            filter_hp_f = 40.0f * args.sampleTime;
 
             // dsp::BiquadFilter::setParameters is relatively fast but let's do it safely.
         }
@@ -145,6 +151,9 @@ struct Geiger : Module {
 
             // Drive the speaker hard
             float out = speakerFilter[c].process(raw_pulse * 10.0f);
+
+            dcBlocker[c].setParameters(dsp::BiquadFilter::HIGHPASS, filter_hp_f, 0.707f, 1.0f);
+            out = dcBlocker[c].process(out);
 
             // Output Transformer/Speaker Saturation
             // This compresses the loud click, making it sound solid rather than spikey.
