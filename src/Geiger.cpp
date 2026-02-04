@@ -50,9 +50,18 @@ struct Geiger : Module {
     float cached_probability_base = 0.0f; // From knob
     float filter_f = 0.0f;
 
+    // 1 mR/h ~= 1300 CPM (SBM-20 tube) -> ~21.66 Hz
+    const float HZ_PER_MRH = 21.66f;
+
+    // Display Scaling
+    // 0.01 mR/h (Background) to 50.0 mR/h
+    const float DISP_BASE = 5000.0f;
+    const float DISP_MULT = 0.01f;
+    const float DISP_OFFSET = 0.0f;
+
     Geiger() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "%", -4, 800, 0.2);
+        configParam(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "mR/h", DISP_BASE, DISP_MULT, DISP_OFFSET);
         
         configInput(TRIG_INPUT, "Manual Click Trigger");
         configInput(RAD_CV_INPUT, "Radiation Level CV");
@@ -74,8 +83,11 @@ struct Geiger : Module {
             // 0.0 -> ~0.2 Hz (Cosmic background)
             // 1.0 -> ~500 Hz (Chernobyl buzz)
             float knob = params[RAD_PARAM].getValue();
-            float density = 0.2f + powf(knob, 4.0f) * 800.0f; // Events per second
-            cached_probability_base = density * args.sampleTime;
+            float mRh = DISP_MULT * std::pow(DISP_BASE, knob) + DISP_OFFSET;
+
+            // 2. Convert mR/h to Hz (Clicks per second) for the physics engine
+            float densityHz = mRh * HZ_PER_MRH;
+            cached_probability_base = densityHz * args.sampleTime;
 
             // Update Filter (Fixed characteristic of the "box")
             // 2.5kHz Bandpass with high Q gives that sharp "plastic" click sound.
@@ -104,7 +116,12 @@ struct Geiger : Module {
 
             // Stochastic Probability
             float cv = inputs[RAD_CV_INPUT].getChannels() > c?inputs[RAD_CV_INPUT].getPolyVoltage(c):inputs[RAD_CV_INPUT].getVoltage() * 0.1f;
-            float combined_prob = clamp(cached_probability_base + (cv * cv * 500.0f * args.sampleTime), 0.0f, 1.0f);
+            float mRh = DISP_MULT * std::pow(DISP_BASE, cv) + DISP_OFFSET;
+
+            // 2. Convert mR/h to Hz (Clicks per second) for the physics engine
+            float densityHz = mRh * HZ_PER_MRH;
+            float cv_probability_base = densityHz * args.sampleTime;
+            float combined_prob = clamp(cached_probability_base + cv_probability_base, 0.0f, 1.0f);
 
             if (random::uniform() < combined_prob) {
                 triggered = true;
