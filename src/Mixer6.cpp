@@ -99,6 +99,13 @@ struct Mixer6 : Module {
 
 	float rate_prev = -1.0f;
 
+	int stepDivider = 33;
+	float cached_pan_cos[num_mono_channels];
+	float cached_pan_sin[num_mono_channels];
+	float cached_level[num_mono_channels];
+	float cached_sendA[num_mono_channels];
+	float cached_sendB[num_mono_channels];
+
 	Mixer6() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
@@ -175,9 +182,41 @@ void Mixer6::process(const ProcessArgs &args) {
 	// VCV Rack CV is +-5V or 0V-10V
 	step++;
 
-	this->handleMuteButtons();
+	if (stepDivider++ >= 32) {
+		stepDivider = 0;
 
-	float rate   = args.sampleRate;
+		this->handleMuteButtons();
+
+		float rate = args.sampleRate;
+
+		// Only recalculate filters if rate changed or we are in the slow block
+		// We iterate all channels here to prep coefficients
+		for (int ch = 0; ch < num_mono_channels; ch++) {
+			float low    = params[LOW_PARAM+ch].getValue();
+			float mid    = params[MID_PARAM+ch].getValue();
+			float high   = params[HIGH_PARAM+ch].getValue();
+
+			// Logic check: Only update if changed (or first run)
+			if (low != low_prev[ch] || mid != mid_prev[ch] || high != high_prev[ch] || rate != rate_prev) {
+				lowS[ch].setParameters(lowS[ch].LOWSHELF, c1/rate, Qs, low);
+				midP[ch].setParameters(midP[ch].PEAK, c2/rate, Qp, mid);
+				highS[ch].setParameters(highS[ch].HIGHSHELF, c3/rate, Qs, high);
+
+				low_prev[ch] = low;
+				mid_prev[ch] = mid;
+				high_prev[ch] = high;
+			}
+
+			// Cache params to avoid array lookups in audio loop
+			float pan = params[PAN_PARAM+ch].getValue();
+			cached_level[ch] = params[CHANNEL_LEVEL_PARAM+ch].getValue();
+			cached_sendA[ch] = params[FX_A_SEND_PARAM+ch].getValue();
+			cached_sendB[ch] = params[FX_B_SEND_PARAM+ch].getValue();
+			cached_pan_cos[ch] = cos(pan);
+			cached_pan_sin[ch] = sin(pan);
+		}
+		rate_prev = rate;
+	}
 
 	float fx_send_A = 0;
 	float fx_send_B = 0;
@@ -199,22 +238,6 @@ void Mixer6::process(const ProcessArgs &args) {
 			in /= sqrtf((float)polyChannels);
 		} else {
 			in = inputs[INPUT + ch].getVoltage();
-		}
-
-
-		float low    = params[LOW_PARAM+ch].getValue();
-		float mid    = params[MID_PARAM+ch].getValue();
-		float high   = params[HIGH_PARAM+ch].getValue();
-
-		// Update Coefficients (Only if changed)
-		if (low != low_prev[ch] || mid != mid_prev[ch] || high != high_prev[ch] || rate != rate_prev) {
-			lowS[ch].setParameters(lowS[ch].LOWSHELF, c1/rate, Qs, low);
-			midP[ch].setParameters(midP[ch].PEAK, c2/rate, Qp, mid);
-			highS[ch].setParameters(highS[ch].HIGHSHELF, c3/rate, Qs, high);
-
-			low_prev[ch] = low;
-			mid_prev[ch] = mid;
-			high_prev[ch] = high;
 		}
 
 		// --- (Daisy Chain) ---
@@ -240,12 +263,11 @@ void Mixer6::process(const ProcessArgs &args) {
 			out = stage2;
 		}
 
-		fx_send_A += params[FX_A_SEND_PARAM+ch].getValue() * out;
-		fx_send_B += params[FX_B_SEND_PARAM+ch].getValue() * out;
-		float pan = params[PAN_PARAM+ch].getValue();
-		float level = params[CHANNEL_LEVEL_PARAM+ch].getValue();
-		main_left  += cos(pan) * level * out;
-		main_right += sin(pan) * level * out;
+		fx_send_A += cached_sendA[ch] * out;
+		fx_send_B += cached_sendB[ch] * out;
+		float level = cached_level[ch];
+		main_left  += cached_pan_cos[ch] * level * out;
+		main_right += cached_pan_sin[ch] * level * out;
 	}
 	
 	// FX
@@ -294,8 +316,6 @@ void Mixer6::process(const ProcessArgs &args) {
 	main_right *= params[LEVEL_MAIN].getValue();
 	outputs[MIXER_OUTPUT_L].setVoltage(main_left);
 	outputs[MIXER_OUTPUT_R].setVoltage(main_right);
-
-	rate_prev = rate;
 
 	// VU meters
 	vuMeterFXA_L.process(args.sampleTime, fx_return_left_A * 0.1f);
