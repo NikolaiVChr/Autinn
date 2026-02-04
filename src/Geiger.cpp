@@ -52,7 +52,7 @@ struct Geiger : Module {
 
     Geiger() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "%");
+        configParam(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "%", -4, 800, 0.2);
         
         configInput(TRIG_INPUT, "Manual Click Trigger");
         configInput(RAD_CV_INPUT, "Radiation Level CV");
@@ -80,7 +80,7 @@ struct Geiger : Module {
             // Update Filter (Fixed characteristic of the "box")
             // 2.5kHz Bandpass with high Q gives that sharp "plastic" click sound.
             // Calculating this here saves expensive trig calls per sample.
-            float freq = 750.0f;
+            float freq = 1000.0f;
             float q = 2.5f;
             // Note: We set parameters per channel later if we want variation, 
             // but for a uniform machine, calculating coefficients once is efficient.
@@ -162,17 +162,17 @@ struct GeigerWidget : ModuleWidget {
         addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         // Knob
-        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(box.size.x/2, 100), module, Geiger::RAD_PARAM));
+        addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Geiger::RAD_PARAM));
 
         // Light
-        addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x/2, 150), module, Geiger::ACT_LIGHT));
+        addChild(createLight<MediumLight<GreenLight>>(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Geiger::ACT_LIGHT));
 
         // Inputs
-        addInput(createInputCentered<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Geiger::TRIG_INPUT));
-        addInput(createInputCentered<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 115), module, Geiger::RAD_CV_INPUT));
+        addInput(createInput<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Geiger::TRIG_INPUT));
+        addInput(createInput<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 115), module, Geiger::RAD_CV_INPUT));
 
         // Output
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Geiger::AUDIO_OUTPUT));
+        addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Geiger::AUDIO_OUTPUT));
     }
 };
 
