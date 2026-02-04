@@ -40,9 +40,6 @@ struct Disee : Module {
 		NUM_LIGHTS
 	};
 
-	const int SIZE = 12500;// fixed for now.
-    int head = 0;
-    float runningDC = 0.0f;
 	float dcFilter[16] = {};
 
 	Disee() {

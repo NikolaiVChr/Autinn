@@ -105,8 +105,10 @@ void Fil::process(const ProcessArgs &args) {
 	int channels = std::max(1, inputs[FIL_INPUT].getChannels());
 	outputs[FIL_OUTPUT].setChannels(channels);
 
+	float driveGain = 0.20f * (params[DIAL_PARAM].getValue() * (DRIVE_MAX - DRIVE_MIN) + DRIVE_MIN);
+
 	for (int c = 0; c < channels; c++) {
-		float in = 0.20f * inputs[FIL_INPUT].getPolyVoltage(c) * (params[DIAL_PARAM].getValue() * (DRIVE_MAX - DRIVE_MIN) + DRIVE_MIN);
+		float in = inputs[FIL_INPUT].getPolyVoltage(c) * driveGain;
 		float out = 0.0f;
 
 		float inInter [8];// max oversample size
