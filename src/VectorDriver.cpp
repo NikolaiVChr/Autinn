@@ -1,5 +1,6 @@
 #include "Autinn.hpp"
 #include <cmath>
+#define POLY_CHANNELS 4
 
 /*
 
@@ -47,7 +48,7 @@ struct VectorDriver : Module {
 		float tim = 0.0f;
 	};
 
-	Channel channels[16];
+	Channel channels[POLY_CHANNELS];
 
 	VectorDriver() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -67,14 +68,14 @@ void VectorDriver::process(const ProcessArgs &args) {
 		return;
 	}
 
-	outputs[X_OUTPUT].setChannels(16);
-	outputs[Y_OUTPUT].setChannels(16);
+	outputs[X_OUTPUT].setChannels(POLY_CHANNELS);
+	outputs[Y_OUTPUT].setChannels(POLY_CHANNELS);
 
 	float dt = args.sampleTime;
 	float movementSpeed = params[SPEED_PARAM].getValue(); // 2-5V/sec
 	float limit = 100.0f * movementSpeed;
 
-	for (int c = 0; c < 16; c++) {
+	for (int c = 0; c < POLY_CHANNELS; c++) {
 		Channel &ch = channels[c];
 
 		if (ch.firstRun) {
@@ -85,7 +86,7 @@ void VectorDriver::process(const ProcessArgs &args) {
 			ch.y = (random::uniform() * 10.0f) - 5.0f;
 		}
 
-		ch.tim += args.sampleTime;
+		ch.tim += dt;
 
 		if (ch.tim > 0.05f) {
 			// Only change steering every 0.1 seconds
@@ -105,15 +106,15 @@ void VectorDriver::process(const ProcessArgs &args) {
 			ch.rotationSpeed = clamp(ch.rotationSpeed, -limit, limit);
 		}
 
-		ch.angle += ch.rotationSpeed * args.sampleTime;
+		ch.angle += ch.rotationSpeed * dt;
 
 		if (ch.angle > 360.f) ch.angle -= 360.f;
 		if (ch.angle < 0.f) ch.angle += 360.f;
 
 		// Move Position
 		float rad = ch.angle * (M_PI / 180.0f);
-		ch.x += std::cos(rad) * movementSpeed * args.sampleTime;
-		ch.y += std::sin(rad) * movementSpeed * args.sampleTime;
+		ch.x += std::cos(rad) * movementSpeed * dt;
+		ch.y += std::sin(rad) * movementSpeed * dt;
 
 		// Bounce
 		// We reflect the angle when hitting a wall.
