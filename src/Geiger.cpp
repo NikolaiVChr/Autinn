@@ -41,8 +41,10 @@ struct Geiger : Module {
     };
 
     dsp::SchmittTrigger triggers[16];
-    dsp::BiquadFilter boxFilter[16];
-    
+    dsp::BiquadFilter speakerFilter[16];
+
+    int pulseTimer[16] = {};
+
     float lightDecay = 0.0f;
     int stepDivider = 33;
     float cached_probability_base = 0.0f; // From knob
@@ -78,7 +80,7 @@ struct Geiger : Module {
             // Update Filter (Fixed characteristic of the "box")
             // 2.5kHz Bandpass with high Q gives that sharp "plastic" click sound.
             // Calculating this here saves expensive trig calls per sample.
-            float freq = 2500.0f;
+            float freq = 750.0f;
             float q = 2.5f;
             // Note: We set parameters per channel later if we want variation, 
             // but for a uniform machine, calculating coefficients once is efficient.
@@ -91,44 +93,55 @@ struct Geiger : Module {
         }
 
         bool lightActive = false;
-        float probability = 0.0f;
 
         for (int c = 0; c < channels; c++) {
-            float impulse = 0.0f;
+            bool triggered = false;
 
-            // External Trigger (Deterministic click)
-            if (triggers[c].process(inputs[TRIG_INPUT].getPolyVoltage(c))) {
-                impulse = 1.0f;
+            // Triggers
+            if (triggers[c].process(inputs[TRIG_INPUT].getChannels() > c?inputs[TRIG_INPUT].getPolyVoltage(c):inputs[TRIG_INPUT].getVoltage())) {
+                triggered = true;
             }
 
-            // Radiation Logic (Stochastic click)
-            // Combine Knob + CV
-            float cv = inputs[RAD_CV_INPUT].getPolyVoltage(c) * 0.1f; // 0-10V -> 0-1.0
-            // Allow negative CV to reduce knob setting
+            // Stochastic Probability
+            float cv = inputs[RAD_CV_INPUT].getChannels() > c?inputs[RAD_CV_INPUT].getPolyVoltage(c):inputs[RAD_CV_INPUT].getVoltage() * 0.1f;
             float combined_prob = clamp(cached_probability_base + (cv * cv * 500.0f * args.sampleTime), 0.0f, 1.0f);
-            
-            // Poisson process: Random check per sample
+
             if (random::uniform() < combined_prob) {
-                impulse = 1.0f;
+                triggered = true;
             }
 
-            // Sound Generation
-            // Update filter parameters (safe to do frequently, but we use cached freq)
-            // Ideally we only set this when sample rate changes, but it's cheap enough.
-            boxFilter[c].setParameters(dsp::BiquadFilter::BANDPASS, filter_f, 2.5f, 1.0f);
+            // Discharge Model
+            // If triggered, we start a short current pulse.
+            // 5 samples at 44.1kHz is ~0.1ms. This adds "weight" to the click.
+            if (triggered) {
+                pulseTimer[c] = 5;
+            }
 
-            // Feed impulse (Dirac delta) into filter. 
-            // The filter will "ring", creating the click sound.
-            float out = boxFilter[c].process(impulse * 5.0f); // Boost impulse for volume
+            float raw_pulse = 0.0f;
+            if (pulseTimer[c] > 0) {
+                pulseTimer[c]--;
+                // A square pulse has harmonics that cut through
+                raw_pulse = 1.0f;
+            }
 
-            // Output Stage
-            // Hard clip to simulate the speaker distorting
+            // Speaker Physics
+            // Update filter: Lowpass allows the low-end "pop" to pass through.
+            // Q = 2.0 simulates the speaker cone ringing slightly after the hit.
+            speakerFilter[c].setParameters(dsp::BiquadFilter::LOWPASS, filter_f, 2.0f, 1.0f);
+
+            // Drive the speaker hard (x10 gain)
+            float out = speakerFilter[c].process(raw_pulse * 10.0f);
+
+            // Output Transformer/Speaker Saturation
+            // This compresses the loud click, making it sound "solid" rather than "spikey".
+            out = non_lin_func(out); // Soft clip
+
+            // Hard clamp for safety
             out = clamp(out * 2.0f, -5.0f, 5.0f);
-            
+
             outputs[AUDIO_OUTPUT].setVoltage(out, c);
 
-            // Light logic
-            if (std::abs(out) > 0.5f) lightActive = true;
+            if (std::abs(out) > 0.1f) lightActive = true;
         }
 
         // Light decay animation
@@ -155,11 +168,11 @@ struct GeigerWidget : ModuleWidget {
         addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x/2, 150), module, Geiger::ACT_LIGHT));
 
         // Inputs
-        addInput(createInputCentered<InPortAutinn>(Vec(box.size.x/2, 220), module, Geiger::TRIG_INPUT));
-        addInput(createInputCentered<InPortAutinn>(Vec(box.size.x/2, 270), module, Geiger::RAD_CV_INPUT));
-        
+        addInput(createInputCentered<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Geiger::TRIG_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 115), module, Geiger::RAD_CV_INPUT));
+
         // Output
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x/2, 330), module, Geiger::AUDIO_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Geiger::AUDIO_OUTPUT));
     }
 };
 
