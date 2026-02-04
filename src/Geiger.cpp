@@ -47,7 +47,6 @@ struct Geiger : Module {
 
     float lightDecay = 0.0f;
     int stepDivider = 33;
-    float cached_probability_base = 0.0f; // From knob
     float filter_f = 0.0f;
 
     // 1 mR/h ~= 1300 CPM (SBM-20 tube) -> ~21.66 Hz
@@ -77,17 +76,7 @@ struct Geiger : Module {
 
         if (stepDivider++ >= 32) {
             stepDivider = 0;
-            
-            // Calculate Base Probability from Knob
-            // We want an exponential curve: 
-            // 0.0 -> ~0.2 Hz (Cosmic background)
-            // 1.0 -> ~500 Hz (Chernobyl buzz)
-            float knob = params[RAD_PARAM].getValue();
-            float mRh = DISP_MULT * std::pow(DISP_BASE, knob) + DISP_OFFSET;
 
-            // 2. Convert mR/h to Hz (Clicks per second) for the physics engine
-            float densityHz = mRh * HZ_PER_MRH;
-            cached_probability_base = densityHz * args.sampleTime;
 
             // Update Filter (Fixed characteristic of the "box")
             // 2.5kHz Bandpass with high Q gives that sharp "plastic" click sound.
@@ -105,6 +94,7 @@ struct Geiger : Module {
         }
 
         bool lightActive = false;
+        float knob = params[RAD_PARAM].getValue();
 
         for (int c = 0; c < channels; c++) {
             bool triggered = false;
@@ -115,15 +105,15 @@ struct Geiger : Module {
             }
 
             // Stochastic Probability
-            float cv = inputs[RAD_CV_INPUT].getChannels() > c?inputs[RAD_CV_INPUT].getPolyVoltage(c):inputs[RAD_CV_INPUT].getVoltage() * 0.1f;
-            float mRh = DISP_MULT * std::pow(DISP_BASE, cv) + DISP_OFFSET;
+            float cv = (inputs[RAD_CV_INPUT].getChannels() > c?inputs[RAD_CV_INPUT].getPolyVoltage(c):inputs[RAD_CV_INPUT].getVoltage()) * 0.1f;
+            float combined_input = clamp(knob + cv, 0.0f, 1.0f);
+            float mRh = DISP_MULT * std::pow(DISP_BASE, combined_input) + DISP_OFFSET;
 
-            // 2. Convert mR/h to Hz (Clicks per second) for the physics engine
+            // 2. Convert mR/h to Hz for the physics engine
             float densityHz = mRh * HZ_PER_MRH;
-            float cv_probability_base = densityHz * args.sampleTime;
-            float combined_prob = clamp(cached_probability_base + cv_probability_base, 0.0f, 1.0f);
+            float probability = densityHz * args.sampleTime;
 
-            if (random::uniform() < combined_prob) {
+            if (random::uniform() < probability) {
                 triggered = true;
             }
 
