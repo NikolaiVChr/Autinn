@@ -49,13 +49,13 @@ struct Geiger : Module {
     int stepDivider = 33;
     float filter_f = 0.0f;
 
-    // 1 mR/h ~= 1300 CPM (SBM-20 tube) -> ~21.66 Hz
-    const float HZ_PER_MRH = 21.66f;
+    // 1 mR/h ~= 1300 CPM (SBM-20 tube) -> ~21.666 Hz
+    const float HZ_PER_MRH = 21.666f;
 
     // Display Scaling
-    // 0.01 mR/h (Background) to 50.0 mR/h
-    const float DISP_BASE = 5000.0f;
-    const float DISP_MULT = 0.01f;
+    // 0.02 mR/h (Background) to 50.0 mR/h
+    const float DISP_BASE = 2500.0f;
+    const float DISP_MULT = 0.02f;
     const float DISP_OFFSET = 0.0f;
 
     Geiger() {
@@ -78,15 +78,12 @@ struct Geiger : Module {
             stepDivider = 0;
 
 
-            // Update Filter (Fixed characteristic of the "box")
-            // 2.5kHz Bandpass with high Q gives that sharp "plastic" click sound.
-            // Calculating this here saves expensive trig calls per sample.
-            float freq = 1000.0f;
+            // Update Filter
+            // 2.5kHz Bandpass with high Q gives that sharp plastic click sound.
+            float freq = 1250.0f;
             float q = 2.5f;
-            // Note: We set parameters per channel later if we want variation, 
-            // but for a uniform machine, calculating coefficients once is efficient.
-            // However, BiquadFilter struct stores state, not coeffs. 
-            // We will just calculate normalized freq here.
+
+            // calculate normalized freq here.
             filter_f = freq * args.sampleTime;
             // If sample rate changes, we should update.
 
@@ -105,7 +102,10 @@ struct Geiger : Module {
             }
 
             // Stochastic Probability
-            float cv = (inputs[RAD_CV_INPUT].getChannels() > c?inputs[RAD_CV_INPUT].getPolyVoltage(c):inputs[RAD_CV_INPUT].getVoltage()) * 0.1f;
+            float cv = 0.0f;
+            if (inputs[RAD_CV_INPUT].isConnected()) {
+                cv = (inputs[RAD_CV_INPUT].getChannels() > c?inputs[RAD_CV_INPUT].getPolyVoltage(c):inputs[RAD_CV_INPUT].getVoltage()) * 0.1f;
+            }
             float combined_input = clamp(knob + cv, 0.0f, 1.0f);
             float mRh = DISP_MULT * std::pow(DISP_BASE, combined_input) + DISP_OFFSET;
 
@@ -136,12 +136,12 @@ struct Geiger : Module {
             // Q = 2.0 simulates the speaker cone ringing slightly after the hit.
             speakerFilter[c].setParameters(dsp::BiquadFilter::LOWPASS, filter_f, 2.0f, 1.0f);
 
-            // Drive the speaker hard (x10 gain)
+            // Drive the speaker hard
             float out = speakerFilter[c].process(raw_pulse * 10.0f);
 
             // Output Transformer/Speaker Saturation
-            // This compresses the loud click, making it sound "solid" rather than "spikey".
-            out = non_lin_func(out); // Soft clip
+            // This compresses the loud click, making it sound solid rather than spikey.
+            out = non_lin_func(out);
 
             // Hard clamp for safety
             out = clamp(out * 2.0f, -5.0f, 5.0f);
