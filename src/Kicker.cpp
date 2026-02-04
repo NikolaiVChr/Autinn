@@ -55,6 +55,7 @@ struct Kicker : Module {
     float lightDecay = 0.0f;
     uint32_t noiseState[16] = {};
     float lastClickFilter[16] = {};
+    bool activeState[MAX_CHANNELS] = {};
 
     int stepDivider = 33;
     float noiseGain = 1.0f;
@@ -130,7 +131,7 @@ void Kicker::process(const ProcessArgs &args) {
     }
 
 
-    bool active = false;
+    bool lightActive = false;
 
     for (int c = 0; c < channels; c++) {
         // Trigger Logic
@@ -139,16 +140,29 @@ void Kicker::process(const ProcessArgs &args) {
             ampEnv[c] = 1.0f;
             pitchEnv[c] = 1.0f;
             phase[c] = 0.25f; // Reset phase for consistent punch
-            active = true;
+            activeState[c] = true;
         }
+
+        if (!activeState[c]) {
+            outputs[AUDIO_OUTPUT].setVoltage(0.0f, c);
+            continue;
+        }
+
+        lightActive = true;
 
         // Envelopes
         ampEnv[c] *= decayCoeff;
         pitchEnv[c] *= pitchDecayCoeff;
 
-        // Prevent denormals
-        if (ampEnv[c] < 0.001f) ampEnv[c] = 0.0f;
-        if (pitchEnv[c] < 0.001f) pitchEnv[c] = 0.0f;
+        // If both envelopes are effectively zero, go to sleep.
+        if (ampEnv[c] <= 0.001f && pitchEnv[c] <= 0.001f) {
+            // Also prevents denormals
+            ampEnv[c] = 0.0f;
+            pitchEnv[c] = 0.0f;
+            activeState[c] = false; // Goodnight.
+            outputs[AUDIO_OUTPUT].setVoltage(0.0f, c);
+            continue;
+        }
 
         // Oscillator
         // Pitch = Base + V/Oct + SweepEnvelope
@@ -216,7 +230,7 @@ void Kicker::process(const ProcessArgs &args) {
     }
 
     // Blink light if any drum triggered
-    if (active) lightDecay = 1.0f;
+    if (lightActive) lightDecay = 1.0f;
     float lightLambda = 1.0f - (args.sampleTime / 0.2f);
     lightDecay *= std::max(0.0f, lightLambda);
     lights[ACT_LIGHT].value = lightDecay;
