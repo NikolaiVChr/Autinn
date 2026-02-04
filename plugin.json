@@ -286,6 +286,15 @@
         "Physical modeling",
         "Dual"
       ]
+    },
+    {
+      "slug": "Geiger",
+      "name": "Rad",
+      "description": "Geiger counter",
+      "tags": [
+        "Physical modeling",
+        "Polyphonic"
+      ]
     }
   ]
 }

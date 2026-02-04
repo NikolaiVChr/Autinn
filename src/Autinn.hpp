@@ -276,3 +276,4 @@ extern Model *modelChord;
 extern Model *modelKicker;
 extern Model *modelSnare;
 extern Model *modelCoil;
+extern Model *modelGeiger;
