@@ -43,6 +43,7 @@ struct Oxcart : Module {
 	float phase[16] = {};
 	float blinkTime = 0.0f;
 	dsp::MinBlepGenerator<16,32,float> oxMinBLEP[16];// 16 zero crossings, x32 oversample
+	float discontinuity = non_lin_func(4.0f);
 
 	Oxcart() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -83,7 +84,7 @@ void Oxcart::process(const ProcessArgs &args) {
 		if (phase[ch] >= period) {
 			phase[ch] -= period;
 			float crossing = -phase[ch] / deltaPhase;
-			oxMinBLEP[ch].insertDiscontinuity(crossing, 1.0);
+			oxMinBLEP[ch].insertDiscontinuity(crossing, discontinuity);
 		}
 		
 	    float buzz = -non_lin_func(phase[ch])+oxMinBLEP[ch].process()+0.826795f;
