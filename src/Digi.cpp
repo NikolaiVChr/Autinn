@@ -41,9 +41,9 @@ struct Digi : Module {
 	enum LightIds {
 		NUM_LIGHTS
 	};
-	
-	dsp::Upsampler<oversample, 8> upsampler = dsp::Upsampler<oversample, 8>(0.9f);
-	dsp::Decimator<oversample, 8> decimator = dsp::Decimator<oversample, 8>(0.9f);
+
+	std::vector<dsp::Upsampler<oversample, 8>> upsamplers;
+	std::vector<dsp::Decimator<oversample, 8>> decimators;
 
 	Digi() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -53,6 +53,9 @@ struct Digi : Module {
 		configInput(CV_INPUT, "CV");
 		configInput(ANALOG_INPUT, "Analog");
 		configOutput(DIGITAL_OUTPUT, "Digital");
+
+		upsamplers.assign(16, dsp::Upsampler<oversample, 8>(0.9f));
+		decimators.assign(16, dsp::Decimator<oversample, 8>(0.9f));
 	}
 
 	void process(const ProcessArgs &args) override;
@@ -65,32 +68,33 @@ void Digi::process(const ProcessArgs &args) {
 	if (!outputs[DIGITAL_OUTPUT].isConnected()) {
 		return;
 	}
-	float input = inputs[ANALOG_INPUT].getVoltage();
-	float jump = clamp(params[STEP_PARAM].getValue()+params[CV_PARAM].getValue()*inputs[CV_INPUT].getVoltage(),0.0f,1.0f);
-	
-	/*	if (jump == 0.0f) {
-		outputs[DIGITAL_OUTPUT].setVoltage(input);
-		return;
-	}*/
-	
-	float inBuf   [oversample];
-	float outBuf  [oversample];
-	
-	upsampler.process(input, inBuf);
-	
-	for (int i = 0; i < oversample; i++) {
-		float analog  = inBuf[i];
-		float digital = 0.0f;
-		if (jump > 0.001f) {
-			// "floor" creates the step.
-			// Adding 0.5f * jump aligns it to the center
-			digital = std::floor(analog / jump) * jump + (0.5f * jump);
-		} else {
-			digital = analog;
+
+	int channels = std::max(1, inputs[ANALOG_INPUT].getChannels());
+	outputs[DIGITAL_OUTPUT].setChannels(channels);
+
+	for (int c = 0; c < channels; c++) {
+		float input = inputs[ANALOG_INPUT].getPolyVoltage(c);
+		float jump = clamp(params[STEP_PARAM].getValue()+params[CV_PARAM].getValue()*inputs[CV_INPUT].getVoltage(),0.0f,1.0f);
+
+		float inBuf   [oversample];
+		float outBuf  [oversample];
+
+		upsamplers[c].process(input, inBuf);
+
+		for (int i = 0; i < oversample; i++) {
+			float analog  = inBuf[i];
+			float digital = 0.0f;
+			if (jump > 0.001f) {
+				// "floor" creates the step.
+				// Adding 0.5f * jump aligns it to the center
+				digital = std::floor(analog / jump) * jump + (0.5f * jump);
+			} else {
+				digital = analog;
+			}
+			outBuf[i] = digital;
 		}
-		outBuf[i] = digital;
+		outputs[DIGITAL_OUTPUT].setVoltage(decimators[c].process(outBuf), c);
 	}
-    outputs[DIGITAL_OUTPUT].setVoltage(decimator.process(outBuf));
 }
 
 struct DigiWidget : ModuleWidget {

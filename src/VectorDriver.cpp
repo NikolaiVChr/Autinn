@@ -38,12 +38,16 @@ struct VectorDriver : Module {
 		NUM_LIGHTS
 	};
 
-	float rotationSpeed = 0.0f;// radians/sec
-	float x = 0.0f;// -5 to 5 V
-	float y = 0.0f;
-	float angle = 0.0f;// degrees
-	bool firstRun = true;
-	float tim = 0.0f;
+	struct Channel {
+		float rotationSpeed = 0.0f; // degs/sec
+		float x = 0.0f; // -5 to 5 V
+		float y = 0.0f;
+		float angle = 0.0f; // degrees
+		bool firstRun = true;
+		float tim = 0.0f;
+	};
+
+	Channel channels[16];
 
 	VectorDriver() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -62,74 +66,80 @@ void VectorDriver::process(const ProcessArgs &args) {
 	if (!outputs[X_OUTPUT].isConnected() and !outputs[Y_OUTPUT].isConnected()) {
 		return;
 	}
-	if (firstRun) {
-		firstRun = false;
-		float ran = random::uniform();// 0-1 random number
-		rotationSpeed = (ran*2-1.0f)*135.0f;
-	}
+
+	outputs[X_OUTPUT].setChannels(16);
+	outputs[Y_OUTPUT].setChannels(16);
+
 	float dt = args.sampleTime;
 	float movementSpeed = params[SPEED_PARAM].getValue(); // 2-5V/sec
+	float limit = 100.0f * movementSpeed;
 
-	tim += args.sampleTime;
+	for (int c = 0; c < 16; c++) {
+		Channel &ch = channels[c];
 
-	// Only change steering every 0.1 seconds
-	// This allows the car to actually complete a turn before changing its mind
-	if (tim > 0.05f) {
-		tim = 0.0f;
+		if (ch.firstRun) {
+			ch.firstRun = false;
+			float ran = random::uniform();
+			ch.rotationSpeed = (ran * 2 - 1.0f) * 135.0f;
+			ch.x = (random::uniform() * 10.0f) - 5.0f;
+			ch.y = (random::uniform() * 10.0f) - 5.0f;
+		}
 
-		// Randomly push the steering wheel left or right
-		// We add to the current speed rather than resetting it
-		float nudge = (random::uniform() * 2.f - 1.f) * (50.0f * movementSpeed);
-		rotationSpeed += nudge;
+		ch.tim += args.sampleTime;
 
-		// slowly return steering to center so it doesn't spin forever
-		rotationSpeed *= 0.9f;
+		if (ch.tim > 0.05f) {
+			// Only change steering every 0.1 seconds
+			// This allows the car to actually complete a turn before changing its mind
 
-		// Hard limit on how fast it can spin
-		float limit = 100.0f * movementSpeed;
-		rotationSpeed = clamp(rotationSpeed, -limit, limit);
+			ch.tim = 0.0f;
+
+			// Randomly push the steering wheel left or right
+			// We add to the current speed rather than resetting it
+			float nudge = (random::uniform() * 2.f - 1.f) * (50.0f * movementSpeed);
+			ch.rotationSpeed += nudge;
+
+			// slowly return steering to center so it doesn't spin forever
+			ch.rotationSpeed *= 0.9f;
+
+			// Hard limit on how fast it can spin
+			ch.rotationSpeed = clamp(ch.rotationSpeed, -limit, limit);
+		}
+
+		ch.angle += ch.rotationSpeed * args.sampleTime;
+
+		if (ch.angle > 360.f) ch.angle -= 360.f;
+		if (ch.angle < 0.f) ch.angle += 360.f;
+
+		// Move Position
+		float rad = ch.angle * (M_PI / 180.0f);
+		ch.x += std::cos(rad) * movementSpeed * args.sampleTime;
+		ch.y += std::sin(rad) * movementSpeed * args.sampleTime;
+
+		// Bounce
+		// We reflect the angle when hitting a wall.
+		if (ch.x > 5.0f) {
+			ch.x = 5.0f;
+			ch.angle = 180.0f - ch.angle;
+			ch.rotationSpeed *= -0.5f;// Lose some turning energy on impact
+		} else if (ch.x < -5.0f) {
+			ch.x = -5.0f;
+			ch.angle = 180.0f - ch.angle;
+			ch.rotationSpeed *= -0.5f;
+		}
+
+		if (ch.y > 5.0f) {
+			ch.y = 5.0f;
+			ch.angle = 360.0f - ch.angle;
+			ch.rotationSpeed *= -0.5f;
+		} else if (ch.y < -5.0f) {
+			ch.y = -5.0f;
+			ch.angle = 360.0f - ch.angle;
+			ch.rotationSpeed *= -0.5f;
+		}
+
+		outputs[X_OUTPUT].setVoltage(ch.x, c);
+		outputs[Y_OUTPUT].setVoltage(ch.y, c);
 	}
-
-	angle += rotationSpeed * args.sampleTime;
-
-	// Normalize angle (0 to 360)
-	if (angle > 360.f) angle -= 360.f;
-	if (angle < 0.f) angle += 360.f;
-
-	// Move Position
-	float rad = angle * (M_PI / 180.0f);
-	x += std::cos(rad) * movementSpeed * args.sampleTime;
-	y += std::sin(rad) * movementSpeed * args.sampleTime;
-
-	// Bounce
-	// Instead of clamping, we reflect the angle when hitting a wall.
-
-	// Hit Right or Left Wall? -> Flip X direction
-	if (x > 5.0f) {
-		x = 5.0f;
-		angle = 180.0f - angle;
-		rotationSpeed *= -0.5f; // Lose some turning energy on impact
-	}
-	else if (x < -5.0f) {
-		x = -5.0f;
-		angle = 180.0f - angle;
-		rotationSpeed *= -0.5f;
-	}
-
-	// Hit Top or Bottom Wall? -> Flip Y direction
-	if (y > 5.0f) {
-		y = 5.0f;
-		angle = 360.0f - angle;
-		rotationSpeed *= -0.5f;
-	}
-	else if (y < -5.0f) {
-		y = -5.0f;
-		angle = 360.0f - angle;
-		rotationSpeed *= -0.5f;
-	}
-	
-    outputs[X_OUTPUT].setVoltage(x);
-    outputs[Y_OUTPUT].setVoltage(y);
 }
 
 struct VectorDriverWidget : ModuleWidget {
