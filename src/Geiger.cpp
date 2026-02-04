@@ -198,9 +198,9 @@ struct GeigerWidget : ModuleWidget {
         addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Geiger::RAD_PARAM));
 
         // debu knobs
-        addParam(createParam<RoundTinyAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 180), module, Geiger::HZ_LOW));
-        addParam(createParam<RoundTinyAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 200), module, Geiger::HZ_HIGH));
-        addParam(createParam<RoundTinyAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 220), module, Geiger::Q));
+        addParam(createParam<RoundSmallAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 180), module, Geiger::HZ_LOW));
+        addParam(createParam<RoundSmallAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 200), module, Geiger::HZ_HIGH));
+        addParam(createParam<RoundSmallAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 220), module, Geiger::Q));
 
         // Light
         addChild(createLight<MediumLight<GreenLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Geiger::ACT_LIGHT));
