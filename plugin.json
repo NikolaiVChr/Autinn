@@ -48,6 +48,7 @@
       "slug": "CVConverter",
       "name": "Conv",
       "description": "Converts to and from uni/bi CV voltages",
+      "keywords": "convert",
       "tags": [
         "Utility",
         "Polyphonic"
@@ -67,6 +68,7 @@
       "slug": "Digi",
       "name": "Digi",
       "description": "Quantizes a signal into discrete steps",
+      "keywords": "digital",
       "tags": [
         "Utility",
         "Digital",
@@ -219,6 +221,7 @@
       "slug": "Overdrive",
       "name": "Fil",
       "description": "Filing away at audio (Overdrive)",
+      "keywords": "overdrive",
       "tags": [
         "Effect",
         "Distortion",
@@ -229,6 +232,7 @@
       "slug": "Distortion",
       "name": "Nap",
       "description": "Taking a nap (Distortion)",
+      "keywords": "distortion",
       "tags": [
         "Effect",
         "Distortion",
@@ -258,6 +262,7 @@
       "slug": "Kicker",
       "name": "Stomp",
       "description": "Kick drum",
+      "keywords": "bass drum",
       "tags": [
         "Drum",
         "Polyphonic"
