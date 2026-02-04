@@ -125,13 +125,14 @@ struct SpringTank {
 
         // Get the integer part and the fractional part
         int indexA = (int)readPos;
-        int indexB = indexA + 1;
-        if (indexB >= MAX_BUFFER_SIZE) indexB = 0;
 
         float frac = readPos - indexA;
 
-        // Linear Interpolation
-        return buffer[indexA] * (1.0f - frac) + buffer[indexB] * frac;
+        // Prevents segfaults if float logic drifts
+        indexA &= (MAX_BUFFER_SIZE - 1);
+        int indexB = (indexA + 1) & (MAX_BUFFER_SIZE - 1);
+
+        return interpolator(frac, buffer[indexA], buffer[indexB]);
     }
 };
 
