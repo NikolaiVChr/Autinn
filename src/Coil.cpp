@@ -23,9 +23,10 @@
 
 #define FREQ_MAX 10000.0f
 #define FREQ_MIN 100.0f
-#define LOG_FREQ_RANGE float(log(FREQ_MAX/FREQ_MIN))
 #define MIN_COILS 6
 #define MAX_COILS 24
+
+const float LOG2_FREQ_RANGE = float(std::log2(FREQ_MAX/FREQ_MIN));
 
 // 1st Order All-Pass Filter for Dispersion
 struct AllPassFilter {
@@ -120,8 +121,8 @@ struct SpringTank {
 
     float readBufferSmooth(const float delaySamples) {
         float readPos = (float)writeHead - delaySamples;
-        while (readPos < 0) readPos += MAX_BUFFER_SIZE;
-        while (readPos >= MAX_BUFFER_SIZE) readPos -= MAX_BUFFER_SIZE;
+        if (readPos < 0) readPos += MAX_BUFFER_SIZE;
+        if (readPos >= MAX_BUFFER_SIZE) readPos -= MAX_BUFFER_SIZE;
 
         // Get the integer part and the fractional part
         int indexA = (int)readPos;
@@ -244,7 +245,7 @@ struct Coil : Module {
 
     static float toExp(float x) {
         // 0 to 1 to exp range
-        return FREQ_MIN * exp( x*LOG_FREQ_RANGE );
+        return FREQ_MIN * std::exp2f( x*LOG2_FREQ_RANGE );
     }
 
     void process(const ProcessArgs& args) override {
@@ -271,7 +272,7 @@ struct Coil : Module {
         inertiaMS = clamp(inertiaMS, 10.f, 160.f); // Allow a wider range via CV
         float inertiaSeconds = inertiaMS / 1000.0f;
 
-        float cv_damp =  powf(2.0f, inputs[DAMP_CV].getVoltage());
+        float cv_damp =  std::exp2f(inputs[DAMP_CV].getVoltage());
         float dampFreq = clamp(this->toExp(params[DAMP_PARAM].getValue())*cv_damp, 20.f, 10000.f);
 
         // --- Audio Input Processing ---

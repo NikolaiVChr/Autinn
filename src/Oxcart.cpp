@@ -70,11 +70,13 @@ void Oxcart::process(const ProcessArgs &args) {
 	float deltaTime = args.sampleTime;
 
 	float pitchBase = params[PITCH_PARAM].getValue();
+	int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
 
 	for (int ch = 0; ch < channels; ch++) {
-		float pitch = pitchBase + inputs[PITCH_INPUT].getPolyVoltage(ch);
+		float pitch = pitchBase + (pitchInputChannels>ch?inputs[PITCH_INPUT].getPolyVoltage(ch):inputs[PITCH_INPUT].getVoltage());
 		pitch = clamp(pitch, -4.0f, 4.0f);
-		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+		//float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+		float freq = dsp::FREQ_C4 * std::exp2f(pitch);//faster
 	
 		float period = 4.0f;
 		float deltaPhase = freq * deltaTime * period;

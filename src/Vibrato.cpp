@@ -134,7 +134,8 @@ void Vibrato::process(const ProcessArgs &args) {
 
 		float deltaPhase = freq * args.sampleTime * period;
 		phase[c] += deltaPhase;
-		phase[c] = fmod(phase[c], period);
+		//phase[c] = fmod(phase[c], period);
+		if (phase[c] >= period) phase[c] -= period;//faster
 
 		// Ring Buffer Write
 		int wIdx = writeIndex[c];
@@ -142,7 +143,8 @@ void Vibrato::process(const ProcessArgs &args) {
 
 		float modulationFactor = sin(phase[c]);
 		float tapper = 4.0f+delay_samples+width_samples*modulationFactor;//1 changed to 4 to give room for spline.
-		int i = floor(tapper);
+		//int i = floor(tapper);
+		int i = static_cast<int>(tapper);//since tapper is always positive, this is faster
 		float portion=tapper-i;
 
 

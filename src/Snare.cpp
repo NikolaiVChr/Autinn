@@ -58,6 +58,9 @@ struct Snare : Module {
     float noiseHp[MAX_CHANNELS] = {};
     dsp::BiquadFilter wireFilter[MAX_CHANNELS];
     uint32_t noiseState[16] = {};
+    int stepDivider = 33;
+    float noiseGain = 1.0f;
+
 
     Snare() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -86,8 +89,12 @@ void Snare::process(const ProcessArgs &args) {
     int channels = std::max(1, inputs[TRIG_INPUT].getChannels());
     outputs[AUDIO_OUTPUT].setChannels(channels);
 
-    // As rate goes up, we boost the noise to maintain constant Power Density
-    float noiseGain = std::sqrt(args.sampleRate / 44100.0f);
+    if (stepDivider++ >= 32) {
+        stepDivider = 0;
+
+        // As rate goes up, we boost the noise to maintain constant Power Density
+        noiseGain = std::sqrt(args.sampleRate / 44100.0f);
+    }
 
     float dt = args.sampleTime;
     float baseFreq = params[FREQ_PARAM].getValue();
@@ -108,9 +115,11 @@ void Snare::process(const ProcessArgs &args) {
 
     float pitchDecayCoeff = 1.0f - (25.0f * dt); // Very fast pitch drop
 
+    /*
     // Simple HPF Coefficient (Cutoff ~800Hz)
     float rc = 1.0f / (2.0f * M_PI * 800.0f);
     float alpha = rc / (rc + dt);
+    */
 
     bool active = false;
 
@@ -141,7 +150,7 @@ void Snare::process(const ProcessArgs &args) {
         // Tonal Body (Triangle/Sine mix for body)
         float voct = inputs[VOCT_INPUT].getPolyVoltage(c);
         float pitchMod = sweepDepth * pitchEnv[c];
-        float freq = baseFreq * powf(2.0f, voct) + pitchMod;
+        float freq = baseFreq * std::exp2f(voct) + pitchMod;
         
         float deltaPhase = freq * dt;
         phase[c] += deltaPhase;

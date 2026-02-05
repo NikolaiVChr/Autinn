@@ -170,7 +170,7 @@ void Kicker::process(const ProcessArgs &args) {
         //float freq = baseFreq * powf(2.0f, voct) + pitchMod;
         //float freq = baseFreq * powf(2.0f, voct + (pitchEnv[c] * 3.0f * params[SWEEP_PARAM].getValue()));
         float mod = pitchEnv[c] * pitchEnv[c] * 5.0f * params[SWEEP_PARAM].getValue();
-        float freq = baseFreq * powf(2.0f, voct + mod);
+        float freq = baseFreq * std::exp2f(voct + mod);
 
 
         float deltaPhase = freq * dt;

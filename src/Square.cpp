@@ -262,11 +262,13 @@ void Square::process(const ProcessArgs &args) {
 	outputs[BUZZ_OUTPUT].setChannels(channels);
 
 	float pitchBase = params[PITCH_PARAM].getValue();
+	int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
 
 	for (int c = 0; c < channels; c++) {
-		float pitch = pitchBase + inputs[PITCH_INPUT].getPolyVoltage(c);
+		float pitch = pitchBase + (pitchInputChannels>c?inputs[PITCH_INPUT].getPolyVoltage(c):inputs[PITCH_INPUT].getVoltage());
 		pitch = clamp(pitch, -4.0f, 5.0f);
-		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+		//float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+		float freq = dsp::FREQ_C4 * std::exp2f(pitch);//faster
 
 		float period = 1.0f;
 		float deltaPhase = freq * deltaTime * period;

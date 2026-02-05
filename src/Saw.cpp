@@ -322,10 +322,13 @@ void Saw::process(const ProcessArgs &args) {
 
 	float deltaTime = args.sampleTime / oversample;
 
+	int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
+
 	for (int c = 0; c < channels; c++) {
-		float pitch = pitchBase + inputs[PITCH_INPUT].getPolyVoltage(c);
+		float pitch = pitchBase + (pitchInputChannels>c?inputs[PITCH_INPUT].getPolyVoltage(c):inputs[PITCH_INPUT].getVoltage());
 		pitch = clamp(pitch, -4.0f, 5.0f);
-		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+		//float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+		float freq = dsp::FREQ_C4 * std::exp2f(pitch);//faster
 
 		float deltaPhase = freq * deltaTime;
 
@@ -374,7 +377,10 @@ void Saw::process(const ProcessArgs &args) {
 		if (c == 0) {
 			blinkTime += args.sampleTime;
 			float blinkPeriod = 1.0f/(freq*0.01f);
-			blinkTime = fmod(blinkTime, blinkPeriod);
+			//blinkTime = fmod(blinkTime, blinkPeriod);
+			if (blinkTime >= blinkPeriod) {
+				blinkTime -= blinkPeriod;
+			}
 			lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod*0.5f) ? 1.0 : 0.0;
 		}
 	}
