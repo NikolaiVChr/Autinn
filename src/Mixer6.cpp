@@ -22,6 +22,10 @@
 
 **/
 
+#define MUTE -1
+#define NORMAL 0
+#define SOLO 1
+
 const static int num_mono_channels = 6;
 
 struct Mixer6 : Module {
@@ -137,7 +141,7 @@ struct Mixer6 : Module {
 		configOutput(MIXER_OUTPUT_R, "Right Audio");
 
 		std::fill_n(mute_solo_button_prev, num_mono_channels, false);
-		std::fill_n(mute_solo_state, num_mono_channels, 0);
+		std::fill_n(mute_solo_state, num_mono_channels, NORMAL);
 
 		for (int i = 0; i < num_mono_channels; i++) {
 			low_prev[i] = -100.0f; // Force update on first frame
@@ -238,7 +242,7 @@ void Mixer6::process(const ProcessArgs &args) {
 
 	int active_channels = 0;
 	for (int ch = 0; ch < num_mono_channels; ch++) {
-		if (!inputs[INPUT+ch].isConnected() || mute_solo_state[ch] == -1 || (solo && mute_solo_state[ch] != 1)) {
+		if (!inputs[INPUT+ch].isConnected() || mute_solo_state[ch] == MUTE || (solo && mute_solo_state[ch] != SOLO)) {
 			continue;
 		}
 		active_channels++;
@@ -324,11 +328,11 @@ void Mixer6::process(const ProcessArgs &args) {
 	fx_return_right_B *= params[FX_B_TO_MAIN_PARAM].getValue();
 
 	// Main out
-	float scaling = autoMainScale?(1.0f / std::sqrt((float)std::max(active_channels, 1))):1.0f;
+	float scaling = autoMainScale && active_channels > 1?(1.0f / std::sqrt((float)active_channels)):1.0f;
 	main_left *= scaling;
 	main_right *= scaling;
-	main_left  = fx_return_left_A  + fx_return_left_B  + main_left;
-	main_right = fx_return_right_A + fx_return_right_B + main_right;
+	main_left  += fx_return_left_A  + fx_return_left_B;
+	main_right += fx_return_right_A + fx_return_right_B;
 	main_left *= params[LEVEL_MAIN].getValue();
 	main_right *= params[LEVEL_MAIN].getValue();
 	outputs[MIXER_OUTPUT_L].setVoltage(main_left);
@@ -368,11 +372,11 @@ void Mixer6::handleMuteButtons() {
 				mute_solo_state[ch] = 1;
 			}
 		}
-		if (mute_solo_state[ch] == 1) {
+		if (mute_solo_state[ch] == SOLO) {
 			solo = true;
 			lights[MUTE_LIGHT+ch*3+0].setBrightness( 0.00f);
 			lights[MUTE_LIGHT+ch*3+2].setBrightness( 1.00f);
-		} else if (mute_solo_state[ch] == -1) {
+		} else if (mute_solo_state[ch] == MUTE) {
 			lights[MUTE_LIGHT+ch*3+0].setBrightness( 1.00f);
 			lights[MUTE_LIGHT+ch*3+2].setBrightness( 0.00f);
 		} else {
