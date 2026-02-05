@@ -65,7 +65,7 @@ void Sjip::process(const ProcessArgs &args) {
 	float pitch = params[PITCH_PARAM].getValue();
 	pitch += inputs[PITCH_INPUT].getVoltage();
 	pitch = clamp(pitch, -4.0f, 6.0f);
-	float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+	float freq = dsp::FREQ_C4 * std::exp2f(pitch);
 
 //	float radius = 5.0f;
 //	float slow_period = 0.5f;
@@ -74,7 +74,12 @@ void Sjip::process(const ProcessArgs &args) {
 	phase += deltaPhase;
 	phase = fmod(phase, period);
 
-	//float a = 1.0f;
+	// when sweeping pitch, turning of a harmonics due to nyquist, can create zipper noise
+	// So we fade out the harmonics over 2000Hz
+	float fadeBand = 2000.0f;
+	float invFade = 1.0f / fadeBand;
+	float nyquist = args.sampleRate*0.5f;
+
 	float b = 1.0f;
 	float c = 1.0f;
 	float d = 1.0f;
@@ -83,28 +88,64 @@ void Sjip::process(const ProcessArgs &args) {
 	float g = 1.0f;
 	float h = 1.0f;
 
-	float nyquist = args.sampleRate*0.5f;
-	if (freq * 15.0f > nyquist) {
-		h = 0.0f;
-		if (freq * 13.0f > nyquist) {
-			g = 0.0f;
-			if (freq * 11.0f > nyquist) {
-				f = 0.0f;
-				if (freq * 9.0f > nyquist) {
-					e = 0.0f;
-					if (freq * 7.0f > nyquist) {
-						d = 0.0f;
-						if (freq * 5.0f > nyquist) {
-							c = 0.0f;
-							if (freq * 3.0f > nyquist) {
-								b = 0.0f;
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+	// Helper macro to keep code clean but inline (fastest possible option)
+	// We use a macro or just raw math to ensure zero function-call overhead
+	// Macro: takes Integer ID (e.g., 15) and Float Multiplier (e.g., 15.0f)
+    #define CALC_FADE(ID, MUL) \
+	    float hFreq_##ID = freq * MUL; \
+	    if (hFreq_##ID >= nyquist) { \
+	        val_##ID = 0.0f; \
+	    } else if (hFreq_##ID > (nyquist - fadeBand)) { \
+	        val_##ID = (nyquist - hFreq_##ID) * invFade; \
+	    }
+
+    // Optimization: Check highest harmonic (15x) first.
+    // If 15x is completely safe (below fade band), all lower ones are safe too.
+    if (freq * 15.0f > (nyquist - fadeBand)) {
+
+        // 15th Harmonic
+        float val_15 = 1.0f;
+        CALC_FADE(15, 15.0f);
+        h = val_15;
+
+        // Only check 13th if 15th was affected
+        if (freq * 13.0f > (nyquist - fadeBand)) {
+            float val_13 = 1.0f;
+            CALC_FADE(13, 13.0f);
+            g = val_13;
+
+            if (freq * 11.0f > (nyquist - fadeBand)) {
+                float val_11 = 1.0f;
+                CALC_FADE(11, 11.0f);
+                f = val_11;
+
+                if (freq * 9.0f > (nyquist - fadeBand)) {
+                    float val_9 = 1.0f;
+                    CALC_FADE(9, 9.0f);
+                    e = val_9;
+
+                    if (freq * 7.0f > (nyquist - fadeBand)) {
+                        float val_7 = 1.0f;
+                        CALC_FADE(7, 7.0f);
+                        d = val_7;
+
+                        if (freq * 5.0f > (nyquist - fadeBand)) {
+                            float val_5 = 1.0f;
+                            CALC_FADE(5, 5.0f);
+                            c = val_5;
+
+                            if (freq * 3.0f > (nyquist - fadeBand)) {
+                                float val_3 = 1.0f;
+                                CALC_FADE(3, 3.0f);
+                                b = val_3;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #undef CALC_FADE
 
 	// BesselJ[1, Pi/2] Sin[x] - (BesselJ[1, (3 Pi)/2] Sin[3 x])/ 3 + (BesselJ[1, (5 Pi)/2] Sin[5 x])/ 5 - (BesselJ[1, (7 Pi)/2] Sin[7 x])/ 7 + (BesselJ[1, (9 Pi)/2] Sin[9 x])/9
 	// 0.566824088906  -0.281657908751/3  0.211263431004/5  -0.176096934095/7  0.154115070794/9  -0.138723869537/11  0.127177675472/13  -0.118103773801/15

@@ -140,7 +140,7 @@ void Jette::process(const ProcessArgs &args) {
 	for (int ch = 0; ch < channels; ch++) {
 		float pitch = pitchBase + inputs[PITCH_INPUT].getPolyVoltage(ch);
 		pitch = clamp(pitch, -4.0f, 6.0f);
-		float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
+		float freq = dsp::FREQ_C4 * std::exp2f(pitch);
 	
 
 		float deltaPhase = freq * dt * period;
@@ -170,10 +170,16 @@ void Jette::process(const ProcessArgs &args) {
 
 				if (k % 2 != 0) { // Odd harmonics only
 					float harmonicFreq = freq * (float)k;
-					if (harmonicFreq > nyquist) break; // Stop early if aliasing
+					float amp = 1.0f;
+					if (harmonicFreq >= nyquist) {
+						break;
+					} else if (harmonicFreq > (nyquist - 2000.0f)) {
+						// Fade out in the top 2000Hz
+						amp = (nyquist - harmonicFreq) / 2000.0f;
+					}
 
 					int sliderIdx = (k - 1) / 2;
-					buzz += sliders[sliderIdx] * val_curr / (float)k;
+					buzz += amp * sliders[sliderIdx] * val_curr / (float)k;
 				}
 			}
 			buzz *= 20.0f / M_PI;
@@ -194,11 +200,17 @@ void Jette::process(const ProcessArgs &args) {
 
 				if (k % 2 != 0) { // Odd harmonics only
 					float harmonicFreq = freq * (float)k;
-					if (harmonicFreq > nyquist) break;
+					float amp = 1.0f;
+					if (harmonicFreq >= nyquist) {
+						break;
+					} else if (harmonicFreq > (nyquist - 2000.0f)) {
+						// Fade out in the top 2000Hz
+						amp = (nyquist - harmonicFreq) / 2000.0f;
+					}
 
 					int sliderIdx = (k - 1) / 2;
 					float div = (float)(k * k); // Falls off as 1/k^2
-					buzz += sliders[sliderIdx] * val_curr / div;
+					buzz += amp * sliders[sliderIdx] * val_curr / div;
 				}
 			}
 			buzz *= 40.0f / (M_PI * M_PI);
@@ -220,10 +232,16 @@ void Jette::process(const ProcessArgs &args) {
 				val_curr = val_next;
 
 				float harmonicFreq = freq * (float)k;
-				if (harmonicFreq > nyquist) break;
+				float amp = 1.0f;
+				if (harmonicFreq >= nyquist) {
+					break;
+				} else if (harmonicFreq > (nyquist - 2000.0f)) {
+					// Fade out in the top 2000Hz
+					amp = (nyquist - harmonicFreq) / 2000.0f;
+				}
 
 				float sign = (k % 2 == 0) ? -1.0f : 1.0f; // Alternating signs
-				buzz += sign * sliders[k-1] * val_curr / (float)k;
+				buzz += amp * sign * sliders[k-1] * val_curr / (float)k;
 			}
 			buzz *= 10.0f / M_PI;
 		}
