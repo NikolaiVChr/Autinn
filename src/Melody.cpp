@@ -101,6 +101,9 @@ struct Melody : Module {
 	int resting[16] = {};
 	int rest_amount[16] = {};
 
+	dsp::PulseGenerator startPulse[16];
+	dsp::PulseGenerator newPhrasePulse[16];
+
 	bool generate_prev = false;
 	long int stepCounter = 0;
 
@@ -162,6 +165,17 @@ struct Melody : Module {
 		}
 	}
 
+#define JSON_POLY "voices"
+#define JSON_REST_AMOUNT "rest"
+#define JSON_SEQ "sequence"
+#define JSON_DURAS "durations"
+#define JSON_ACCENTS "accents"
+#define JSON_GLIDES "glides"
+#define JSON_GAP "gap"
+#define JSON_IDX_PHRASE "phrase_index"
+//#define JSON_RESTING "resting"
+
+
 	json_t *dataToJson() override {
 	    json_t *root = json_object();
 
@@ -170,39 +184,41 @@ struct Melody : Module {
 		for (int c = 0; c < 16; c++) {
 			json_t *voiceRoot = json_object();
 
-			json_object_set_new(voiceRoot, "phrase_index", json_integer(phrase_index[c]));
-			json_object_set_new(voiceRoot, "resting", json_integer(resting[c]));
-			json_object_set_new(voiceRoot, "phrase_length", json_integer(phrase_length[c]));
+			//json_object_set_new(voiceRoot, JSON_IDX_PHRASE, json_integer(phrase_index[c]));
+			//json_object_set_new(voiceRoot, JSON_RESTING, json_integer(resting[c]));
+			//json_object_set_new(voiceRoot, JSON_PHRASE_LEN, json_integer(phrase_length[c]));
 
-			json_object_set_new(voiceRoot, "rest_amount", json_integer(rest_amount[c]));
-			json_object_set_new(voiceRoot, "gap", json_real(gap[c]));
+			json_object_set_new(voiceRoot, JSON_REST_AMOUNT, json_integer(rest_amount[c]));
+			json_object_set_new(voiceRoot, JSON_GAP, json_real(gap[c]));
 
 			json_t *phraseJ = json_array();
 			for (int val : phrase[c]) json_array_append_new(phraseJ, json_integer(val));
-			json_object_set_new(voiceRoot, "sequence", phraseJ);
+			json_object_set_new(voiceRoot, JSON_SEQ, phraseJ);
 
 			json_t *durJ = json_array();
 			for (int val : phraseDurations[c]) json_array_append_new(durJ, json_integer(val));
-			json_object_set_new(voiceRoot, "durations", durJ);
+			json_object_set_new(voiceRoot, JSON_DURAS, durJ);
 
 			json_t *accJ = json_array();
 			for (bool val : phraseAccents[c]) json_array_append_new(accJ, json_integer((int)val));
-			json_object_set_new(voiceRoot, "accents", accJ);
+			json_object_set_new(voiceRoot, JSON_ACCENTS, accJ);
 
 			json_t *glideJ = json_array();
 			for (bool val : phraseGlides[c]) json_array_append_new(glideJ, json_integer((int)val));
-			json_object_set_new(voiceRoot, "glides", glideJ);
+			json_object_set_new(voiceRoot, JSON_GLIDES, glideJ);
 
 			json_array_append_new(voicesJ, voiceRoot);
 		}
+
+		json_object_set_new(root, JSON_POLY, voicesJ);
 
 	    return root;
 	}
 
 	void dataFromJson(json_t *root) override
 	{
-		// 1. Try to find the new Polyphonic format
-		json_t *voicesJ = json_object_get(root, "voices");
+		// Try to find the new Polyphonic format
+		json_t *voicesJ = json_object_get(root, JSON_POLY);
 
 		if (voicesJ) {
 			for (int c = 0; c < 16; c++) {
@@ -210,55 +226,74 @@ struct Melody : Module {
                 if (!voiceRoot) continue;
 
                 json_t *curr;
-
-                curr = json_object_get(voiceRoot, "phrase_index");
+				/*
+                curr = json_object_get(voiceRoot, JSON_IDX_PHRASE);
                 if (curr) phrase_index[c] = json_integer_value(curr);
 
-                curr = json_object_get(voiceRoot, "resting");
+                curr = json_object_get(voiceRoot, JSON_RESTING);
                 if (curr) resting[c] = json_integer_value(curr);
-
-                curr = json_object_get(voiceRoot, "rest_amount");
+				*/
+                curr = json_object_get(voiceRoot, JSON_REST_AMOUNT);
                 if (curr) rest_amount[c] = json_integer_value(curr);
 
-                curr = json_object_get(voiceRoot, "phrase_length");
+				/*
+                curr = json_object_get(voiceRoot, JSON_PHRASE_LEN);
                 if (curr) phrase_length[c] = json_integer_value(curr);
-
-                curr = json_object_get(voiceRoot, "gap");
+				*/
+                curr = json_object_get(voiceRoot, JSON_GAP);
                 if (curr) gap[c] = json_real_value(curr);
 
                 // Load Vectors
                 json_t *arr;
 
-                arr = json_object_get(voiceRoot, "sequence");
+                arr = json_object_get(voiceRoot, JSON_SEQ);
                 if (arr) {
                     phrase[c].clear();
                     size_t len = json_array_size(arr);
                     for (size_t i = 0; i < len; i++) phrase[c].push_back(json_integer_value(json_array_get(arr, i)));
                 }
 
-                arr = json_object_get(voiceRoot, "durations");
+                arr = json_object_get(voiceRoot, JSON_DURAS);
                 if (arr) {
                     phraseDurations[c].clear();
                     size_t len = json_array_size(arr);
                     for (size_t i = 0; i < len; i++) phraseDurations[c].push_back(json_integer_value(json_array_get(arr, i)));
                 }
 
-                arr = json_object_get(voiceRoot, "accents");
+                arr = json_object_get(voiceRoot, JSON_ACCENTS);
                 if (arr) {
                     phraseAccents[c].clear();
                     size_t len = json_array_size(arr);
                     for (size_t i = 0; i < len; i++) phraseAccents[c].push_back((bool)json_integer_value(json_array_get(arr, i)));
                 }
 
-                arr = json_object_get(voiceRoot, "glides");
+                arr = json_object_get(voiceRoot, JSON_GLIDES);
                 if (arr) {
                     phraseGlides[c].clear();
                     size_t len = json_array_size(arr);
                     for (size_t i = 0; i < len; i++) phraseGlides[c].push_back((bool)json_integer_value(json_array_get(arr, i)));
                 }
+
+				if (phraseDurations[c].size() != phrase[c].size() || phraseAccents[c].size() != phrase[c].size()
+					|| phraseGlides[c].size() != phrase[c].size() || phrase[c].size() < PHRASE_LENGTH_MIN) {
+					// Illegal Json, we generate new phrase instead
+					this->generateMelody(c);
+					phrase_length[c] = fmin(phrase[c].size(), phraseDurations[c].size());// fmin to prevent index being bigger than any of the vectors.
+				} else {
+					phrase_length[c] = phrase[c].size();
+					phrase_index[c] = 0;
+					resting[c] = 0;
+					nextPhrase[c].clear();// else it will switch to constructor generated one, right after loading json.
+					nextPhraseDurations[c].clear();
+					nextPhraseAccents[c].clear();
+					nextPhraseGlides[c].clear();
+				}
+				phrase_index[0] = 0;
+
+				nextPhrase[c].clear();//prevent constructor generated phrase to overwrite the loaded one.
             }
 		} else {
-			json_t *sequence_json_array = json_object_get(root, "sequence");
+			json_t *sequence_json_array = json_object_get(root, JSON_SEQ);
 			if(sequence_json_array) {
 				phrase[0].resize(0);
 				size_t i;
@@ -269,7 +304,7 @@ struct Melody : Module {
 				}
 			}
 
-			json_t *durations_json_array = json_object_get(root, "durations");
+			json_t *durations_json_array = json_object_get(root, JSON_DURAS);
 			if(durations_json_array) {
 				phraseDurations[0].resize(0);
 				size_t i;
@@ -280,7 +315,7 @@ struct Melody : Module {
 				}
 			}
 
-			json_t *accents_json_array = json_object_get(root, "accents");
+			json_t *accents_json_array = json_object_get(root, JSON_ACCENTS);
 			if(accents_json_array) {
 				phraseAccents[0].resize(0);
 				size_t i;
@@ -291,7 +326,7 @@ struct Melody : Module {
 				}
 			}
 
-			json_t *glides_json_array = json_object_get(root, "glides");
+			json_t *glides_json_array = json_object_get(root, JSON_GLIDES);
 			if(glides_json_array) {
 				phraseGlides[0].resize(0);
 				size_t i;
@@ -302,17 +337,18 @@ struct Melody : Module {
 				}
 			}
 
-			json_t *ext = json_object_get(root, "gap");
+			json_t *ext = json_object_get(root, JSON_GAP);
 			if (ext) {
 				gap[0] = float(json_real_value(ext));
 			}
 
-			json_t *ext2 = json_object_get(root, "rest");
+			json_t *ext2 = json_object_get(root, JSON_REST_AMOUNT);
 			if (ext2) {
 				rest_amount[0] = json_integer_value(ext2);
 			}
 
-			if (phraseDurations[0].size() != phrase[0].size() || phraseAccents[0].size() != phrase[0].size() || phraseGlides[0].size() != phrase[0].size() || phrase[0].size() < PHRASE_LENGTH_MIN) {
+			if (phraseDurations[0].size() != phrase[0].size() || phraseAccents[0].size() != phrase[0].size()
+				|| phraseGlides[0].size() != phrase[0].size() || phrase[0].size() < PHRASE_LENGTH_MIN) {
 				// Illegal Json, we generate new phrase instead
 				this->generateMelody(0);
 				phrase_length[0] = fmin(phrase[0].size(), phraseDurations[0].size());// fmin to prevent index being bigger than any of the vectors.
@@ -431,10 +467,12 @@ void Melody::process(const ProcessArgs &args) {
 				resting[c]--;
 			}
 			if (phrase_index[c] > phrase_length[c] - 1) {
-				start = 10.0f;
+				//start = 10.0f;
+				startPulse[c].trigger(1e-3f); // 1ms pulse
 				phrase_index[c] = 0;
 				if(nextPhrase[c].size() > 0) {
-					newStart = 10.0f;
+					//newStart = 10.0f;
+					newPhrasePulse[c].trigger(1e-3f); // 1ms pulse
 					// Switching to next phrase
 					// Safely copy data without triggering reallocation, so we can save json at same time this happens wihtout issues
 					phrase[c].resize(nextPhrase[c].size());
@@ -450,7 +488,7 @@ void Melody::process(const ProcessArgs &args) {
 					std::copy(nextPhraseGlides[c].begin(), nextPhraseGlides[c].end(), phraseGlides[c].begin());
 
 					phrase_length[c] = next_phrase_length[c];
-					//nextPhrase.resize(0);
+					nextPhrase[c].resize(0);
 					gap[c] = nextGap[c];
 				}
 				if (rest_amount[c] > 0) {
@@ -460,14 +498,21 @@ void Melody::process(const ProcessArgs &args) {
 			clockCount_last[c] = clockCount[c];
 			clockCount[c] = 0;
 
-			outputs[START_PHRASE_OUTPUT].setVoltage(start, c);
-			outputs[NEW_PHRASE_OUTPUT].setVoltage(newStart, c);
+
+			//outputs[START_PHRASE_OUTPUT].setVoltage(start, c);
+			//outputs[NEW_PHRASE_OUTPUT].setVoltage(newStart, c);
 		} else {
 			clockCount[c]++;
 			if (clockCount[c] > 10000000) {
 				clockCount[c] = 0;
 			}
 		}
+
+		bool p1 = startPulse[c].process(args.sampleTime);
+		bool p2 = newPhrasePulse[c].process(args.sampleTime);
+
+		outputs[START_PHRASE_OUTPUT].setVoltage(p1 ? 10.0f : 0.0f, c);
+		outputs[NEW_PHRASE_OUTPUT].setVoltage(p2 ? 10.0f : 0.0f, c);
 
 		float out = this->note2vPoct(phrase[c][phrase_index[c]]);
 		if (!phraseGlides[c][phrase_index[c]] || passedClocks[c] > 0) {
