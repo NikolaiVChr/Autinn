@@ -287,7 +287,8 @@ void Square::process(const ProcessArgs &args) {
 
 		for (int i = 0; i < oversample; i++) {
 			phase[c] += deltaPhase;
-			phase[c] = fmod(phase[c], period);
+			//phase[c] = fmod(phase[c], period);//too expensive
+			if (phase[c] >= period) phase[c] -= period;
 
 			float p = phase[c] * TABLE_SIZE;
 			int idx = (int)p;

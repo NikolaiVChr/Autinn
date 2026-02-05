@@ -53,6 +53,8 @@
 static const int oversample2 = 2;
 static const int oversample4 = 4;
 
+static const float LOG2_CUTOFF_RANGE = std::log2(CUTOFF_KNOB_MAX / CUTOFF_KNOB_MIN);
+
 struct Bass : Module {
 	enum ParamIds {
 		CUTOFF_PARAM,
@@ -392,7 +394,8 @@ void Bass::process(const ProcessArgs &args) {
 		vca_env = this->vca_env(gate, note, clamp(resonance,0.0f,1.0f), knob_accent);//knob_env_decay
 	}
 
-	float cutoff_setting = this->toExp(knob_cutoff, CUTOFF_KNOB_MIN, CUTOFF_KNOB_MAX);
+	//float cutoff_setting = this->toExp(knob_cutoff, CUTOFF_KNOB_MIN, CUTOFF_KNOB_MAX);
+	float cutoff_setting = CUTOFF_KNOB_MIN * std::exp2f(x * LOG2_CUTOFF_RANGE);// much faster
 
 	float range_hz = knob_envmod * CUTOFF_RANGE_FOR_ENVELOPE + CUTOFF_ENVMOD_MIN;//knob_envmod * maxf(cutoff_setting * 2.0f, CUTOFF_RANGE_FOR_ENVELOPE) + CUTOFF_ENVMOD_MIN;
 
