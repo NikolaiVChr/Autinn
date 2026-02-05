@@ -106,6 +106,8 @@ struct Mixer6 : Module {
 	float cached_sendA[num_mono_channels];
 	float cached_sendB[num_mono_channels];
 
+	bool autoMainScale = false;
+
 	Mixer6() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
@@ -154,6 +156,8 @@ struct Mixer6 : Module {
 	    json_object_set(root, "mute_solo", mute_json_array);
 	    json_decref(mute_json_array);
 
+		json_object_set_new(root, "autoScaleMain", json_boolean(autoMainScale));
+
 	    return root;
 	}
 
@@ -170,11 +174,19 @@ struct Mixer6 : Module {
 				}
 			}
 	    }
+		json_t *ext2 = json_object_get(root, "autoScaleMain");
+		if (ext2)
+			autoMainScale = json_boolean_value(ext2);
 	}
 
 	void handleMuteButtons();
 
 	void process(const ProcessArgs &args) override;
+
+	void onReset(const ResetEvent& e) override {
+		autoMainScale = false;
+		Module::onReset(e);
+	}
 };
 
 void Mixer6::process(const ProcessArgs &args) {
@@ -224,10 +236,12 @@ void Mixer6::process(const ProcessArgs &args) {
 	float main_left  = 0;
 	float main_right = 0;
 
+	int active_channels = 0;
 	for (int ch = 0; ch < num_mono_channels; ch++) {
 		if (!inputs[INPUT+ch].isConnected() || mute_solo_state[ch] == -1 || (solo && mute_solo_state[ch] != 1)) {
 			continue;
 		}
+		active_channels++;
 
 		float in = 0.0f;
 		int polyChannels = inputs[INPUT + ch].getChannels();
@@ -310,6 +324,9 @@ void Mixer6::process(const ProcessArgs &args) {
 	fx_return_right_B *= params[FX_B_TO_MAIN_PARAM].getValue();
 
 	// Main out
+	float scaling = autoMainScale?(1.0f / std::sqrt((float)std::max(active_channels, 1))):1.0f;
+	main_left *= scaling;
+	main_right *= scaling;
 	main_left  = fx_return_left_A  + fx_return_left_B  + main_left;
 	main_right = fx_return_right_A + fx_return_right_B + main_right;
 	main_left *= params[LEVEL_MAIN].getValue();
@@ -366,6 +383,24 @@ void Mixer6::handleMuteButtons() {
 		mute_solo_button_prev[ch] = state;
 	}
 }
+
+struct AutoLevelMenuItem : MenuItem {
+	Mixer6* _module;
+
+	AutoLevelMenuItem(Mixer6* module, const char* label)
+	: _module(module)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->autoMainScale = !_module->autoMainScale;
+	}
+
+	void step() override {
+		rightText = _module->autoMainScale == true ? "✔" : "";
+	}
+};
 
 struct Mixer6Widget : ModuleWidget {
 	Mixer6Widget(Mixer6 *module) {
@@ -457,6 +492,19 @@ struct Mixer6Widget : ModuleWidget {
 			addChild(createLight<SmallLight<RedLight>>(Vec(light_x_pos_b - HALF_LIGHT_SMALL*2 - HALF_LIGHT_SMALL, light_y_pos - light_y_spacing * i), module, Mixer6::VU_FXB_LEFT_LIGHT + i));
 			addChild(createLight<SmallLight<RedLight>>(Vec(light_x_pos_b + HALF_LIGHT_SMALL*2 - HALF_LIGHT_SMALL, light_y_pos - light_y_spacing * i), module, Mixer6::VU_FXB_RIGHT_LIGHT + i));
 		}
+	}
+
+	void appendContextMenu(Menu* menu) override {
+		Mixer6* a = dynamic_cast<Mixer6*>(module);
+		assert(a);
+
+		//menu->addChild(new MenuLabel());
+		//menu->addChild(new EmphasizeMenuItem(a, "Passband gain comp.",  1.0f));
+		//menu->addChild(new EmphasizeMenuItem(a, "Medium compensation",  0.5f));
+		//menu->addChild(new EmphasizeMenuItem(a, "No compensation", 0.0f));
+
+		menu->addChild(new MenuLabel());
+		menu->addChild(new AutoLevelMenuItem(a, "Auto scale main out"));
 	}
 };
 

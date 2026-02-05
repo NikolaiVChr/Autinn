@@ -225,6 +225,7 @@ inline float non_lin_func2(const float parm) {
 }
 
 inline float interpolator(float mix, float a, float b) {
+	// same as: a * (1.0f - mix) + b * mix;
 	return a + mix * (b - a);
 }
 
