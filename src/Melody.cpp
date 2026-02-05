@@ -43,33 +43,55 @@
 
 struct Melody : Module {
 	enum ParamIds {
+		/// @brief Root note selection (0-11, C to B).
 		TONIC_PARAM,
+		/// @brief Musical mode selection (Major, Dorian, etc.).
 		MODE_PARAM,
+		/// @brief Manual trigger button to generate a new melody immediately.
 		BUTTON_GENERATE_PARAM,
+		/// @brief Target length for the generated phrase (4-32 steps).
 		PHRASE_PARAM,
+		/// @brief Note length/articulation (Staccato to Legato).
 		GAP_PARAM,
+		/// @brief Probability (0-100%) of a note being accented.
 		ACCENT_PARAM,
+		/// @brief Probability (0-100%) of a note sliding (glide).
 		GLIDE_PARAM,
+		/// @brief Number of beats to rest after a phrase finishes.
 		REST_PARAM,
 		NUM_PARAMS
 	};
 	enum InputIds {
+		/// @brief External clock input (advances the sequence).
 		CLOCK_INPUT,
+		/// @brief Trigger input to generate a new melody (same as button).
 		GENERATE_INPUT,
+		/// @brief CV control for Tonic (added to parameter).
 		CV_TONIC_INPUT,
+		/// @brief CV control for Mode selection.
 		CV_MODE_INPUT,
+		/// @brief CV control for Phrase Length.
 		CV_PHRASE_INPUT,
+		/// @brief CV control for Gap/Articulation.
 		CV_GAP_INPUT,
+		/// @brief CV control for Accent probability.
 		CV_ACCENT_INPUT,
+		/// @brief CV control for Glide probability.
 		CV_GLIDE_INPUT,
+		/// @brief CV control for Rest amount.
 		CV_REST_INPUT,
 		NUM_INPUTS
 	};
 	enum OutputIds {
+		/// @brief 1V/Octave Pitch output.
 		FREQ_OUTPUT,
+		/// @brief Gate output (high while note is playing).
 		GATE_OUTPUT,
+		/// @brief Accent output (10V trigger/gate for accented notes).
 		ACCENT_OUTPUT,
+		/// @brief Trigger output when a *newly generated* phrase starts playing.
 		NEW_PHRASE_OUTPUT,
+		/// @brief Trigger output at the start of *every* phrase loop.
 		START_PHRASE_OUTPUT,
 		NUM_OUTPUTS
 	};
@@ -77,35 +99,105 @@ struct Melody : Module {
 		NUM_LIGHTS
 	};
 
-	std::vector<int> phrase[16];
-	std::vector<int> nextPhrase[16];
-	std::vector<int> phraseDurations[16];
-	std::vector<int> nextPhraseDurations[16];
-	std::vector<bool> phraseAccents[16];
-	std::vector<bool> nextPhraseAccents[16];
-	std::vector<bool> phraseGlides[16];
-	std::vector<bool> nextPhraseGlides[16];
+	/// @brief Buffer for the current phrase notes.
+	std::vector<int> phrase[16] = {};
 
-	int phrase_length[16];
-	int next_phrase_length[16];
+	/// @brief Buffer for the next phrase notes.
+	///
+	/// This vector is populated by the generator thread. When the current
+	/// phrase finishes, these values are swapped into the active #phrase vector.
+	std::vector<int> nextPhrase[16] = {};
+
+	/// @brief Current phrase note durations, measured in clock steps.
+	std::vector<int> phraseDurations[16] = {};
+	/// @brief Next phrase note durations, measured in clock steps.
+	std::vector<int> nextPhraseDurations[16] = {};
+	/// @brief Current phrase note accent bools.
+	std::vector<bool> phraseAccents[16] = {};
+	/// @brief Next phrase note accent bools.
+	std::vector<bool> nextPhraseAccents[16] = {};
+	/// @brief Current phrase note glide bools.
+	std::vector<bool> phraseGlides[16] = {};
+	/// @brief Next phrase note glide bools.
+	std::vector<bool> nextPhraseGlides[16] = {};
+
+	/// @brief Current phrase number of notes.
+	int phrase_length[16] = {};
+	/// @brief Next phrase number of notes.
+	int next_phrase_length[16] = {};
+	/// @brief Current phrase index in #phrase where we are currently playing
 	int phrase_index[16] = {};
-
-	bool clockExt_prev[16] = {};
+	/// @brief Schmitt trigger state for detecting the rising edge of the external clock input.
+	//bool clockExt_prev[16] = {};
+	dsp::SchmittTrigger clockTrigger[16];
+	/// @brief Process steps counter tracking 'time' since the last clock pulse.
+	/// Used to calculate the linear interpolation for Glide effects.
 	long int clockCount[16] = {};
+	/// @brief The total process steps duration of the previous clock cycle.
+	/// Used as a reference to ensure Glide timing scales relative to the BPM.
 	long int clockCount_last[16] = {};
+	/// @brief Counter for how many clock ticks have passed during the current note.
+	/// Compares against #phraseDurations to determine when to advance to the next note.
 	int passedClocks[16] = {};
-
-	float gap[16];
-	float nextGap[16];
-
+	/// @brief Current phrase gate ON times, expressed in fractions of a notes total clock ticks.
+	float gap[16] = {};
+	/// @brief Next phrase gaps (gate ON times, expressed in fractions of a notes total clock ticks).
+	float nextGap[16] = {};
+	/// @brief Current rest after phrase finished state countdown, expressed in clock ticks.
 	int resting[16] = {};
+	/// @brief Rest after the current phrase, expressed in clock ticks.
 	int rest_amount[16] = {};
-
-	dsp::PulseGenerator startPulse[16];
-	dsp::PulseGenerator newPhrasePulse[16];
-
-	bool generate_prev = false;
+	/// @brief Pulse generator for the "Start Phrase" trigger output.
+	/// Generates a 1ms pulse whenever the sequence loops back to index 0.
+	dsp::PulseGenerator startPulse[16] = {};
+	/// @brief Pulse generator for the "New Phrase" trigger output.
+	/// Generates a 1ms pulse only when a *newly generated* phrase begins playing.
+	dsp::PulseGenerator newPhrasePulse[16] = {};
+	/// @brief State tracking for the "Generate" button/input to detect rising edges.
+	/// Prevents the generator from triggering continuously while the button is held.
+	//bool generate_prev = false;
+	dsp::SchmittTrigger generateTrigger;
+	/// @brief Low-priority counter for throttling expensive parameter updates.
+	/// Parameter `attenuvert` calculations only run when this reaches 512.
 	long int stepCounter = 0;
+
+	void initialize_melodies() {
+		int init_phrase[6] = {60,62,67,65,62,60};
+		int init_phrase_dura[6] = {2,2,2,2,2,2};
+		int init_phrase_acc[6] = {false,false,false,false,false,false};
+		int init_phrase_glide[6] = {false,false,false,false,false,false};
+
+		for (int c = 0; c < 16; c++) {
+			phrase[c].reserve(PHRASE_LENGTH_MAX);
+			nextPhrase[c].reserve(PHRASE_LENGTH_MAX);
+			phraseDurations[c].reserve(PHRASE_LENGTH_MAX);
+			nextPhraseDurations[c].reserve(PHRASE_LENGTH_MAX);
+			phraseAccents[c].reserve(PHRASE_LENGTH_MAX);
+			nextPhraseAccents[c].reserve(PHRASE_LENGTH_MAX);
+			phraseGlides[c].reserve(PHRASE_LENGTH_MAX);
+			nextPhraseGlides[c].reserve(PHRASE_LENGTH_MAX);
+
+			phrase[c].assign(init_phrase, init_phrase+6);
+			phraseDurations[c].assign(init_phrase_dura, init_phrase_dura+6);
+			phraseAccents[c].assign(init_phrase_acc, init_phrase_acc+6);
+			phraseGlides[c].assign(init_phrase_glide, init_phrase_glide+6);
+
+			phrase_length[c] = 6;
+			nextGap[c] = GAP_NORMAL;
+			rest_amount[c] = 2; // Default rest
+			phrase_index[c] = 0;
+			passedClocks[c] = 0;
+			resting[c] = 0;
+			clockCount[c] = 0;
+			clockCount_last[c] = 0;
+			//clockExt_prev[c] = false;
+			clockTrigger[c].reset();
+
+			// Generate initial 'next' state
+			this->generateMelody(c);
+			switch_to_next_phrase(c);
+		}
+	}
 
 	Melody() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -135,34 +227,7 @@ struct Melody : Module {
 		configInput(CV_GAP_INPUT, "Expression CV ±5V");
 		configInput(CV_REST_INPUT, "Rest CV ±5V");
 
-		int init_phrase[6] = {60,62,67,65,62,60};
-		int init_phrase_dura[6] = {2,2,2,2,2,2};
-		int init_phrase_acc[6] = {false,false,false,false,false,false};
-		int init_phrase_glide[6] = {false,false,false,false,false,false};
-
-		for (int c = 0; c < 16; c++) {
-			phrase[c].reserve(PHRASE_LENGTH_MAX);
-			nextPhrase[c].reserve(PHRASE_LENGTH_MAX);
-			phraseDurations[c].reserve(PHRASE_LENGTH_MAX);
-			nextPhraseDurations[c].reserve(PHRASE_LENGTH_MAX);
-			phraseAccents[c].reserve(PHRASE_LENGTH_MAX);
-			nextPhraseAccents[c].reserve(PHRASE_LENGTH_MAX);
-			phraseGlides[c].reserve(PHRASE_LENGTH_MAX);
-			nextPhraseGlides[c].reserve(PHRASE_LENGTH_MAX);
-
-			phrase[c].assign(init_phrase, init_phrase+6);
-			phraseDurations[c].assign(init_phrase_dura, init_phrase_dura+6);
-			phraseAccents[c].assign(init_phrase_acc, init_phrase_acc+6);
-			phraseGlides[c].assign(init_phrase_glide, init_phrase_glide+6);
-
-			phrase_length[c] = 6;
-			gap[c] = GAP_NORMAL;
-			nextGap[c] = GAP_NORMAL;
-			rest_amount[c] = 2; // Default rest
-
-			// Generate initial 'next' state
-			this->generateMelody(c);
-		}
+		initialize_melodies();
 	}
 
 #define JSON_POLY "voices"
@@ -172,7 +237,7 @@ struct Melody : Module {
 #define JSON_ACCENTS "accents"
 #define JSON_GLIDES "glides"
 #define JSON_GAP "gap"
-#define JSON_IDX_PHRASE "phrase_index"
+//#define JSON_IDX_PHRASE "phrase_index"
 //#define JSON_RESTING "resting"
 
 
@@ -181,12 +246,15 @@ struct Melody : Module {
 
 		json_t *voicesJ = json_array();
 
-		for (int c = 0; c < 16; c++) {
+		int active_voices = inputs[CLOCK_INPUT].getChannels();
+		if (active_voices < 1) active_voices = 1;
+		if (active_voices > 16) active_voices = 16;
+
+		for (int c = 0; c < active_voices; c++) {
 			json_t *voiceRoot = json_object();
 
 			//json_object_set_new(voiceRoot, JSON_IDX_PHRASE, json_integer(phrase_index[c]));
 			//json_object_set_new(voiceRoot, JSON_RESTING, json_integer(resting[c]));
-			//json_object_set_new(voiceRoot, JSON_PHRASE_LEN, json_integer(phrase_length[c]));
 
 			json_object_set_new(voiceRoot, JSON_REST_AMOUNT, json_integer(rest_amount[c]));
 			json_object_set_new(voiceRoot, JSON_GAP, json_real(gap[c]));
@@ -236,10 +304,6 @@ struct Melody : Module {
                 curr = json_object_get(voiceRoot, JSON_REST_AMOUNT);
                 if (curr) rest_amount[c] = json_integer_value(curr);
 
-				/*
-                curr = json_object_get(voiceRoot, JSON_PHRASE_LEN);
-                if (curr) phrase_length[c] = json_integer_value(curr);
-				*/
                 curr = json_object_get(voiceRoot, JSON_GAP);
                 if (curr) gap[c] = json_real_value(curr);
 
@@ -281,16 +345,17 @@ struct Melody : Module {
 					phrase_length[c] = fmin(phrase[c].size(), phraseDurations[c].size());// fmin to prevent index being bigger than any of the vectors.
 				} else {
 					phrase_length[c] = phrase[c].size();
-					phrase_index[c] = 0;
 					resting[c] = 0;
 					nextPhrase[c].clear();// else it will switch to constructor generated one, right after loading json.
 					nextPhraseDurations[c].clear();
 					nextPhraseAccents[c].clear();
 					nextPhraseGlides[c].clear();
+					next_phrase_length[0] = 0;
+					nextGap[c] = 0.0f;
 				}
-				phrase_index[0] = 0;
-
-				nextPhrase[c].clear();//prevent constructor generated phrase to overwrite the loaded one.
+				phrase_index[c] = 0;
+				passedClocks[c] = 0;
+				clockCount[c] = 0;
             }
 		} else {
 			json_t *sequence_json_array = json_object_get(root, JSON_SEQ);
@@ -358,14 +423,19 @@ struct Melody : Module {
 				nextPhraseDurations[0].resize(0);
 				nextPhraseAccents[0].resize(0);
 				nextPhraseGlides[0].resize(0);
+				nextGap[0] = gap[0];
+				next_phrase_length[0] = 0;
 			}
 			phrase_index[0] = 0;
 		}
 	}
 
-	int c4 = 60;
+	/// @brief MIDI note number for C4 (Middle C), used as the 0V reference.
+	const int c4 = 60;
 	
-	// Intervals [modes][intervals]
+	/// @brief Look-up table for scale intervals.
+	/// Format: modes[mode_index][step_interval].
+	/// Values represent semitones between scale degrees
 	std::vector<int> modes[NUMBER_OF_MODES] = { {2,2,1,2,2,2,1},  //   I Major
 												{2,1,2,2,2,1,2},  //  II Dorian
 												{1,2,2,2,1,2,2},  // III Phrygian
@@ -384,7 +454,7 @@ struct Melody : Module {
 	//float note2freq (int note);
 	//float freq2vPoct (float freq);
 	float note2vPoct (int note);
-	int getSemiNoteOffset (int steps, int referenceIndex, std::vector<int> mode);
+	static int getSemiNoteOffset (int steps, int referenceIndex, const std::vector<int>& mode);
 	//int getModeIndex (int note, int reference, int referenceIndex, std::vector<int> mode);
 	void generateMelody (int c);
 	//int attenuvertInt(int CV, int KNOB, float min_result, float max_result);
@@ -392,8 +462,8 @@ struct Melody : Module {
 	void attenuvertFloat(int CV, int KNOB, float min_result, float max_result);
 
 	void onReset(const ResetEvent& e) override {
-		// Later might think of something needed here
 		Module::onReset(e);
+		initialize_melodies();
 	}
 
 	void onRandomize(const RandomizeEvent& e) override {
@@ -401,8 +471,39 @@ struct Melody : Module {
 		Module::onRandomize(e);
 	}
 
+	void switch_to_next_phrase(int c);
 	void process(const ProcessArgs &args) override;
 };
+
+void Melody::switch_to_next_phrase(int c) {
+	//start = 10.0f;
+	startPulse[c].trigger(1e-3f); // 1ms pulse
+	phrase_index[c] = 0;
+	if(!nextPhrase[c].empty()) {
+		//newStart = 10.0f;
+		newPhrasePulse[c].trigger(1e-3f); // 1ms pulse
+		// Switching to next phrase
+		// Safely copy data without triggering reallocation, so we can save json at same time this happens wihtout issues
+		phrase[c].resize(nextPhrase[c].size());
+		std::copy(nextPhrase[c].begin(), nextPhrase[c].end(), phrase[c].begin());
+
+		phraseDurations[c].resize(nextPhraseDurations[c].size());
+		std::copy(nextPhraseDurations[c].begin(), nextPhraseDurations[c].end(), phraseDurations[c].begin());
+
+		phraseAccents[c].resize(nextPhraseAccents[c].size());
+		std::copy(nextPhraseAccents[c].begin(), nextPhraseAccents[c].end(), phraseAccents[c].begin());
+
+		phraseGlides[c].resize(nextPhraseGlides[c].size());
+		std::copy(nextPhraseGlides[c].begin(), nextPhraseGlides[c].end(), phraseGlides[c].begin());
+
+		phrase_length[c] = next_phrase_length[c];
+		nextPhrase[c].resize(0);
+		gap[c] = nextGap[c];
+	}
+	if (rest_amount[c] > 0) {
+		resting[c] = rest_amount[c];
+	}
+}
 
 void Melody::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
@@ -439,6 +540,7 @@ void Melody::process(const ProcessArgs &args) {
 		this->attenuvertFloat(CV_GAP_INPUT, GAP_PARAM, 0, 3);
 	}
 
+	/*
 	bool generate = params[BUTTON_GENERATE_PARAM].getValue() >= 1.0f || inputs[GENERATE_INPUT].getVoltage() >= 1.0f;
 	if (generate && !generate_prev) {
 		for(int c = 0; c < active_voices; c++) {
@@ -446,16 +548,25 @@ void Melody::process(const ProcessArgs &args) {
 		}
 	}
 	generate_prev = generate;
+	*/
+	if (generateTrigger.process(params[BUTTON_GENERATE_PARAM].getValue() + inputs[GENERATE_INPUT].getVoltage())) {
+		for(int c = 0; c < active_voices; c++) {
+			this->generateMelody(c);
+		}
+	}
 
 	for (int c = 0; c < active_voices; c++) {
 		int clock_idx = (clock_channels > 1) ? c : 0;
 
+		/*
 		float clockVolt = inputs[CLOCK_INPUT].getPolyVoltage(clock_idx);
 		bool clockExt = clockVolt >= 1.0f;
 		float start = 0.0f;
 		float newStart = 0.0f;
 
 		if (clockExt && !clockExt_prev[c]) {
+			*/
+		if (clockTrigger[c].process(inputs[CLOCK_INPUT].getPolyVoltage(clock_idx))) {
 			if (resting[c] == 0) {
 				if (passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1) {
 					passedClocks[c] = 0;
@@ -467,33 +578,7 @@ void Melody::process(const ProcessArgs &args) {
 				resting[c]--;
 			}
 			if (phrase_index[c] > phrase_length[c] - 1) {
-				//start = 10.0f;
-				startPulse[c].trigger(1e-3f); // 1ms pulse
-				phrase_index[c] = 0;
-				if(nextPhrase[c].size() > 0) {
-					//newStart = 10.0f;
-					newPhrasePulse[c].trigger(1e-3f); // 1ms pulse
-					// Switching to next phrase
-					// Safely copy data without triggering reallocation, so we can save json at same time this happens wihtout issues
-					phrase[c].resize(nextPhrase[c].size());
-					std::copy(nextPhrase[c].begin(), nextPhrase[c].end(), phrase[c].begin());
-
-					phraseDurations[c].resize(nextPhraseDurations[c].size());
-					std::copy(nextPhraseDurations[c].begin(), nextPhraseDurations[c].end(), phraseDurations[c].begin());
-
-					phraseAccents[c].resize(nextPhraseAccents[c].size());
-					std::copy(nextPhraseAccents[c].begin(), nextPhraseAccents[c].end(), phraseAccents[c].begin());
-
-					phraseGlides[c].resize(nextPhraseGlides[c].size());
-					std::copy(nextPhraseGlides[c].begin(), nextPhraseGlides[c].end(), phraseGlides[c].begin());
-
-					phrase_length[c] = next_phrase_length[c];
-					nextPhrase[c].resize(0);
-					gap[c] = nextGap[c];
-				}
-				if (rest_amount[c] > 0) {
-					resting[c] = rest_amount[c];
-				}
+				switch_to_next_phrase(c);
 			}
 			clockCount_last[c] = clockCount[c];
 			clockCount[c] = 0;
@@ -538,7 +623,7 @@ void Melody::process(const ProcessArgs &args) {
 		} else {
 			outputs[GATE_OUTPUT].setVoltage(10.0f, c);
 		}
-		clockExt_prev[c] = clockExt;
+		//clockExt_prev[c] = clockExt;
 	}
 }
 
@@ -702,7 +787,7 @@ void Melody::attenuvertFloat(int CV, int KNOB, float min_result, float max_resul
 	}
 }
 
-int Melody::getSemiNoteOffset (int steps, int referenceIndex, std::vector<int> mode) {
+int Melody::getSemiNoteOffset (int steps, int referenceIndex, const std::vector<int>& mode) {
 	int indexMax = mode.size()-1;
 	int index = referenceIndex;
 	int semiOffset = 0;
@@ -764,7 +849,7 @@ float Melody::freq2vPoct (float freq) {
 	return log2(freq / dsp::FREQ_C4);
 }*/
 
-float Melody::note2vPoct (int note) {
+float Melody::note2vPoct (const int note) {
 	return float(note-c4) / 12.0f;
 }
 
