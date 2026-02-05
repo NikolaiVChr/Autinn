@@ -28,6 +28,26 @@ static const int oversample8 = 8;
 #define DRIVE_MAX 10.0f
 #define DRIVE_MIN 0.1f
 
+struct SimpleDCBlocker {
+	float x1 = 0.0f;
+	float y1 = 0.0f;
+	// 0.999 creates a cutoff around 10Hz-20Hz, perfect for DC blocking
+	const float R = 0.999f;
+
+	float process(float x) {
+		// Standard DC Block formula: y[n] = x[n] - x[n-1] + R * y[n-1]
+		float y = x - x1 + R * y1;
+		x1 = x;
+		y1 = y;
+		return y;
+	}
+
+	void reset() {
+		x1 = 0.0f;
+		y1 = 0.0f;
+	}
+};
+
 struct Fil : Module {
 	enum ParamIds {
 		DIAL_PARAM,
@@ -62,6 +82,8 @@ struct Fil : Module {
 
 	int current_oversample = 4;
 	float th=1.0f/3.0f;
+
+	SimpleDCBlocker dcBlocker[16];
 
 	dsp::Upsampler<oversample2, 10> upsampler2[16];
 	dsp::Decimator<oversample2, 10> decimator2[16];
@@ -160,8 +182,8 @@ void Fil::process(const ProcessArgs &args) {
 		} else {
 			out = decimator8[c].process(outBuf);
 		}
-
-		outputs[FIL_OUTPUT].setVoltage(out*6.0f, c);
+		out = dcBlocker[c].process(out);
+		outputs[FIL_OUTPUT].setVoltage(out*5.0f, c);
 	}
 }
 
