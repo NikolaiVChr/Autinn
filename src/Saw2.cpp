@@ -200,7 +200,7 @@ struct Saw2Widget : ModuleWidget {
 		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM));
 		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM));
 
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 90), module, Saw2::CV_AGE_INPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 75+HALF_KNOB_MED), module, Saw2::CV_AGE_INPUT));
 
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.25, 185), module, Saw2::TYPE_PARAM));
 
@@ -209,8 +209,8 @@ struct Saw2Widget : ModuleWidget {
 		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25, 300+HALF_PORT), module, Saw2::BUZZ_OUTPUT));
 
 		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5, 50), module, Saw2::BLINK_LIGHT));
-		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6, 180), module, Saw2::SAW_LIGHT));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6, 190), module, Saw2::SQUARE_LIGHT));
+		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6, 160), module, Saw2::SAW_LIGHT));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6, 180), module, Saw2::SQUARE_LIGHT));
 	}
 };
 
