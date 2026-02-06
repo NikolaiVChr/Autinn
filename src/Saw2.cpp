@@ -24,6 +24,7 @@
 struct Saw2 : Module {
 	enum ParamIds {
 		PITCH_PARAM,
+		AGE_PARAM,
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -46,6 +47,7 @@ struct Saw2 : Module {
 	Saw2() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Saw2::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
+		configParam(Saw2::AGE_PARAM, 0.0f, 30.0f, 15.0f, "Age", " Years");
 		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
 	}
@@ -79,8 +81,8 @@ struct Saw2 : Module {
 		float pitchBase = params[PITCH_PARAM].getValue();
 		int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
 
-		// 30Hz is the magic number for the 303's capacitor droop
-		const float cutoff_hz = 60.0f;
+		// 30Hz is the magic number for a new TB-303 capacitor droop
+		const float cutoff_hz = 30.0f + params[AGE_PARAM].getValue()*2.0f;
 		const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
 		const float alpha = rc / (rc + args.sampleTime);
 
@@ -142,6 +144,7 @@ struct Saw2Widget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
 		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Saw2::PITCH_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 100), module, Saw2::AGE_PARAM));
 
 		addInput(createInput<InPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Saw2::PITCH_INPUT));
 		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Saw2::BUZZ_OUTPUT));
