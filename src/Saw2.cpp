@@ -95,7 +95,7 @@ struct Saw2 : Module {
 		const float alpha = rc / (rc + args.sampleTime);
 		// As the capacitor dries out (Age increases), bass is lost and the signal thins out.
 		// We add gain to compensate, making the Bulge even bigger.
-		float makeupGain = 1.0f + (ageValue * 0.05f); // Up to 2.5x boost at max age
+		float makeupGain = 1.0f + (params[AGE_PARAM].getValue() * 0.05f); // Up to 2.5x boost at max age
 
 		for (int c = 0; c < channels; c++) {
 			// Calculate Frequency
