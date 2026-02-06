@@ -269,7 +269,7 @@ struct Saw2Widget : ModuleWidget {
 
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 75+HALF_KNOB_MED), module, Saw2::CV_AGE_INPUT));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75, (75+HALF_KNOB_MED+162)/2.0f), module, Saw2::TYPE_PARAM));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75, 5.0f + (75+HALF_KNOB_MED+162)/2.0f), module, Saw2::TYPE_PARAM));
 
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25, 200+HALF_PORT), module, Saw2::CV_PITCH_INPUT));
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 200+HALF_PORT), module, Saw2::CV_TYPE_INPUT));
