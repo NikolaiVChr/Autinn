@@ -206,6 +206,7 @@ struct Melody : Module {
 															"VI: Minor", "VII: Locrian", "Double Harmonic Major", "Double Harmonic Minor",
 															"Hexatonic Blues", "Bebop Dominant", "Major Pentatonic", "Chromatic"});
 		configSwitch(Melody::GAP_PARAM, 0, 3, 2.50f, "Expression", {"Staccatissimo", "Staccato", "Normal", "Legato"});
+		getParamQuantity(Melody::GAP_PARAM)->snapEnabled = false;
 		configButton(Melody::BUTTON_GENERATE_PARAM, "Generate new phrase from settings (will start when current phrase ends)");
 		configParam(Melody::GLIDE_PARAM, 0, 100, 0, "Each note's chance of glide"," %", 0.0f, 1.0f);
 		configParam(Melody::ACCENT_PARAM, 0, 100, 0, "Each note's chance of accent"," %", 0.0f, 1.0f);
@@ -457,8 +458,7 @@ struct Melody : Module {
 	static int getSemiNoteOffset (int steps, int referenceIndex, const std::vector<int>& mode);
 	//int getModeIndex (int note, int reference, int referenceIndex, std::vector<int> mode);
 	void generateMelody (int c);
-	//int attenuvertInt(int CV, int KNOB, float min_result, float max_result);
-	void attenuvert(int CV, int KNOB, float min_result, float max_result);
+	void attenuvertInt(int CV, int KNOB, int min_result, int max_result);
 	void attenuvertFloat(int CV, int KNOB, float min_result, float max_result);
 
 	void onReset(const ResetEvent& e) override {
@@ -477,11 +477,11 @@ struct Melody : Module {
 
 void Melody::switch_to_next_phrase(int c) {
 	//start = 10.0f;
-	startPulse[c].trigger(1e-3f); // 1ms pulse
+	startPulse[c].trigger(); // 1ms pulse
 	phrase_index[c] = 0;
 	if(!nextPhrase[c].empty()) {
 		//newStart = 10.0f;
-		newPhrasePulse[c].trigger(1e-3f); // 1ms pulse
+		newPhrasePulse[c].trigger(); // 1ms pulse
 		// Switching to next phrase
 		// Safely copy data without triggering reallocation, so we can save json at same time this happens wihtout issues
 		phrase[c].resize(nextPhrase[c].size());
@@ -531,12 +531,12 @@ void Melody::process(const ProcessArgs &args) {
 	}
 
 	if (stepCounter == 512) {
-		this->attenuvert(CV_TONIC_INPUT, TONIC_PARAM, TONIC_MIN, TONIC_MAX+0.99f);// Add almost 1 to give it a chance of being selected
-		this->attenuvert(CV_MODE_INPUT, MODE_PARAM, 0, NUMBER_OF_MODES-0.001f);
-		this->attenuvert(CV_PHRASE_INPUT, PHRASE_PARAM, PHRASE_LENGTH_MIN, PHRASE_LENGTH_MAX+0.99f);
-		this->attenuvert(CV_ACCENT_INPUT, ACCENT_PARAM, 0, 100.99f);
-		this->attenuvert(CV_GLIDE_INPUT, GLIDE_PARAM, 0, 100.99f);
-		this->attenuvert(CV_REST_INPUT, REST_PARAM, 0, REST_MAX+0.99f);
+		this->attenuvertInt(CV_TONIC_INPUT, TONIC_PARAM, TONIC_MIN, TONIC_MAX);
+		this->attenuvertInt(CV_MODE_INPUT, MODE_PARAM, 0, NUMBER_OF_MODES-1);
+		this->attenuvertInt(CV_PHRASE_INPUT, PHRASE_PARAM, PHRASE_LENGTH_MIN, PHRASE_LENGTH_MAX);
+		this->attenuvertInt(CV_ACCENT_INPUT, ACCENT_PARAM, 0, 100);
+		this->attenuvertInt(CV_GLIDE_INPUT, GLIDE_PARAM, 0, 100);
+		this->attenuvertInt(CV_REST_INPUT, REST_PARAM, 0, REST_MAX);
 		this->attenuvertFloat(CV_GAP_INPUT, GAP_PARAM, 0, 3);
 	}
 
@@ -647,9 +647,9 @@ void Melody::generateMelody (int c) {
 
 
 	// Melody
-	int tonic = int(params[TONIC_PARAM].getValue());
-	std::vector<int> mode = modes[int(params[MODE_PARAM].getValue())];
-	next_phrase_length[c] = int(params[PHRASE_PARAM].getValue());
+	int tonic = int(std::round(params[TONIC_PARAM].getValue()));
+	std::vector<int> mode = modes[int(std::round(params[MODE_PARAM].getValue()))];
+	next_phrase_length[c] = int(std::round(params[PHRASE_PARAM].getValue()));
 	int minOffset = -2;
 	int maxOffset =  4;
 	nextPhrase[c].clear(); // Keeps capacity, just sets size to 0
@@ -727,9 +727,9 @@ void Melody::generateMelody (int c) {
 	}
 
 	nextPhraseDurations[c].clear();
-	float chance = int(params[ACCENT_PARAM].getValue());
+	float chance = int(std::round(params[ACCENT_PARAM].getValue()));
 	nextPhraseAccents[c].clear();
-	float chance_g = int(params[GLIDE_PARAM].getValue());
+	float chance_g = int(std::round(params[GLIDE_PARAM].getValue()));
 	nextPhraseGlides[c].clear();
 	for (int i = 0; i < next_phrase_length[c]; i++) {
 		nextPhraseDurations[c].push_back(1 + (int)(rack::random::uniform() * 2)); // 1 or 2
@@ -738,7 +738,7 @@ void Melody::generateMelody (int c) {
 	}
 
 	// Rest
-	rest_amount[c] = int(params[REST_PARAM].getValue());
+	rest_amount[c] = int(std::round(params[REST_PARAM].getValue()));
 
 	// Gaps
 	nextGap[c] = rescale(params[GAP_PARAM].getValue(), 0, 3, GAP_STACCATISSIMO, GAP_LEGATO);
@@ -755,24 +755,15 @@ void Melody::generateMelody (int c) {
 	}*/
 }
 
-/*
-int Melody::attenuvertInt(int CV, int KNOB, float min_result, float max_result) {
-	int result;
+void Melody::attenuvertInt(int CV, int KNOB, int min_result, int max_result) {
 	if (inputs[CV].isConnected()) {
-		result = clamp(rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, min_result, max_result), min_result, max_result);
-		if (params[KNOB].getValue() != result) { 
-	        params[KNOB].setValue(result); 
-	    }
-	} else {
-		result = int(params[KNOB].getValue());
-	}
-	return result;
-}*/
-
-void Melody::attenuvert(int CV, int KNOB, float min_result, float max_result) {
-	if (inputs[CV].isConnected()) {
-		int result = static_cast<int>(clamp(rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, min_result, max_result), min_result, max_result));
-		if (params[KNOB].getValue() != (float)result) {
+		int total_steps = max_result - min_result + 1;
+		float input_scaled = rescale(inputs[CV].getVoltage(), -5.0f, 5.0f, 0, 1);
+		//    This creates perfectly even distributions for every integer.
+		int step_index = (int)std::floor(input_scaled * total_steps);
+		step_index = clamp(step_index, 0, total_steps - 1);
+		int result = min_result + step_index;
+		if (std::abs(params[KNOB].getValue() - (float)result) > 0.1f) {
 	        params[KNOB].setValue((float)result);
 	    }
 	}
