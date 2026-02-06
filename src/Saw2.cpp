@@ -43,6 +43,7 @@ struct Saw2 : Module {
 	float phase[16] = {};
 	float hp_state[16] = {}; // Capacitor state for the "Acid" curve
 	float blinkTime = 0.0f;
+	bool square = false;
 
 	Saw2() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -82,7 +83,7 @@ struct Saw2 : Module {
 		int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
 
 		// 30Hz is the magic number for a new TB-303 capacitor droop
-		const float cutoff_hz = 30.0f + params[AGE_PARAM].getValue()*2.0f;
+		const float cutoff_hz = 30.0f + params[AGE_PARAM].getValue()*4.0f;
 		const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
 		const float alpha = rc / (rc + args.sampleTime);
 
@@ -104,9 +105,30 @@ struct Saw2 : Module {
 			// A simple ramp: 2 * phase - 1
 			float saw = 2.0f * phase[c] - 1.0f;
 
-			// Apply PolyBLEP correction
-			// This subtracts the aliasing "residue" from the naive saw
-			saw -= poly_blep(phase[c], dt);
+			if (!square) {
+				// Apply PolyBLEP
+				saw -= poly_blep(phase[c], dt);
+			} else {
+				// 303 Square Trick: Subtract a DC-offset saw from the original saw
+				// This creates a pulse wave without needing a separate oscillator
+				// 0.5f is the phase shift (50% pulse width)
+				// Calculate the shifted phase (180 degrees / 0.5 offset)
+				float phase_shifted = phase[c] + 0.5f;
+				if (phase_shifted >= 1.0f) phase_shifted -= 1.0f;
+
+				// Generate the Naive Shifted Saw
+				float saw_shifted = 2.0f * phase_shifted - 1.0f;
+
+				saw_shifted -= poly_blep(phase_shifted, dt);
+
+				// Subtract to create the pulse
+				// Saw - InvertedSaw = Square
+				saw -= saw_shifted;
+
+				// The subtraction results in a slightly denser signal.
+				// We attenuate slightly to match the perceived loudness of the saw.
+				saw *= 0.7f;
+			}
 
 			// Apply "Acid" High Pass Filter (The 303 Shape)
 			// This mimics the AC coupling capacitor that bends the saw into a shark fin.
