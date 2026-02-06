@@ -30,6 +30,8 @@ struct Saw2 : Module {
 	};
 	enum InputIds {
 		PITCH_INPUT,
+		CV_TYPE_INPUT,
+		CV_AGE_INPUT,
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -38,6 +40,8 @@ struct Saw2 : Module {
 	};
 	enum LightIds {
 		BLINK_LIGHT,
+		SAW_LIGHT,
+		SQUARE_LIGHT,
 		NUM_LIGHTS
 	};
 
@@ -51,9 +55,11 @@ struct Saw2 : Module {
 	Saw2() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Saw2::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
-		configParam(Saw2::AGE_PARAM, 0.0f, 30.0f, 15.0f, "Age", " Years");
+		configParam(Saw2::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years")->displayPrecision = 3;
 		configButton(TYPE_PARAM, "Saw or Square");
 		configInput(PITCH_INPUT, "1V/Oct CV");
+		configInput(CV_AGE_INPUT, "1V/decade CV");
+		configInput(CV_TYPE_INPUT, "Type trigger");
 		configOutput(BUZZ_OUTPUT, "Audio");
 	}
 
@@ -80,9 +86,11 @@ struct Saw2 : Module {
 			return;
 		}
 
-		if (schmittButton.process(params[TYPE_PARAM].getValue())) {
+		if (schmittButton.process(params[TYPE_PARAM].getValue()+inputs[CV_TYPE_INPUT].getVoltage())) {
 			square = !square;
 		}
+		lights[SAW_LIGHT].setBrightness(square ? 0.0f : 1.0f);
+		lights[SQUARE_LIGHT].setBrightness(square ? 1.0f : 0.0f);
 
 		int channels = std::max(1, inputs[PITCH_INPUT].getChannels());
 		outputs[BUZZ_OUTPUT].setChannels(channels);
@@ -90,19 +98,22 @@ struct Saw2 : Module {
 		float pitchBase = params[PITCH_PARAM].getValue();
 		int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
 
-		// 30Hz is the magic number for a new TB-303 capacitor droop
-		const float cutoff_hz = 30.0f + params[AGE_PARAM].getValue()*9.0f;
-		const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
-		const float alpha = rc / (rc + args.sampleTime);
-
-		const float cutoff_hz2 = 5.0f + params[AGE_PARAM].getValue()*4.0f;
-		const float rc2 = 1.0f / (2.0f * M_PI * cutoff_hz2);
-		const float alpha2 = rc2 / (rc2 + args.sampleTime);
-		// As the capacitor dries out (Age increases), bass is lost and the signal thins out.
-		// We add gain to compensate, making the Bulge even bigger.
-		float makeupGain = 1.0f + (params[AGE_PARAM].getValue() * 0.1f); // Up to 5x boost at max age
-
 		for (int c = 0; c < channels; c++) {
+			float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
+			cv_age *= 10.0f;
+
+			// 30Hz is the magic number for a new TB-303 capacitor droop
+			const float cutoff_hz = 30.0f + (cv_age+params[AGE_PARAM].getValue())*9.0f;
+			const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
+			const float alpha = rc / (rc + args.sampleTime);
+
+			const float cutoff_hz2 = 0.5f + (cv_age+params[AGE_PARAM].getValue())*4.0f;
+			const float rc2 = 1.0f / (2.0f * M_PI * cutoff_hz2);
+			const float alpha2 = rc2 / (rc2 + args.sampleTime);
+			// As the capacitor dries out (age increases), bass is lost and the signal thins out.
+			// We add gain to compensate, making the Bulge even bigger.
+			float makeupGain = 1.0f + (params[AGE_PARAM].getValue() * 0.1f); // Up to 5x boost at max age
+
 			// Calculate Frequency
 			float pitch = pitchBase + (pitchInputChannels > c ? inputs[PITCH_INPUT].getPolyVoltage(c) : inputs[PITCH_INPUT].getVoltage());
 			pitch = clamp(pitch, -4.0f, 6.0f); // Allow a slightly higher range
@@ -186,15 +197,20 @@ struct Saw2Widget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 125), module, Saw2::PITCH_PARAM));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 75), module, Saw2::AGE_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.25-HALF_KNOB_MED, 125), module, Saw2::PITCH_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.25-HALF_KNOB_MED, 75), module, Saw2::AGE_PARAM));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5, 185), module, Saw2::TYPE_PARAM));
+		addInput(createInputCentered<InPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.75, 80), module, Saw2::CV_AGE_INPUT));
 
-		addInput(createInput<InPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Saw2::PITCH_INPUT));
-		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Saw2::BUZZ_OUTPUT));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(5 * RACK_GRID_WIDTH*0.25, 185), module, Saw2::TYPE_PARAM));
 
-		addChild(createLight<MediumLight<GreenLight>>(Vec(5 * RACK_GRID_WIDTH*0.5-9.378*0.5, 50), module, Saw2::BLINK_LIGHT));
+		addInput(createInput<InPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.25-HALF_PORT, 200), module, Saw2::PITCH_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.75-HALF_PORT, 200), module, Saw2::CV_TYPE_INPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.25-HALF_PORT, 300), module, Saw2::BUZZ_OUTPUT));
+
+		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(5 * RACK_GRID_WIDTH*0.5, 50), module, Saw2::BLINK_LIGHT));
+		addChild(createLightCentered<SmallLight<RedLight>>(Vec(5 * RACK_GRID_WIDTH*0.6, 180), module, Saw2::SAW_LIGHT));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(5 * RACK_GRID_WIDTH*0.6, 190), module, Saw2::SQUARE_LIGHT));
 	}
 };
 
