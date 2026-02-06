@@ -29,7 +29,7 @@ struct Saw2 : Module {
 		NUM_PARAMS
 	};
 	enum InputIds {
-		PITCH_INPUT,
+		CV_PITCH_INPUT,
 		CV_TYPE_INPUT,
 		CV_AGE_INPUT,
 		NUM_INPUTS
@@ -46,8 +46,10 @@ struct Saw2 : Module {
 	};
 
 	float phase[16] = {};
-	float hp_state[16] = {}; // Capacitor state for the "Acid" curve
+	float hp_state[16] = {}; // Capacitor state for the Acid curve
 	float hp_state2[16] = {};
+	float dc_blocker[16] = {};
+	float dc_input_prev[16] = {};
 	float blinkTime = 0.0f;
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
@@ -57,7 +59,7 @@ struct Saw2 : Module {
 		configParam(Saw2::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam(Saw2::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years")->displayPrecision = 3;
 		configButton(TYPE_PARAM, "Saw or Square");
-		configInput(PITCH_INPUT, "1V/Oct CV");
+		configInput(CV_PITCH_INPUT, "1V/Oct CV");
 		configInput(CV_AGE_INPUT, "1V/decade CV");
 		configInput(CV_TYPE_INPUT, "Type trigger");
 		configOutput(BUZZ_OUTPUT, "Audio");
@@ -87,6 +89,8 @@ struct Saw2 : Module {
 			hp_state[c] = 0.0f;
 			hp_state2[c] = 0.0f;
 			phase[c] = 0.0f;
+			dc_blocker[c] = 0.0f;
+			dc_input_prev[c] = 0.0f;
 		}
 		blinkTime = 0.0f;
 		schmittButton.reset();
@@ -121,11 +125,11 @@ struct Saw2 : Module {
 		lights[SAW_LIGHT].setBrightness(square ? 0.0f : 1.0f);
 		lights[SQUARE_LIGHT].setBrightness(square ? 1.0f : 0.0f);
 
-		int channels = std::max(1, inputs[PITCH_INPUT].getChannels());
+		int channels = std::max(1, inputs[CV_PITCH_INPUT].getChannels());
 		outputs[BUZZ_OUTPUT].setChannels(channels);
 
 		float pitchBase = params[PITCH_PARAM].getValue();
-		int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
+		int pitchInputChannels = inputs[CV_PITCH_INPUT].getChannels();
 
 		for (int c = 0; c < channels; c++) {
 			float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
@@ -145,7 +149,7 @@ struct Saw2 : Module {
 			float makeupGain = 1.0f + (params[AGE_PARAM].getValue() * 0.1f); // Up to 5x boost at max age
 
 			// Calculate Frequency
-			float pitch = pitchBase + (pitchInputChannels > c ? inputs[PITCH_INPUT].getPolyVoltage(c) : inputs[PITCH_INPUT].getVoltage());
+			float pitch = pitchBase + (pitchInputChannels > c ? inputs[CV_PITCH_INPUT].getPolyVoltage(c) : inputs[CV_PITCH_INPUT].getVoltage());
 			pitch = clamp(pitch, -4.0f, 6.0f); // Allow a slightly higher range
 			float freq = dsp::FREQ_C4 * std::exp2f(pitch);
 			
@@ -208,9 +212,24 @@ struct Saw2 : Module {
 			}
 			float stage2 = stage1 - hp_state2[c];
 
+			// remove DC offset
+			// Fixed cutoff at 10Hz (below audible range, but fast enough to kill offset)
+			// We calculate the coefficient based on sample rate.
+			const float dc_cutoff = 10.0f;
+			const float dc_rc = 1.0f / (2.0f * M_PI * dc_cutoff);
+			// R = RC / (RC + dt)
+			const float dc_alpha = dc_rc / (dc_rc + args.sampleTime);
+			float block_val = non_lin_func(stage2 * makeupGain);
+			// DC Block algorithm: y[n] = R * (y[n-1] + x[n] - x[n-1])
+			dc_blocker[c] = dc_alpha * (dc_blocker[c] + block_val - dc_input_prev[c]);
+			dc_input_prev[c] = block_val;
+
+			float final_out = dc_blocker[c];
+
+
 			// Output Gain Staging
 			// Bass will gain it a bit, so we keep the voltage down.
-			outputs[BUZZ_OUTPUT].setVoltage(non_lin_func(stage2 * makeupGain) * 2.5f, c);
+			outputs[BUZZ_OUTPUT].setVoltage( * 2.75f, c);
 
 			// Blink Light
 			if (c == 0) {
@@ -240,13 +259,13 @@ struct Saw2Widget : ModuleWidget {
 
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.25, 185), module, Saw2::TYPE_PARAM));
 
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25, 200+HALF_PORT), module, Saw2::PITCH_INPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25, 200+HALF_PORT), module, Saw2::CV_PITCH_INPUT));
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 200+HALF_PORT), module, Saw2::CV_TYPE_INPUT));
 		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25, 300+HALF_PORT), module, Saw2::BUZZ_OUTPUT));
 
 		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5, 50), module, Saw2::BLINK_LIGHT));
-		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6, 164), module, Saw2::SAW_LIGHT));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6, 174), module, Saw2::SQUARE_LIGHT));
+		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6, 162), module, Saw2::SAW_LIGHT));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6, 177), module, Saw2::SQUARE_LIGHT));
 	}
 };
 
