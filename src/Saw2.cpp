@@ -43,6 +43,7 @@ struct Saw2 : Module {
 
 	float phase[16] = {};
 	float hp_state[16] = {}; // Capacitor state for the "Acid" curve
+	float hp_state2[16] = {};
 	float blinkTime = 0.0f;
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
@@ -60,7 +61,7 @@ struct Saw2 : Module {
 	// Smooths the sharp discontinuity of the sawtooth to remove aliasing.
 	// t = phase (0..1)
 	// dt = phase increment per sample
-	float poly_blep(float t, float dt) {
+	static float poly_blep(float t, float dt) {
 		if (t < dt) {
 			// 0 < t < dt: Beginning of cycle (the rise)
 			t /= dt;
@@ -90,17 +91,21 @@ struct Saw2 : Module {
 		int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
 
 		// 30Hz is the magic number for a new TB-303 capacitor droop
-		const float cutoff_hz = 30.0f + params[AGE_PARAM].getValue()*15.0f;
+		const float cutoff_hz = 30.0f + params[AGE_PARAM].getValue()*9.0f;
 		const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
 		const float alpha = rc / (rc + args.sampleTime);
+
+		const float cutoff_hz2 = 30.0f + params[AGE_PARAM].getValue()*3.0f;
+		const float rc2 = 1.0f / (2.0f * M_PI * cutoff_hz2);
+		const float alpha2 = rc2 / (rc2 + args.sampleTime);
 		// As the capacitor dries out (Age increases), bass is lost and the signal thins out.
 		// We add gain to compensate, making the Bulge even bigger.
-		float makeupGain = 1.0f + (params[AGE_PARAM].getValue() * 0.05f); // Up to 2.5x boost at max age
+		float makeupGain = 1.0f + (params[AGE_PARAM].getValue() * 0.1f); // Up to 2.5x boost at max age
 
 		for (int c = 0; c < channels; c++) {
 			// Calculate Frequency
 			float pitch = pitchBase + (pitchInputChannels > c ? inputs[PITCH_INPUT].getPolyVoltage(c) : inputs[PITCH_INPUT].getVoltage());
-			pitch = clamp(pitch, -4.0f, 6.0f); // Allow slightly higher range
+			pitch = clamp(pitch, -4.0f, 6.0f); // Allow a slightly higher range
 			float freq = dsp::FREQ_C4 * std::exp2f(pitch);
 			
 			// Clamp to prevent explosions near Nyquist
@@ -140,19 +145,25 @@ struct Saw2 : Module {
 				saw *= 0.7f;
 			}
 
-			// Apply "Acid" High Pass Filter (The 303 Shape)
+			// Apply Acid High Pass Filter (The 303 Shape)
 			// This mimics the AC coupling capacitor that bends the saw into a shark fin.
 			// 30-40Hz is the sweet spot for that hardware look.
 			// Simple 1-pole High Pass: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
 
 			// High Pass Logic: output = input - low_passed_state
 			// We use a simple leaky integrator to track the DC offset
+			// Stage 1: The Curve (Shark Fin)
 			hp_state[c] = (hp_state[c] * alpha) + (saw * (1.0f - alpha));
-			float acid_saw = saw - hp_state[c];
+			float stage1 = saw - hp_state[c];
+
+			// Stage 2: Creates the Overshoot
+			// We apply the high pass logic again to the output of Stage 1.
+			hp_state2[c] = (hp_state2[c] * alpha2) + (stage1 * (1.0f - alpha2));
+			float stage2 = stage1 - hp_state2[c];
 
 			// Output Gain Staging
 			// Bass will gain it a bit, so we keep the voltage down. +/- 2.5V is a good standard level.
-			outputs[BUZZ_OUTPUT].setVoltage(acid_saw * 2.5f * makeupGain, c);
+			outputs[BUZZ_OUTPUT].setVoltage(stage2 * 2.5f * makeupGain, c);
 
 			// Blink Light
 			if (c == 0) {
@@ -177,7 +188,8 @@ struct Saw2Widget : ModuleWidget {
 
 		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 125), module, Saw2::PITCH_PARAM));
 		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 75), module, Saw2::AGE_PARAM));
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5, 150), module, Saw2::TYPE_PARAM));
+
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5, 175), module, Saw2::TYPE_PARAM));
 
 		addInput(createInput<InPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Saw2::PITCH_INPUT));
 		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Saw2::BUZZ_OUTPUT));
