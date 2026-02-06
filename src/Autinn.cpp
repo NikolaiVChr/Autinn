@@ -68,4 +68,5 @@ void init(rack::Plugin *p) {
 	p->addModel(modelSnare);
 	p->addModel(modelCoil);
 	p->addModel(modelGeiger);
+	p->addModel(modelSaw2);
 }

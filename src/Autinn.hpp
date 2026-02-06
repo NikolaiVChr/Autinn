@@ -278,3 +278,4 @@ extern Model *modelKicker;
 extern Model *modelSnare;
 extern Model *modelCoil;
 extern Model *modelGeiger;
+extern Model *modelSaw2;

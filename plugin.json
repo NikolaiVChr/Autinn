@@ -134,6 +134,15 @@
       ]
     },
     {
+      "slug": "Saw2",
+      "name": "Axe",
+      "description": "Oscillator with a axed saw sound",
+      "tags": [
+        "Oscillator",
+        "Polyphonic"
+      ]
+    },
+    {
       "slug": "Sjip",
       "name": "Sjip",
       "description": "Oscillator with rounded waveform",
