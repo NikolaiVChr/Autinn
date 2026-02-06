@@ -139,7 +139,7 @@ struct Saw2 : Module {
 			cv_age *= 10.0f;
 
 			// 30Hz is the magic number for a new TB-303 capacitor droop
-			const float age = clamp(cv_age+params[AGE_PARAM].getValue(), 0.0f, 50.0f);
+			const float age = clamp(cv_age+params[AGE_PARAM].getValue(), 0.0f, 60.0f);
 			const float cutoff_hz = 30.0f + age*9.0f;
 			const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
 			const float alpha = rc / (rc + args.sampleTime);
@@ -149,7 +149,7 @@ struct Saw2 : Module {
 			const float alpha2 = rc2 / (rc2 + args.sampleTime);
 			// As the capacitor dries out (age increases), bass is lost and the signal thins out.
 			// We add gain to compensate, making the Bulge even bigger.
-			float makeupGain = 1.0f + (params[AGE_PARAM].getValue() * 0.1f); // Up to 5x boost at max age
+			float makeupGain = 1.0f + (age * 0.1f); // Up to 5x boost at max age
 
 			// Calculate Frequency
 			float pitch = pitchBase + (pitchInputChannels > c ? inputs[CV_PITCH_INPUT].getPolyVoltage(c) : inputs[CV_PITCH_INPUT].getVoltage());
