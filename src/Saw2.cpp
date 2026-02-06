@@ -130,7 +130,7 @@ struct Saw2 : Module {
 		int pitchInputChannels = inputs[CV_PITCH_INPUT].getChannels();
 
 		// extremely slow. It corrects the DC drift without touching the bass.
-		constexpr float servo_hz = 0.5f;
+		constexpr float servo_hz = 2.0f;
 		constexpr float servo_rc = 1.0f / (2.0f * M_PI * servo_hz);
 		const float servo_alpha = args.sampleTime / (servo_rc + args.sampleTime);
 
@@ -215,7 +215,7 @@ struct Saw2 : Module {
 			}
 			float stage2 = stage1 - hp_state2[c];
 
-			float out = non_lin_func(stage2 * makeupGain);
+			float out = stage2 * makeupGain;//non_lin_func(stage2 * makeupGain);
 
 			// remove DC offset
 			// Measure the current offset (Accumulate average)
