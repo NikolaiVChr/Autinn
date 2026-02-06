@@ -21,6 +21,8 @@
 
 **/
 
+static const int OVERSAMPLE = 4;
+
 struct Saw2 : Module {
 	enum ParamIds {
 		PITCH_PARAM,
@@ -52,6 +54,7 @@ struct Saw2 : Module {
 	float blinkTime = 0.0f;
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
+	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimators;
 
 	Saw2() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -62,6 +65,7 @@ struct Saw2 : Module {
 		configInput(CV_AGE_INPUT, "1V/decade CV");
 		configInput(CV_TYPE_INPUT, "Type trigger");
 		configOutput(BUZZ_OUTPUT, "Audio");
+		decimators.resize(16);
 	}
 
 	// PolyBLEP: Polynomial Band-Limited Step
@@ -142,11 +146,11 @@ struct Saw2 : Module {
 			const float age = clamp(cv_age+params[AGE_PARAM].getValue(), 0.0f, 60.0f);
 			const float cutoff_hz = 30.0f + age*9.0f;
 			const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
-			const float alpha = rc / (rc + args.sampleTime);
+			const float alpha = rc / (rc + args.sampleTime/(float)OVERSAMPLE);
 
 			const float cutoff_hz2 = 0.5f + age*4.0f;
 			const float rc2 = 1.0f / (2.0f * M_PI * cutoff_hz2);
-			const float alpha2 = rc2 / (rc2 + args.sampleTime);
+			const float alpha2 = rc2 / (rc2 + args.sampleTime/(float)OVERSAMPLE);
 			// As the capacitor dries out (age increases), bass is lost and the signal thins out.
 			// We add gain to compensate, making the Bulge even bigger.
 			float makeupGain = 1.0f + (age * 0.1f); // Up to 5x boost at max age
@@ -159,63 +163,73 @@ struct Saw2 : Module {
 			// Clamp to prevent explosions near Nyquist
 			freq = clamp(freq, 1.0f, args.sampleRate / 2.0f - 1.0f);
 
-			// Increment Phase
-			float dt = freq * args.sampleTime;
-			phase[c] += dt;
-			if (phase[c] >= 1.0f) phase[c] -= 1.0f;
+			//float inBuf   [OVERSAMPLE];
+			float outBuf  [OVERSAMPLE];
+			//upsamplers[c].process(stage2, inBuf);
 
-			// Generate Naive Saw (-1 to 1)
-			// A simple ramp: 2 * phase - 1
-			float saw = 2.0f * phase[c] - 1.0f;
+			for (int i = 0; i < OVERSAMPLE; i++) {
+				// Increment Phase
+				float dt = freq * args.sampleTime;
+				dt = dt / (float)OVERSAMPLE;
+				phase[c] += dt;
+				if (phase[c] >= 1.0f) phase[c] -= 1.0f;
 
-			// Apply PolyBLEP
-			saw -= poly_blep(phase[c], dt);
+				// Generate Naive Saw (-1 to 1)
+				// A simple ramp: 2 * phase - 1
+				float saw = 2.0f * phase[c] - 1.0f;
 
-			if (square) {
-				// Subtract a DC-offset saw from the original saw
-				// This creates a pulse wave without needing a separate oscillator
-				// 0.5f is the phase shift (50% pulse width)
-				// Calculate the shifted phase (180 degrees / 0.5 offset)
-				float phase_shifted = phase[c] + 0.5f;
-				if (phase_shifted >= 1.0f) phase_shifted -= 1.0f;
+				// Apply PolyBLEP
+				saw -= poly_blep(phase[c], dt);
 
-				// Generate the Naive Shifted Saw
-				float saw_shifted = 2.0f * phase_shifted - 1.0f;
+				if (square) {
+					// Subtract a DC-offset saw from the original saw
+					// This creates a pulse wave without needing a separate oscillator
+					// 0.5f is the phase shift (50% pulse width)
+					// Calculate the shifted phase (180 degrees / 0.5 offset)
+					float phase_shifted = phase[c] + 0.5f;
+					if (phase_shifted >= 1.0f) phase_shifted -= 1.0f;
 
-				saw_shifted -= poly_blep(phase_shifted, dt);
+					// Generate the Naive Shifted Saw
+					float saw_shifted = 2.0f * phase_shifted - 1.0f;
 
-				// Subtract to create the pulse
-				// Saw - InvertedSaw = Square
-				saw -= saw_shifted;
+					saw_shifted -= poly_blep(phase_shifted, dt);
 
-				// The subtraction results in a slightly denser signal.
-				// We attenuate slightly to match the perceived loudness of the saw.
-				saw *= 0.7f;
+					// Subtract to create the pulse
+					// Saw - InvertedSaw = Square
+					saw -= saw_shifted;
+
+					// The subtraction results in a slightly denser signal.
+					// We attenuate slightly to match the perceived loudness of the saw.
+					saw *= 0.7f;
+				}
+
+				// Apply Acid High Pass Filter (The 303 Shape)
+				// This mimics the AC coupling capacitor that bends the saw into a shark fin.
+				// 30-40Hz is the sweet spot for that hardware look.
+				// Simple 1-pole High Pass: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
+
+				// High Pass Logic: output = input - low_passed_state
+				// We use a simple leaky integrator to track the DC offset
+				// Stage 1: The Curve (Shark Fin)
+				hp_state[c] = (hp_state[c] * alpha) + (saw * (1.0f - alpha));
+				if (!std::isfinite(hp_state[c])) {
+					hp_state[c] = 0.0f;
+				}
+				float stage1 = saw - hp_state[c];
+
+				// Stage 2: Creates the Overshoot
+				// We apply the high pass logic again to the output of Stage 1.
+				hp_state2[c] = (hp_state2[c] * alpha2) + (stage1 * (1.0f - alpha2));
+				if (!std::isfinite(hp_state2[c])) {
+					hp_state2[c] = 0.0f;
+				}
+				float stage2 = stage1 - hp_state2[c];
+
+
+				outBuf[i] = non_lin_func(stage2 * makeupGain);
 			}
 
-			// Apply Acid High Pass Filter (The 303 Shape)
-			// This mimics the AC coupling capacitor that bends the saw into a shark fin.
-			// 30-40Hz is the sweet spot for that hardware look.
-			// Simple 1-pole High Pass: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
-
-			// High Pass Logic: output = input - low_passed_state
-			// We use a simple leaky integrator to track the DC offset
-			// Stage 1: The Curve (Shark Fin)
-			hp_state[c] = (hp_state[c] * alpha) + (saw * (1.0f - alpha));
-			if (!std::isfinite(hp_state[c])) {
-				hp_state[c] = 0.0f;
-			}
-			float stage1 = saw - hp_state[c];
-
-			// Stage 2: Creates the Overshoot
-			// We apply the high pass logic again to the output of Stage 1.
-			hp_state2[c] = (hp_state2[c] * alpha2) + (stage1 * (1.0f - alpha2));
-			if (!std::isfinite(hp_state2[c])) {
-				hp_state2[c] = 0.0f;
-			}
-			float stage2 = stage1 - hp_state2[c];
-
-			float out = stage2 * makeupGain;//non_lin_func(stage2 * makeupGain);
+			float out = decimators[c].process(outBuf);
 
 			// remove DC offset
 			// Measure the current offset (Accumulate average)
@@ -223,11 +237,11 @@ struct Saw2 : Module {
 
 			// Subtract the measured offset from the signal
 			// This gently moves the whole wave up or down to center it.
-			float final_out = out - dc_integrator[c];
+			out -= dc_integrator[c];
 
 			// Output Gain Staging
 			// Bass will gain it a bit, so we keep the voltage down.
-			outputs[BUZZ_OUTPUT].setVoltage(final_out * 2.75f, c);
+			outputs[BUZZ_OUTPUT].setVoltage(out * 2.75f, c);
 
 			// Blink Light
 			if (c == 0) {
