@@ -109,7 +109,7 @@ struct Saw2 : Module {
 				// Apply PolyBLEP
 				saw -= poly_blep(phase[c], dt);
 			} else {
-				// 303 Square Trick: Subtract a DC-offset saw from the original saw
+				// Subtract a DC-offset saw from the original saw
 				// This creates a pulse wave without needing a separate oscillator
 				// 0.5f is the phase shift (50% pulse width)
 				// Calculate the shifted phase (180 degrees / 0.5 offset)
