@@ -95,12 +95,12 @@ struct Saw2 : Module {
 		const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
 		const float alpha = rc / (rc + args.sampleTime);
 
-		const float cutoff_hz2 = 30.0f + params[AGE_PARAM].getValue()*3.0f;
+		const float cutoff_hz2 = 5.0f + params[AGE_PARAM].getValue()*4.0f;
 		const float rc2 = 1.0f / (2.0f * M_PI * cutoff_hz2);
 		const float alpha2 = rc2 / (rc2 + args.sampleTime);
 		// As the capacitor dries out (Age increases), bass is lost and the signal thins out.
 		// We add gain to compensate, making the Bulge even bigger.
-		float makeupGain = 1.0f + (params[AGE_PARAM].getValue() * 0.1f); // Up to 2.5x boost at max age
+		float makeupGain = 1.0f + (params[AGE_PARAM].getValue() * 0.1f); // Up to 5x boost at max age
 
 		for (int c = 0; c < channels; c++) {
 			// Calculate Frequency
@@ -162,8 +162,8 @@ struct Saw2 : Module {
 			float stage2 = stage1 - hp_state2[c];
 
 			// Output Gain Staging
-			// Bass will gain it a bit, so we keep the voltage down. +/- 2.5V is a good standard level.
-			outputs[BUZZ_OUTPUT].setVoltage(stage2 * 2.5f * makeupGain, c);
+			// Bass will gain it a bit, so we keep the voltage down.
+			outputs[BUZZ_OUTPUT].setVoltage(non_lin_func(stage2 * makeupGain) * 2.5f, c);
 
 			// Blink Light
 			if (c == 0) {
@@ -189,7 +189,7 @@ struct Saw2Widget : ModuleWidget {
 		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 125), module, Saw2::PITCH_PARAM));
 		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 75), module, Saw2::AGE_PARAM));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5, 175), module, Saw2::TYPE_PARAM));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5, 185), module, Saw2::TYPE_PARAM));
 
 		addInput(createInput<InPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Saw2::PITCH_INPUT));
 		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Saw2::BUZZ_OUTPUT));
