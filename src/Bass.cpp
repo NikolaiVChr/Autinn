@@ -405,7 +405,7 @@ void Bass::process(const ProcessArgs &args) {
 	}
 
 	//float cutoff_setting = this->toExp(knob_cutoff, CUTOFF_KNOB_MIN, CUTOFF_KNOB_MAX);
-	float cutoff_setting = CUTOFF_KNOB_MIN * std::exp2f(x * LOG2_CUTOFF_RANGE);// much faster
+	float cutoff_setting = CUTOFF_KNOB_MIN * std::exp2f(knob_cutoff * LOG2_CUTOFF_RANGE);// much faster
 
 	float range_hz = knob_envmod * CUTOFF_RANGE_FOR_ENVELOPE + CUTOFF_ENVMOD_MIN;//knob_envmod * maxf(cutoff_setting * 2.0f, CUTOFF_RANGE_FOR_ENVELOPE) + CUTOFF_ENVMOD_MIN;
 

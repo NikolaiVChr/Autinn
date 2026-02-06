@@ -134,7 +134,7 @@ struct Saw2 : Module {
 struct Saw2Widget : ModuleWidget {
 	Saw2Widget(Saw2 *module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/SawModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/AxeModule.svg")));
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
