@@ -48,8 +48,7 @@ struct Saw2 : Module {
 	float phase[16] = {};
 	float hp_state[16] = {}; // Capacitor state for the Acid curve
 	float hp_state2[16] = {};
-	float dc_blocker[16] = {};
-	float dc_input_prev[16] = {};
+	float dc_integrator[16] = {};
 	float blinkTime = 0.0f;
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
@@ -89,8 +88,7 @@ struct Saw2 : Module {
 			hp_state[c] = 0.0f;
 			hp_state2[c] = 0.0f;
 			phase[c] = 0.0f;
-			dc_blocker[c] = 0.0f;
-			dc_input_prev[c] = 0.0f;
+			dc_integrator[c] = 0.0f;
 		}
 		blinkTime = 0.0f;
 		schmittButton.reset();
@@ -130,6 +128,11 @@ struct Saw2 : Module {
 
 		float pitchBase = params[PITCH_PARAM].getValue();
 		int pitchInputChannels = inputs[CV_PITCH_INPUT].getChannels();
+
+		// extremely slow. It corrects the DC drift without touching the bass.
+		constexpr float servo_hz = 0.5f;
+		constexpr float servo_rc = 1.0f / (2.0f * M_PI * servo_hz);
+		const float servo_alpha = args.sampleTime / (servo_rc + args.sampleTime);
 
 		for (int c = 0; c < channels; c++) {
 			float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
@@ -213,19 +216,12 @@ struct Saw2 : Module {
 			float stage2 = stage1 - hp_state2[c];
 
 			// remove DC offset
-			// Fixed cutoff at 10Hz (below audible range, but fast enough to kill offset)
-			// We calculate the coefficient based on sample rate.
-			const float dc_cutoff = 10.0f;
-			const float dc_rc = 1.0f / (2.0f * M_PI * dc_cutoff);
-			// R = RC / (RC + dt)
-			const float dc_alpha = dc_rc / (dc_rc + args.sampleTime);
-			float block_val = non_lin_func(stage2 * makeupGain);
-			// DC Block algorithm: y[n] = R * (y[n-1] + x[n] - x[n-1])
-			dc_blocker[c] = dc_alpha * (dc_blocker[c] + block_val - dc_input_prev[c]);
-			dc_input_prev[c] = block_val;
+			// Measure the current offset (Accumulate average)
+			dc_integrator[c] += (stage2 - dc_integrator[c]) * servo_alpha;
 
-			float final_out = dc_blocker[c];
-
+			// Subtract the measured offset from the signal
+			// This gently moves the whole wave up or down to center it.
+			float final_out = stage2 - dc_integrator[c];
 
 			// Output Gain Staging
 			// Bass will gain it a bit, so we keep the voltage down.
