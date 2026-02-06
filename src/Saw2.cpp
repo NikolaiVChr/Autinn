@@ -197,20 +197,20 @@ struct Saw2Widget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(5 * box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM));
-		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(5 * box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM));
+		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM));
+		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM));
 
-		addInput(createInputCentered<InPortAutinn>(Vec(5 * box.size.x*0.75, 90), module, Saw2::CV_AGE_INPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 90), module, Saw2::CV_AGE_INPUT));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(5 * box.size.x*0.25, 185), module, Saw2::TYPE_PARAM));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.25, 185), module, Saw2::TYPE_PARAM));
 
-		addInput(createInputCentered<InPortAutinn>(Vec(5 * box.size.x*0.25, 200+HALF_PORT), module, Saw2::PITCH_INPUT));
-		addInput(createInputCentered<InPortAutinn>(Vec(5 * box.size.x*0.75, 200+HALF_PORT), module, Saw2::CV_TYPE_INPUT));
-		addOutput(createOutputCentered<OutPortAutinn>(Vec(5 * box.size.x*0.25, 300+HALF_PORT), module, Saw2::BUZZ_OUTPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25, 200+HALF_PORT), module, Saw2::PITCH_INPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 200+HALF_PORT), module, Saw2::CV_TYPE_INPUT));
+		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25, 300+HALF_PORT), module, Saw2::BUZZ_OUTPUT));
 
-		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(5 * box.size.x*0.5, 50), module, Saw2::BLINK_LIGHT));
-		addChild(createLightCentered<SmallLight<RedLight>>(Vec(5 * box.size.x*0.6, 180), module, Saw2::SAW_LIGHT));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(5 * box.size.x*0.6, 190), module, Saw2::SQUARE_LIGHT));
+		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5, 50), module, Saw2::BLINK_LIGHT));
+		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6, 180), module, Saw2::SAW_LIGHT));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6, 190), module, Saw2::SQUARE_LIGHT));
 	}
 };
 
