@@ -215,13 +215,15 @@ struct Saw2 : Module {
 			}
 			float stage2 = stage1 - hp_state2[c];
 
+			float out = non_lin_func(stage2 * makeupGain);
+
 			// remove DC offset
 			// Measure the current offset (Accumulate average)
-			dc_integrator[c] += (stage2 - dc_integrator[c]) * servo_alpha;
+			dc_integrator[c] += (out - dc_integrator[c]) * servo_alpha;
 
 			// Subtract the measured offset from the signal
 			// This gently moves the whole wave up or down to center it.
-			float final_out = stage2 - dc_integrator[c];
+			float final_out = out - dc_integrator[c];
 
 			// Output Gain Staging
 			// Bass will gain it a bit, so we keep the voltage down.
