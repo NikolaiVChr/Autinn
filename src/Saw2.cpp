@@ -106,12 +106,12 @@ struct Saw2 : Module {
 
 	json_t *dataToJson() override {
 		json_t *root = json_object();
-		json_object_set_new(root, "type", json_boolean(square));
+		json_object_set_new(root, "square", json_boolean(square));
 		return root;
 	}
 
 	void dataFromJson(json_t *rootJ) override {
-		json_t *ext = json_object_get(rootJ, "type");
+		json_t *ext = json_object_get(rootJ, "square");
 		if (ext)
 			square = json_boolean_value(ext);
 	}
@@ -205,7 +205,7 @@ struct Saw2 : Module {
 
 				// Apply Acid High Pass Filter (The 303 Shape)
 				// This mimics the AC coupling capacitor that bends the saw into a shark fin.
-				// 30-40Hz is the sweet spot for that hardware look.
+				// 30-40Hz is the sweet spot for that hardware sound.
 				// Simple 1-pole High Pass: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
 
 				// High Pass Logic: output = input - low_passed_state
@@ -269,7 +269,7 @@ struct Saw2Widget : ModuleWidget {
 
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 75+HALF_KNOB_MED), module, Saw2::CV_AGE_INPUT));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.25, 185), module, Saw2::TYPE_PARAM));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75, (75+HALF_KNOB_MED+162)/2.0f), module, Saw2::TYPE_PARAM));
 
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25, 200+HALF_PORT), module, Saw2::CV_PITCH_INPUT));
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 200+HALF_PORT), module, Saw2::CV_TYPE_INPUT));
