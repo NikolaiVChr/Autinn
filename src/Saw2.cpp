@@ -229,7 +229,7 @@ struct Saw2 : Module {
 
 			// Output Gain Staging
 			// Bass will gain it a bit, so we keep the voltage down.
-			outputs[BUZZ_OUTPUT].setVoltage( * 2.75f, c);
+			outputs[BUZZ_OUTPUT].setVoltage(final_out * 2.75f, c);
 
 			// Blink Light
 			if (c == 0) {
