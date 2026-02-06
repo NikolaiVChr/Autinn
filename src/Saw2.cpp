@@ -81,6 +81,35 @@ struct Saw2 : Module {
 		return 0.0f;
 	}
 
+	void onReset(const ResetEvent& e) override {
+		square = false;
+		for (int c = 0; c < 16; c++) {
+			hp_state[c] = 0.0f;
+			hp_state2[c] = 0.0f;
+			phase[c] = 0.0f;
+		}
+		blinkTime = 0.0f;
+		schmittButton.reset();
+		Module::onReset(e);
+	}
+
+	void onRandomize(const RandomizeEvent& e) override {
+		Module::onRandomize(e);
+		square = bool(random::uniform() < 0.5f);
+	}
+
+	json_t *dataToJson() override {
+		json_t *root = json_object();
+		json_object_set_new(root, "type", json_boolean(square));
+		return root;
+	}
+
+	void dataFromJson(json_t *rootJ) override {
+		json_t *ext = json_object_get(rootJ, "type");
+		if (ext)
+			square = json_boolean_value(ext);
+	}
+
 	void process(const ProcessArgs &args) override {
 		if (!outputs[BUZZ_OUTPUT].isConnected()) {
 			return;
@@ -103,11 +132,12 @@ struct Saw2 : Module {
 			cv_age *= 10.0f;
 
 			// 30Hz is the magic number for a new TB-303 capacitor droop
-			const float cutoff_hz = 30.0f + (cv_age+params[AGE_PARAM].getValue())*9.0f;
+			const float age = clamp(cv_age+params[AGE_PARAM].getValue(), 0.0f, 50.0f);
+			const float cutoff_hz = 30.0f + age*9.0f;
 			const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
 			const float alpha = rc / (rc + args.sampleTime);
 
-			const float cutoff_hz2 = 0.5f + (cv_age+params[AGE_PARAM].getValue())*4.0f;
+			const float cutoff_hz2 = 0.5f + age*4.0f;
 			const float rc2 = 1.0f / (2.0f * M_PI * cutoff_hz2);
 			const float alpha2 = rc2 / (rc2 + args.sampleTime);
 			// As the capacitor dries out (age increases), bass is lost and the signal thins out.
@@ -165,11 +195,17 @@ struct Saw2 : Module {
 			// We use a simple leaky integrator to track the DC offset
 			// Stage 1: The Curve (Shark Fin)
 			hp_state[c] = (hp_state[c] * alpha) + (saw * (1.0f - alpha));
+			if (!std::isfinite(hp_state[c])) {
+				hp_state[c] = 0.0f;
+			}
 			float stage1 = saw - hp_state[c];
 
 			// Stage 2: Creates the Overshoot
 			// We apply the high pass logic again to the output of Stage 1.
 			hp_state2[c] = (hp_state2[c] * alpha2) + (stage1 * (1.0f - alpha2));
+			if (!std::isfinite(hp_state2[c])) {
+				hp_state2[c] = 0.0f;
+			}
 			float stage2 = stage1 - hp_state2[c];
 
 			// Output Gain Staging
@@ -209,8 +245,8 @@ struct Saw2Widget : ModuleWidget {
 		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25, 300+HALF_PORT), module, Saw2::BUZZ_OUTPUT));
 
 		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5, 50), module, Saw2::BLINK_LIGHT));
-		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6, 160), module, Saw2::SAW_LIGHT));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6, 180), module, Saw2::SQUARE_LIGHT));
+		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6, 164), module, Saw2::SAW_LIGHT));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6, 174), module, Saw2::SQUARE_LIGHT));
 	}
 };
 
