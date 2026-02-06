@@ -80,7 +80,7 @@ struct Saw2 : Module {
 		int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
 
 		// 30Hz is the magic number for the 303's capacitor droop
-		const float cutoff_hz = 30.0f;
+		const float cutoff_hz = 60.0f;
 		const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
 		const float alpha = rc / (rc + args.sampleTime);
 
