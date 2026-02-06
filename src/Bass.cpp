@@ -50,6 +50,17 @@
 #define VCV_TO_MOOG 0.18f
 #define EXPECTED_PEAK_INPUT 7.0f // Do not input larger OSC tones, or accented notes might start hard clipping.
 
+#define FILTER_ENV_0_ATTACK 0
+#define FILTER_ENV_1_PEAK 1
+#define FILTER_ENV_2_DECAY 2
+#define FILTER_ENV_3_OFF 3
+
+#define VCA_ENV_0_ATTACK 0
+#define VCA_ENV_1_PEAK 1 // only used in accented notes
+#define VCA_ENV_2_DECAY 2
+#define VCA_ENV_3_END 3
+#define VCA_ENV_4_OFF 4
+
 static const int oversample2 = 2;
 static const int oversample4 = 4;
 
@@ -133,30 +144,28 @@ struct Bass : Module {
 	dsp::Upsampler<oversample4, 10> upsampler4;
 	dsp::Decimator<oversample4, 10> decimator4;
 
-	bool gate_prev = false;
 	float minimum = 0.0001f;
 	bool accentBool = false;
 
 	unsigned number_vca = 1;
-	unsigned mode_vca = 3;
+	unsigned mode_vca = VCA_ENV_4_OFF;
 	unsigned target_vca = 0;
 	float current_vca = minimum;
 	float factor_vca = 0.0f;
 
 	int number_cutoff = 1;//must not be unsigned as used in minus operation where it might get below 0
-	unsigned mode_cutoff = 3;
+	unsigned mode_cutoff = FILTER_ENV_3_OFF;
 	int target_cutoff = 0;
 	float current_cutoff = minimum;
 	float factor_cutoff = 0.0f;
 	float cutoff_env_prev = 0.0f;
 
 	dsp::SchmittTrigger schmittGate;
-	//dsp::SchmittTrigger schmittAccent;
-	float note_prev = 0.0f;
+	dsp::SchmittTrigger schmittButton;
+	bool gate_prev = false;
 
 	//float tim = 0.0f;
-	bool gateInput = true;
-	bool button_prev = false;
+	bool gateInputType = true;
 	
 	// Json saved options ==============
 	float priority = 1.0f;// If 1.0f then will compensate for passband lowering at high resonances. If 0.0f then its just the raw filter.
@@ -220,22 +229,22 @@ struct Bass : Module {
 		configLight(Bass::GAIN_LIGHT, "Warning that oscillator input has too big magnitude (7+ Voltage)");
 	}
 
-	float vca_env(bool gate,float note, float resonance,float knob_accent);
-	float vca_env_acc(bool gate,float note, float resonance,float knob_accent);
-	float filter_env(bool gate,float note,float decay_cutoff_time, float accent, float r, float knob_accent);
+	float vca_env(bool gateRising, float resonance,float knob_accent);
+	float vca_env_acc(bool gateRising, float resonance,float knob_accent);
+	float filter_env(bool gateRising,float decay_cutoff_time, float accent, float r, float knob_accent);
 	float acid_filter(float in, float r, float cutoff, int oversample_protected);
 	float attackCurve(float x, unsigned target);
 	float accentAttackCurve(float x);
 	float accentAttackCurveInverse(float y);
 	float toExp(float x, float min, float max);
-	float accent_env(bool gate, float note, bool accent, float knob_accent);
+	float accent_env(bool gateRising, bool accent, float knob_accent);
 	void process(const ProcessArgs &args) override;
 	void vca_lights(float attack, float sustain, float decay, float end);
 	void vcf_lights(float attack, float sustain, float decay, float end);
 
 	json_t *dataToJson() override {
 		json_t *root = json_object();
-		json_object_set_new(root, "gateInput", json_boolean(gateInput));
+		json_object_set_new(root, "gateInput", json_boolean(gateInputType));
 		json_object_set_new(root, "oversample", json_integer(current_oversample));
 		//json_object_set_new(root, "Gcomp", json_real((double) priority));
 		return root;
@@ -244,7 +253,7 @@ struct Bass : Module {
 	void dataFromJson(json_t *rootJ) override {
 		json_t *ext = json_object_get(rootJ, "gateInput");
 		if (ext)
-			gateInput = json_boolean_value(ext);
+			gateInputType = json_boolean_value(ext);
 		json_t *ext3 = json_object_get(rootJ, "oversample");
 		if (ext3) {
 			current_oversample = json_integer_value(ext3);
@@ -259,13 +268,15 @@ struct Bass : Module {
 
 	void onReset(const ResetEvent& e) override {
 		priority = 1.0f;
-		gateInput = true;
+		gateInputType = true;
+		schmittGate.reset();
+		schmittButton.reset();
 		Module::onReset(e);
 	}
 
 	void onRandomize(const RandomizeEvent& e) override {
 		Module::onRandomize(e);
-		gateInput = bool(random::uniform() < 0.5f);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
+		gateInputType = bool(random::uniform() < 0.5f);// min + (rand() % static_cast<int>(max - min + 1)) [including min and max]
 	}
 };
 
@@ -327,12 +338,11 @@ void Bass::process(const ProcessArgs &args) {
 	// VCV Rack CV is +-5V or 0V-10V
 
 	// We put this before connection check so the button and light works even when module not connected.
-	if (params[BUTTON_PARAM].getValue() > 0.0f and !button_prev) {
-		gateInput = !gateInput;
+	if (schmittButton.process(params[BUTTON_PARAM].getValue())) {
+		gateInputType = !gateInputType;
 	}
-	button_prev = bool(params[BUTTON_PARAM].getValue());
-	lights[GATE_LIGHT].value = gateInput;
-	lights[TRIG_LIGHT].value = !gateInput;
+	lights[GATE_LIGHT].value = gateInputType;
+	lights[TRIG_LIGHT].value = !gateInputType;
 
 	if (!outputs[BASS_OUTPUT].isConnected()) {
 		return;
@@ -356,29 +366,29 @@ void Bass::process(const ProcessArgs &args) {
 	dsp::SchmittTrigger::setThresholds(float low, float high) has been removed, and the thresholds are now fixed at 0 and 1.
 	Instead, rescale your input if needed with trigger.process(rescale(in, low, high, 0.f, 1.f)).
 	**/
-	bool gate = schmittGate.process(note);
+	bool gateRising = schmittGate.process(note);
 	//bool accentHyst = schmittAccent.process(accent);
 	//std::cout <<     "Gate "+std::to_string(gate)+"\n";
 	//std::cout <<     "Note "+std::to_string(note)+"\n";
 
-	if (gate && !gate_prev) {
+	if (gateRising) {
 		accentBool = accent >= 1.0f;
 		//std::cout <<     "       ACCENT CHANGED "+std::to_string(accentBool)+"\n";
-	} else if (gate && !accentBool && accent >= 1.0f && mode_cutoff == 0) {
-		// Late Accent Fix: Catch accent if it arrives slightly late (during Attack phase only)
+	} else if (schmittGate.isHigh() && !accentBool && accent >= 1.0f && mode_cutoff == FILTER_ENV_0_ATTACK) {
+		// Late accent fix: Catch accent if it arrives slightly late (during attack phase only)
 		accentBool = true;
 
-		// Momentarily force gate_prev to false.
+		// Momentarily force gate trigger.
 		// This tells vca_env and filter_env to "Re-Trigger" this frame.
 		// They will automatically set 'accentAttackBase = current_cutoff'
 		// and smooth out the VCA transition.
-		gate_prev = false;
+		gateRising = true;
 	}
 	lights[E_LIGHT].value = accentBool;
 
 	//float accent_envelope = this->accent_env(gate, note, accent, knob_accent);
 
-	float cutoff_env_norm = this->filter_env(gate, note, knob_env_decay, accent, clamp(resonance, 0.0f, 1.0f), knob_accent);//params[DECAY3_PARAM].getValue()
+	float cutoff_env_norm = this->filter_env(gateRising, knob_env_decay, accent, clamp(resonance, 0.0f, 1.0f), knob_accent);//params[DECAY3_PARAM].getValue()
 	
 
 	float vca_env;
@@ -388,10 +398,10 @@ void Bass::process(const ProcessArgs &args) {
 	if (accentBool) {
 		//vca_env_sum = (vca_env+accent_envelope*ACCENT_ENVELOPE_VCA_OFFSET)/(1.0f+ACCENT_ENVELOPE_VCA_OFFSET);
 		//std::cout << "Branch accent\n";
-		vca_env = this->vca_env_acc(gate, note, clamp(resonance,0.0f,1.0f), knob_accent);
+		vca_env = this->vca_env_acc(gateRising, clamp(resonance,0.0f,1.0f), knob_accent);
 	} else {
 		//std::cout << "Branch normal\n";
-		vca_env = this->vca_env(gate, note, clamp(resonance,0.0f,1.0f), knob_accent);//knob_env_decay
+		vca_env = this->vca_env(gateRising, clamp(resonance,0.0f,1.0f), knob_accent);//knob_env_decay
 	}
 
 	//float cutoff_setting = this->toExp(knob_cutoff, CUTOFF_KNOB_MIN, CUTOFF_KNOB_MAX);
@@ -438,10 +448,9 @@ void Bass::process(const ProcessArgs &args) {
 	}
 	tim += args.sampleTime;
 	fast_counter += 1;**/
-	gate_prev = gate;
-	note_prev = note;
-	
-	
+
+	gate_prev = schmittGate.isHigh();
+
 	lights[GAIN_LIGHT].value = clamp(fabsf(osc)-EXPECTED_PEAK_INPUT,0.0f,1.0f)*1.0f;//OSC input has too much gain. (7V+)
 }
 
@@ -468,11 +477,11 @@ float Bass::toExp(float xx, float min, float max) {
 }
 
 
-float Bass::accent_env(bool gate, float note, bool accent, float knob_accent) {
+float Bass::accent_env(bool gate, bool accent, float knob_accent) {
 	// This method is not used atm. Does not simulate the accent envelope which is a modified vcf envelope good enough.
 	float dt = APP->engine->getSampleTime();
 	if (!accentBool) return 0.0f;
-	if (gate && !gate_prev) {
+	if (gate) {
 		noteSteps = 0;
 	} else {
 		noteSteps++;
@@ -492,32 +501,32 @@ float Bass::accent_env(bool gate, float note, bool accent, float knob_accent) {
 	return knob_accent*clamp(value, 0.0f, 1.0f);
 }
 
-float Bass::vca_env(bool gate, float note,  float resonance, float knob_accent) {
+float Bass::vca_env(bool gateRising, float resonance, float knob_accent) {
 	float dt = APP->engine->getSampleTime();
 	float level = 0.0f;
 
 	number_vca += 1; // steps progress counter
 	//std::cout <<     "NrmMode "+std::to_string(mode_vca)+" Number "+std::to_string(number_vca)+" Target "+std::to_string(target_vca)+"\n";
-	if (gate && !gate_prev) {
-		mode_vca = 0;// attack phase
+	if (gateRising) {
+		mode_vca = VCA_ENV_0_ATTACK;// attack phase
 		number_vca = 1;// first step of this phase
 		
 		// linear attack from previous level, to avoid clicking
 		target_vca = unsigned(ATTACK_VCA/dt);// How many steps to get amp to 1.0
 		factor_vca = (1.0f-current_vca)/float(target_vca);// How much to increase amp each step until 1.0 is reached (offset)
-	} else if (gateInput && mode_vca < 2 && note < 1.0f && note_prev >= 1.0f) {
-		mode_vca = 2;// Input set to gate. Note ending.
+	} else if (gateInputType && mode_vca < VCA_ENV_3_END && !schmittGate.isHigh() && gate_prev) {
+		mode_vca = VCA_ENV_3_END;// Input set to gate. Note ending.
 		number_vca = 1;// first step of this phase
 		target_vca = unsigned(DECAY_VCA_NOTE_END/dt);// fast declicker
 		factor_vca = (current_vca-0.0f) / float(target_vca);// Linear go to 0.0 (offset)
-	} else if (mode_vca > 2) {//can be 3 or 4 if just was in vca_env_acc()
+	} else if (mode_vca > VCA_ENV_3_END) {
 		// ended decay
 		number_vca = 0;// we wont get it too high
 		target_vca = 0;//to prevent vca_env_acc() to go into infinite loop
 		return 0.0f;
-	} else if (mode_vca == 0 && number_vca > target_vca) {
+	} else if (mode_vca == VCA_ENV_0_ATTACK && number_vca > target_vca) {
 		// We were in attack phase, now lets switch to decay
-		mode_vca = 1;// decay phase
+		mode_vca = VCA_ENV_2_DECAY;// decay phase
 		number_vca = 1;// first step of this phase
 		target_vca = unsigned(DECAY_VCA_SECS/dt);// Number of steps to decay
 		if (DECAY_VCA_EXP) {
@@ -527,16 +536,19 @@ float Bass::vca_env(bool gate, float note,  float resonance, float knob_accent) 
 		}
 	} else if (number_vca > target_vca) {
 		// end decay or end note decay
-		mode_vca = 3;
+		mode_vca = VCA_ENV_4_OFF;
 	}
 
 	switch (mode_vca) {
-		case 0: {//attack
+		case VCA_ENV_0_ATTACK: {
+			//attack
 			level = current_vca+factor_vca;
 			current_vca = level;
 			this->vca_lights(1,0,0,0);
 			break;
-		} case 1: { //decay
+		} case VCA_ENV_1_PEAK: {
+			// Should not happen
+		} case VCA_ENV_2_DECAY: { //decay
 			if (DECAY_VCA_EXP) {
 				level = current_vca*factor_vca;
 			} else {
@@ -545,7 +557,7 @@ float Bass::vca_env(bool gate, float note,  float resonance, float knob_accent) 
 			current_vca = level;
 			this->vca_lights(0,0,level,0);
 			break;
-		} case 2: { //end note
+		} case VCA_ENV_3_END: { //end note
 			level = current_vca-factor_vca;
 			current_vca = level;
 			this->vca_lights(0,0,0,clamp(1-level,0.0f,1.0f));
@@ -559,7 +571,7 @@ float Bass::vca_env(bool gate, float note,  float resonance, float knob_accent) 
 	return level;
 }
 
-float Bass::vca_env_acc(bool gate, float note,  float resonance, float knob_accent) {
+float Bass::vca_env_acc(bool gateRising, float resonance, float knob_accent) {
 	float dt = APP->engine->getSampleTime();
 	float level = 0.0f;
 
@@ -567,59 +579,59 @@ float Bass::vca_env_acc(bool gate, float note,  float resonance, float knob_acce
 
 	number_vca += 1; // steps progress counter
 	//std::cout <<     "AccMode "+std::to_string(mode_vca)+" Number "+std::to_string(number_vca)+" Target "+std::to_string(target_vca)+"\n";
-	if (gate && !gate_prev) {
-		mode_vca = 0;// attack phase
+	if (gateRising) {
+		mode_vca = VCA_ENV_0_ATTACK;// attack phase
 		float fraction = accentAttackCurveInverse(current_vca/attack_vca_accent_peak);
 		float attack_time = ATTACK_VCF_ACCENT*resonance+ATTACK_VCA;
 		target_vca = unsigned(attack_time/dt);// How many steps to get amp to attack_vca_accent_peak from zero
 		number_vca = 1+unsigned(fraction*float(target_vca));// We do this to avoid click when rising from prev level.			
 		//std::cout <<     "Attack "+std::to_string(fraction)+" Target "+std::to_string(target_vca)+" Number "+std::to_string(number_vca)+" Volts "+std::to_string(current_vca)+"\n";
-	} else if (gateInput && mode_vca < 3 && note < 1.0f && note_prev >= 1.0f) {
-		mode_vca = 3;// Input set to gate. Note ending.
+	} else if (gateInputType && mode_vca < VCA_ENV_3_END && !schmittGate.isHigh() && gate_prev) {
+		mode_vca = VCA_ENV_3_END;// Input set to gate. Note ending.
 		number_vca = 1;// first step of this phase
 		target_vca = unsigned(DECAY_VCA_NOTE_END/dt);// fast declicker
 		factor_vca = (current_vca-0.0f) / float(target_vca);// Linear go to 0.0 (offset)
-	} else if (mode_vca > 3) {
+	} else if (mode_vca > VCA_ENV_3_END) {
 		// ended decay
 		number_vca = 0;// we wont get it too high
 		target_vca = 0;
 		return 0.0f;
-	} else if (mode_vca == 0 && number_vca >= target_vca) {
+	} else if (mode_vca == VCA_ENV_0_ATTACK && number_vca >= target_vca) {
 		// ended attack
-		mode_vca = 1;// peak phase
+		mode_vca = VCA_ENV_1_PEAK;// peak phase
 		number_vca = 1;// we wont get it too high
 		target_vca = unsigned(PEAK_ACCENT_SUSTAIN/dt);//holding peak time
-	} else if (mode_vca == 1 && number_vca > target_vca) {
+	} else if (mode_vca == VCA_ENV_1_PEAK && number_vca > target_vca) {
 		// We were in peak phase, now lets switch to decay
-		mode_vca = 2;// decay phase
+		mode_vca = VCA_ENV_2_DECAY;// decay phase
 		number_vca = 1;// first step of this phase
 		target_vca = unsigned(DECAY_VCA_ACCENT/dt);// Number of steps to decay
 	} else if (number_vca > target_vca) {
 		// end decay or end note decay
-		mode_vca = 4;
+		mode_vca = VCA_ENV_4_OFF;
 	}
 
 	// when switch to any accent timing, make sure no divide by zero (target_vca) due to switching method
 
 	switch (mode_vca) {
-		case 0: {//attack
+		case VCA_ENV_0_ATTACK: {//attack
 			float fraction = target_vca==0?1.0f:float(number_vca)/float(target_vca);
 			level = this->accentAttackCurve(fraction) * attack_vca_accent_peak;
 			current_vca = level;
 			this->vca_lights(1,0,0,0);
 			break;
-		} case 1: { //peak
+		} case VCA_ENV_1_PEAK: { //peak
 			level = attack_vca_accent_peak;
 			current_vca = level;
 			this->vca_lights(0,1,0,0);
 			break;
-		} case 2: { //decay
+		} case VCA_ENV_2_DECAY: { //decay
 			float fraction = float(number_vca)/float(target_vca);
 			level = attack_vca_accent_peak * powf(1.0f+fraction*2.0f,-fraction*6.0f);
 			current_vca = level;
 			this->vca_lights(0,0,level,0);
 			break;
-		} case 3: { //end note
+		} case VCA_ENV_3_END: { //end note
 			level = current_vca-factor_vca;
 			current_vca = level;
 			this->vca_lights(0,0,0,clamp(1-level,0.0f,1.0f));
@@ -635,7 +647,7 @@ float Bass::vca_env_acc(bool gate, float note,  float resonance, float knob_acce
 
 
 
-float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent, float resonance, float knob_accent) {
+float Bass::filter_env(bool gate, float knob_env_decay, float accent, float resonance, float knob_accent) {
 	float dt = APP->engine->getSampleTime();
 	float level = 0.0f;
 
@@ -643,9 +655,9 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 	
 	
 
-	if (gate && !gate_prev) {
+	if (gate) {
 		// start attack
-		mode_cutoff = 0;
+		mode_cutoff = FILTER_ENV_0_ATTACK;
 		float attack_time = float(accentBool)*ATTACK_VCF_ACCENT*resonance+ATTACK_VCF;//params[DECAY2_PARAM].getValue()
 		//std::cerr << "Old target = "+std::to_string(dt*old_decay_target)+" ("+std::to_string(target_cutoff)+" , "+std::to_string(number_cutoff)+"\n";
 		
@@ -664,15 +676,15 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 		//std::cerr <<     "Time, Env\n";
 
 		
-	} else if (mode_cutoff > 2) {
+	} else if (mode_cutoff > FILTER_ENV_2_DECAY) {
 		// ended decay
 		number_cutoff = 0;// we wont get it too high
 		target_cutoff = 0;
 		current_cutoff = 0.0f;
 		return 0.0f;
-	} else if (mode_cutoff == 1 && number_cutoff > target_cutoff) {
+	} else if (mode_cutoff == FILTER_ENV_1_PEAK && number_cutoff > target_cutoff) {
 		// start decay
-		mode_cutoff = 2;
+		mode_cutoff = FILTER_ENV_2_DECAY;
 		number_cutoff = 1;
 		target_cutoff = int((accentBool?DECAY_VCF_ACCENT:knob_env_decay)/dt);
 		//std::cerr << "New target = "+std::to_string(decay_cutoff_time)+" ("+std::to_string(target_cutoff)+"\n";
@@ -685,9 +697,9 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 				factor_cutoff = (current_cutoff-minimum)/ float(target_cutoff);
 			}
 		}
-	} else if (mode_cutoff == 0 && number_cutoff >= target_cutoff) {
+	} else if (mode_cutoff == FILTER_ENV_0_ATTACK && number_cutoff >= target_cutoff) {
 		// start top
-		mode_cutoff = 1;
+		mode_cutoff = FILTER_ENV_1_PEAK;
 		number_cutoff = 1;
 		if (accentBool) {
 			target_cutoff = int(PEAK_ACCENT_SUSTAIN/dt);//holding peak time
@@ -696,7 +708,7 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 		}
 	} else if (number_cutoff > target_cutoff) {
 		// end decay
-		if (mode_cutoff == 2 and accentBool and current_cutoff > minimum) {
+		if (mode_cutoff == FILTER_ENV_2_DECAY and accentBool and current_cutoff > minimum) {
 			// we allow decay to go on beyond DECAY_VCF_ACCENT until it gets to minimum
 		} else {
 			mode_cutoff += 1;
@@ -705,7 +717,7 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 	}
 
 	switch (mode_cutoff) {
-		case 0: { //attack
+		case FILTER_ENV_0_ATTACK: { //attack
 			if (accentBool) {
 				float fraction = target_cutoff==0?1.0f:float(number_cutoff)/float(target_cutoff);
 				level = this->accentAttackCurve(fraction) * (accentAttackPeak - accentAttackBase) + accentAttackBase;
@@ -717,11 +729,11 @@ float Bass::filter_env(bool gate, float note, float knob_env_decay, float accent
 			
 			this->vcf_lights(1,0,0,0);
 			break;
-		} case 1: { //peak
+		} case FILTER_ENV_1_PEAK: { //peak
 			level = current_cutoff;
 			this->vcf_lights(0,1,0,0);
 			break;
-		} case 2: { //decay
+		} case FILTER_ENV_2_DECAY: { //decay
 			if(accentBool) {
 				float fraction = float(number_cutoff)/float(target_cutoff);
 				level = accentAttackPeak * powf(1.0f+fraction*2.0f,-fraction*2.0f);
