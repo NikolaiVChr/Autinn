@@ -135,6 +135,8 @@ template <typename TBase>
 struct AutinnArcKnob : TBase {
     int inputId = -1;
 	int attenId = -1;
+	float radiusOffset = 0.0f;
+	float stroke = 1.0f;
 
     // This function defines "How to calculate the Arc position"
     // Arguments: (Current CV Voltage, Current Knob Value)
@@ -190,9 +192,9 @@ struct AutinnArcKnob : TBase {
 
         	if (std::abs(angleCurrent - angleMod) > 0.001f) {
         		nvgBeginPath(args.vg);
-        		float r = this->box.size.x * 0.5f - 1.0f;
+        		float r = this->box.size.x * 0.5f + radiusOffset;
         		nvgArc(args.vg, this->box.size.x/2.0f, this->box.size.y/2.0f, r, angleCurrent, angleMod, (angleMod > angleCurrent) ? NVG_CW : NVG_CCW);
-        		nvgStrokeWidth(args.vg, 1.5f);
+        		nvgStrokeWidth(args.vg, stroke);
 
         		if (rawModVal > maxVal || rawModVal < minVal) {
         			// Greater magnitude than knob limits -> Bright red
@@ -207,8 +209,14 @@ struct AutinnArcKnob : TBase {
         }
     }
 };
-using AutinnArcMidKnob   = AutinnArcKnob<RoundMediumAutinnKnob>;
-using AutinnArcSmallKnob = AutinnArcKnob<RoundSmallAutinnKnob>;
+struct AutinnArcMidKnob : AutinnArcKnob<RoundMediumAutinnKnob> {
+	AutinnArcMidKnob() { radiusOffset = -1.0f; stroke = 1.5f; }
+};
+
+// 2. Small Knob: Arc is closer to edge (-1.0) or outside (+2.0)
+struct AutinnArcSmallKnob : AutinnArcKnob<RoundSmallAutinnKnob> {
+	AutinnArcSmallKnob() { radiusOffset = -2.0f; stroke = 1.0f; }
+};
 
 struct ScrewStarAutinn : ThemedSvgScrew {
 	ScrewStarAutinn() {
