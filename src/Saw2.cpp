@@ -264,13 +264,13 @@ struct Saw2Widget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		AutinnArcMidKnob* pitchKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM);
+		auto pitchKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM);
 		pitchKnob->setModulation(Saw2::CV_PITCH_INPUT, [](float cv, float val, float att) {
 					return clamp(val + cv, -4.0f, 6.0f);
 				});
 		addParam(pitchKnob);
 
-		AutinnArcMidKnob* ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM);
+		auto ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM);
 
 		// Link modulation:
 		// 1. Source: CV_AGE_INPUT

@@ -116,7 +116,12 @@ struct AmpWidget : ModuleWidget {
 		addInput(createInput<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Amp::AMP_INPUT));
 		addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Amp::AMP_OUTPUT));
 		//INFO("AmpWidget: Adding knob Widgets");
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Amp::DIAL_PARAM));
+		//addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Amp::DIAL_PARAM));
+		auto pitchKnob = createParam<AutinnArcMidKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Amp::DIAL_PARAM);
+		pitchKnob->setModulation(Amp::CV_INPUT, [](float cv, float val, float att) {
+					return clamp(val + cv*0.2f, 0.0f, 2.0f);
+				});
+		addParam(pitchKnob);
 
 		//INFO("AmpWidget: Adding light Widgets");
 		addChild(createLight<MediumLight<YellowLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Amp::BLINK_LIGHT));

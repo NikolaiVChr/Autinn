@@ -450,14 +450,35 @@ struct FloraWidget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-275-HALF_KNOB_MED), module, Flora::CUTOFF_PARAM));
+		//addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-275-HALF_KNOB_MED), module, Flora::CUTOFF_PARAM));
+		auto cutKnob = createParam<AutinnArcMidKnob>(Vec(75, RACK_GRID_HEIGHT-275-HALF_KNOB_MED), module, Flora::CUTOFF_PARAM);
+		cutKnob->setModulation(Flora::CUTOFF_INPUT, [](float cv, float val, float att) {
+					// Calculate how many Octaves the knob covers
+					const float totalOctaves = std::log2f(FREQ_MAX / FREQ_MIN);
+					// 2. Scale CV so 1V = 1 Octave of knob travel
+					float cvNormalized = (cv*att) / totalOctaves;
+					// 3. Add to knob position (Linear Pitch Space)
+					return clamp(val + cvNormalized, 0.0f, 1.0f);
+				}, Flora::CUTOFF_INFL_PARAM);
+		addParam(cutKnob);
 		addParam(createParam<RoundSmallAutinnKnob>(Vec(40, RACK_GRID_HEIGHT-275-HALF_KNOB_SMALL), module, Flora::CUTOFF_INFL_PARAM));
 
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-205-HALF_KNOB_MED), module, Flora::RESONANCE_PARAM));
+		//addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-205-HALF_KNOB_MED), module, Flora::RESONANCE_PARAM));
+		auto qKnob = createParam<AutinnArcMidKnob>(Vec(75, RACK_GRID_HEIGHT-205-HALF_KNOB_MED), module, Flora::RESONANCE_PARAM);
+		qKnob->setModulation(Flora::RESONANCE_INPUT, [](float cv, float val, float att) {
+					return clamp(val + cv*att, 0.0f, RESONANCE_MAX);
+				}, Flora::RESONANCE_INFL_PARAM);
+		addParam(qKnob);
 		addParam(createParam<RoundSmallAutinnKnob>(Vec(40, RACK_GRID_HEIGHT-205-HALF_KNOB_SMALL), module, Flora::RESONANCE_INFL_PARAM));
 
 		addParam(createParam<RoundSmallAutinnKnob>(Vec(40, RACK_GRID_HEIGHT-135-HALF_KNOB_SMALL), module, Flora::DRIVE_INFL_PARAM));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-135-HALF_KNOB_MED), module, Flora::DRIVE_PARAM));
+		//addParam(createParam<RoundMediumAutinnKnob>(Vec(75, RACK_GRID_HEIGHT-135-HALF_KNOB_MED), module, Flora::DRIVE_PARAM));
+		auto drvKnob = createParam<AutinnArcMidKnob>(Vec(75, RACK_GRID_HEIGHT-135-HALF_KNOB_MED), module, Flora::DRIVE_PARAM);
+		drvKnob->setModulation(Flora::DRIVE_INPUT, [](float cv, float val, float att) {
+					return clamp(val + cv*att, 0.0f, DRIVE_MAX);
+				}, Flora::DRIVE_INFL_PARAM);
+		addParam(drvKnob);
+
 
 		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-275-HALF_PORT), module, Flora::CUTOFF_INPUT));
 		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-205-HALF_PORT), module, Flora::RESONANCE_INPUT));

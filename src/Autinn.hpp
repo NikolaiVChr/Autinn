@@ -209,13 +209,13 @@ struct AutinnArcKnob : TBase {
         }
     }
 };
+
+//TODO: vibrato
 struct AutinnArcMidKnob : AutinnArcKnob<RoundMediumAutinnKnob> {
 	AutinnArcMidKnob() { radiusOffset = -1.0f; stroke = 1.5f; }
 };
-
-// 2. Small Knob: Arc is closer to edge (-1.0) or outside (+2.0)
 struct AutinnArcSmallKnob : AutinnArcKnob<RoundSmallAutinnKnob> {
-	AutinnArcSmallKnob() { radiusOffset = -2.0f; stroke = 1.0f; }
+	AutinnArcSmallKnob() { radiusOffset = -2.8f; stroke = 1.0f; }
 };
 
 struct ScrewStarAutinn : ThemedSvgScrew {
