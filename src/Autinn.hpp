@@ -219,7 +219,7 @@ struct AutinnArcMidKnob : AutinnArcKnob<RoundMediumAutinnKnob> {
 	AutinnArcMidKnob() { radiusOffset = -1.0f; stroke = 1.5f; green = false;}
 };
 struct AutinnArcSmallKnob : AutinnArcKnob<RoundSmallAutinnKnob> {
-	AutinnArcSmallKnob() { radiusOffset = -2.8f; stroke = 1.0f; green = true;}
+	AutinnArcSmallKnob() { radiusOffset = -2.8f; stroke = 1.2f; green = true;}
 };
 
 struct ScrewStarAutinn : ThemedSvgScrew {
