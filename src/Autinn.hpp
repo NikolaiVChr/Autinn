@@ -137,6 +137,7 @@ struct AutinnArcKnob : TBase {
 	int attenId = -1;
 	float radiusOffset = 0.0f;
 	float stroke = 1.0f;
+	bool green = false;
 
     // This function defines "How to calculate the Arc position"
     // Arguments: (Current CV Voltage, Current Knob Value)
@@ -200,8 +201,12 @@ struct AutinnArcKnob : TBase {
         			// Greater magnitude than knob limits -> Orange
         			nvgStrokeColor(args.vg, nvgRGBA(255, 110, 0, 255));
         		} else {
-        			// Normal Color -> Gold (Matches Logo)
-        			nvgStrokeColor(args.vg, nvgRGBA(255, 230, 100, 240));
+        			// Normal Color -> Gold (Matches Logo) / Green
+        			if (green) {
+        				nvgStrokeColor(args.vg, nvgRGBA(0, 255, 0, 255));
+        			} else {
+        				nvgStrokeColor(args.vg, nvgRGBA(255, 230, 100, 240));
+        			}
         		}
 
         		nvgStroke(args.vg);
@@ -210,12 +215,11 @@ struct AutinnArcKnob : TBase {
     }
 };
 
-//TODO: vibrato
 struct AutinnArcMidKnob : AutinnArcKnob<RoundMediumAutinnKnob> {
-	AutinnArcMidKnob() { radiusOffset = -1.0f; stroke = 1.5f; }
+	AutinnArcMidKnob() { radiusOffset = -1.0f; stroke = 1.5f; green = false;}
 };
 struct AutinnArcSmallKnob : AutinnArcKnob<RoundSmallAutinnKnob> {
-	AutinnArcSmallKnob() { radiusOffset = -2.8f; stroke = 1.0f; }
+	AutinnArcSmallKnob() { radiusOffset = -2.8f; stroke = 1.0f; green = true;}
 };
 
 struct ScrewStarAutinn : ThemedSvgScrew {
