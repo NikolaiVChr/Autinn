@@ -55,8 +55,8 @@ struct Nap : Module {
 
 	Nap() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(SNORING_PARAM, 0.0f, 1.0f, 0.0f, "Snore amount", " ", SNORING_MAX/SNORING_MIN, SNORING_MIN);
-		configParam(DREAMING_PARAM, DREAMING_MIN, DREAMING_MAX, 1.00f, "Dream amount", " ", 0.0f, 1.0f);
+		configParam<Param3Digits>(SNORING_PARAM, 0.0f, 1.0f, 0.0f, "Snore amount", " ", SNORING_MAX/SNORING_MIN, SNORING_MIN);
+		configParam<Param3Digits>(DREAMING_PARAM, DREAMING_MIN, DREAMING_MAX, 1.00f, "Dream amount", " ", 0.0f, 1.0f);
 		configBypass(NAP_INPUT, NAP_OUTPUT);
 		configInput(NAP_INPUT, "Audio");
 		configOutput(NAP_OUTPUT, "Audio");

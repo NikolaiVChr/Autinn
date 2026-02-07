@@ -65,10 +65,10 @@ struct Snare : Module {
     Snare() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(FREQ_PARAM, 100.0f, 400.0f, dsp::FREQ_C4/2.0f, "Tune", " Hz");
-        configParam(DECAY_PARAM, 0.05f, 0.8f, 0.2f, "Decay", " s");
-        configParam(SWEEP_PARAM, 0.0f, 1.0f, 0.2f, "Sweep", "%",0, 100);
-        configParam(SNAP_PARAM, 0.0f, 1.0f, 0.25f, "Snappy", "%",0, 100);
-        configParam(DRIVE_PARAM, 0.0f, 5.0f, 1.0f, "Drive", "");
+        configParam<Param3Digits>(DECAY_PARAM, 0.05f, 0.8f, 0.2f, "Decay", " s");
+        configParam<Param4Digits>(SWEEP_PARAM, 0.0f, 1.0f, 0.2f, "Sweep", "%",0, 100);
+        configParam<Param4Digits>(SNAP_PARAM, 0.0f, 1.0f, 0.25f, "Snappy", "%",0, 100);
+        configParam<Param3Digits>(DRIVE_PARAM, 0.0f, 5.0f, 1.0f, "Drive", "");
 
         configInput(TRIG_INPUT, "Trigger");
         configInput(VOCT_INPUT, "V/Oct");

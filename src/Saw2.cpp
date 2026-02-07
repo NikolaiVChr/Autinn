@@ -59,7 +59,7 @@ struct Saw2 : Module {
 	Saw2() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Saw2::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
-		configParam(Saw2::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years")->displayPrecision = 3;
+		configParam<Param3Digits>(Saw2::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
 		configButton(TYPE_PARAM, "Saw or Square");
 		configInput(CV_PITCH_INPUT, "1V/Oct CV");
 		configInput(CV_AGE_INPUT, "1V/decade CV");

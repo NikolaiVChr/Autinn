@@ -70,7 +70,7 @@ struct Fil : Module {
 
 	Fil() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(DIAL_PARAM, 0.0f, 1.0f, 0.25f, "Drive", " ", DRIVE_MAX/DRIVE_MIN, DRIVE_MIN);
+		configParam<Param3Digits>(DIAL_PARAM, 0.0f, 1.0f, 0.25f, "Drive", " ", DRIVE_MAX/DRIVE_MIN, DRIVE_MIN);
 		configBypass(FIL_INPUT, FIL_OUTPUT);
 		configInput(FIL_INPUT, "Audio");
 		configOutput(FIL_OUTPUT, "Audio");

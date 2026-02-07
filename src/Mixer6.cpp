@@ -117,19 +117,19 @@ struct Mixer6 : Module {
 
 		for (int ch = 0; ch < num_mono_channels; ch++) {
 			configInput(INPUT+ch, "Channel "+std::to_string(ch+1)+" Audio");
-			configParam(HIGH_PARAM+ch, 0.25f, 4.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ High", " dB", -10.0f, 20.0f, 0);
-			configParam(MID_PARAM+ch, 0.25f, 4.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", -10.0f, 20.0f, 0);
-			configParam(LOW_PARAM+ch, 0.25f, 4.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", -10.0f, 20.0f, 0);
-			configParam(FX_A_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX A Send", " dB", -10, 20);
-			configParam(FX_B_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX B Send", " dB", -10, 20);
-			configParam(CHANNEL_LEVEL_PARAM+ch, 0.0f, 2.0f, 1.0f, "Channel "+std::to_string(ch+1)+" Level", " dB", -10, 20);
+			configParam<Param3Digits>(HIGH_PARAM+ch, 0.25f, 4.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ High", " dB", -10.0f, 20.0f, 0);
+			configParam<Param3Digits>(MID_PARAM+ch, 0.25f, 4.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ Mid", " dB", -10.0f, 20.0f, 0);
+			configParam<Param3Digits>(LOW_PARAM+ch, 0.25f, 4.0f, 1.0f, "Channel "+std::to_string(ch+1)+" EQ Low", " dB", -10.0f, 20.0f, 0);
+			configParam<Param3Digits>(FX_A_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX A Send", " dB", -10, 20);
+			configParam<Param3Digits>(FX_B_SEND_PARAM+ch, 0.0f, 2.0f, 0.0f, "Channel "+std::to_string(ch+1)+" FX B Send", " dB", -10, 20);
+			configParam<Param3Digits>(CHANNEL_LEVEL_PARAM+ch, 0.0f, 2.0f, 1.0f, "Channel "+std::to_string(ch+1)+" Level", " dB", -10, 20);
 			configParam(PAN_PARAM+ch, 0.0f, M_PI*0.5f, M_PI*0.25f, "Channel "+std::to_string(ch+1)+" Pan", " ", 0.0f, 2.0f/M_PI, -0.5f);
 			configLight(MUTE_LIGHT+ch*3, "Mute (red)/Solo (blue)");
 			configButton(MUTE_BUTTON_PARAM+ch, "Mute/Solo");
 		}
 		configParam(LEVEL_MAIN, 0.0f, 2.0f, 1.0f, "Main Level", " dB", -10, 20);
-		configParam(Mixer6::FX_A_TO_MAIN_PARAM, 0.0f, 2.0f, 1.0f, "FX A To Main", " dB", -10, 20);
-		configParam(Mixer6::FX_B_TO_MAIN_PARAM, 0.0f, 2.0f, 1.0f, "FX B To Main", " dB", -10, 20);
+		configParam<Param3Digits>(Mixer6::FX_A_TO_MAIN_PARAM, 0.0f, 2.0f, 1.0f, "FX A To Main", " dB", -10, 20);
+		configParam<Param3Digits>(Mixer6::FX_B_TO_MAIN_PARAM, 0.0f, 2.0f, 1.0f, "FX B To Main", " dB", -10, 20);
 		//configBypass(MIXER_INPUT, MIXER_OUTPUT);
 		configInput(FX_RETURN_L_A, "FX A Return Left");
 		configInput(FX_RETURN_R_A, "FX A Return Right");

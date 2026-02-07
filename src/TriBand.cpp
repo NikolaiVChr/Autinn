@@ -57,9 +57,9 @@ struct TriBand : Module {
 
 	TriBand() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(TriBand::LOW_PARAM, 0.25f, 4.0f, 1.0f, "Low", " dB", -10.0f, 20.0f, 0);
-		configParam(TriBand::MID_PARAM, 0.25f, 4.0f, 1.0f, "Mid", " dB", -10.0f, 20.0f, 0);
-		configParam(TriBand::HIGH_PARAM, 0.25f, 4.0f, 1.0f, "High", " dB", -10.0f, 20.0f, 0);
+		configParam<Param3Digits>(TriBand::LOW_PARAM, 0.25f, 4.0f, 1.0f, "Low", " dB", -10.0f, 20.0f, 0);
+		configParam<Param3Digits>(TriBand::MID_PARAM, 0.25f, 4.0f, 1.0f, "Mid", " dB", -10.0f, 20.0f, 0);
+		configParam<Param3Digits>(TriBand::HIGH_PARAM, 0.25f, 4.0f, 1.0f, "High", " dB", -10.0f, 20.0f, 0);
 		configBypass(TRIBAND_INPUT, TRIBAND_OUTPUT);
 		configInput(TRIBAND_INPUT, "Audio");
 		configOutput(TRIBAND_OUTPUT, "Audio");

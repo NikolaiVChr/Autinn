@@ -71,10 +71,10 @@ struct Kicker : Module {
     Kicker() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(FREQ_PARAM, 30.0f, 200.0f, dsp::FREQ_C4/4.0f, "Tune", " Hz");
-        configParam(DECAY_PARAM, 0.1f, 0.8f, 0.2f, "Decay", " s")->displayPrecision=3;
-        configParam(SWEEP_PARAM, 0.0f, 1.0f, 1.0f, "Sweep", "%",0, 100)->displayPrecision=4;
-        configParam(CLICK_PARAM, 0.0f, 1.0f, 0.5f, "Click", "%",0, 100)->displayPrecision=4;
-        configParam(DRIVE_PARAM, 0.0f, 5.0f, 1.0f, "Drive", "")->displayPrecision=3; // 0 to 5x gain
+        configParam<Param3Digits>(DECAY_PARAM, 0.1f, 0.8f, 0.2f, "Decay", " s");
+        configParam<Param4Digits>(SWEEP_PARAM, 0.0f, 1.0f, 1.0f, "Sweep", "%",0, 100);
+        configParam<Param4Digits>(CLICK_PARAM, 0.0f, 1.0f, 0.5f, "Click", "%",0, 100);
+        configParam<Param3Digits>(DRIVE_PARAM, 0.0f, 5.0f, 1.0f, "Drive", ""); // 0 to 5x gain
 
         configInput(TRIG_INPUT, "Trigger");
         configInput(VOCT_INPUT, "V/Oct");

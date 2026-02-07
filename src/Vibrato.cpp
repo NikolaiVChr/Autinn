@@ -49,11 +49,11 @@ struct Vibrato : Module {
 	Vibrato() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Vibrato::FREQ_PARAM, 1.0f, 20.0f, 5.0f, "Frequency", " Hz", 0.0f, 1.0f);
-		configParam(Vibrato::WIDTH_PARAM, 0.001f, 0.020f, 0.005f, "Width", " ms", 0.0f, 1000.0f);
-		configParam(Vibrato::FLANGER_PARAM, 0.0f, 1.0f, 0.0f, "Flanger", "%", 0.0f, 100.0f);
-		configParam(Vibrato::CV_FREQ_PARAM, 0.0f, 0.2f, 0.0f, "Frequency CV", "%", 0.0f, 500.0f);
-		configParam(Vibrato::CV_WIDTH_PARAM, 0.0f, 0.2f, 0.0f, "Width CV", "%", 0.0f, 500.0f);
-		configParam(Vibrato::CV_FLANGER_PARAM, 0.0f, 0.2f, 0.0f, "Flanger CV", "%", 0.0f, 500.0f);
+		configParam<Param3Digits>(Vibrato::WIDTH_PARAM, 0.001f, 0.020f, 0.005f, "Width", " ms", 0.0f, 1000.0f);
+		configParam<Param4Digits>(Vibrato::FLANGER_PARAM, 0.0f, 1.0f, 0.0f, "Flanger", "%", 0.0f, 100.0f);
+		configParam<Param4Digits>(Vibrato::CV_FREQ_PARAM, 0.0f, 0.2f, 0.0f, "Frequency CV", "%", 0.0f, 500.0f);
+		configParam<Param4Digits>(Vibrato::CV_WIDTH_PARAM, 0.0f, 0.2f, 0.0f, "Width CV", "%", 0.0f, 500.0f);
+		configParam<Param4Digits>(Vibrato::CV_FLANGER_PARAM, 0.0f, 0.2f, 0.0f, "Flanger CV", "%", 0.0f, 500.0f);
 		configBypass(VIBRATO_INPUT, VIBRATO_OUTPUT);
 		configInput(WIDTH_INPUT, "Width CV");
 		configInput(FREQ_INPUT, "Frequency CV");

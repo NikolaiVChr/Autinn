@@ -189,10 +189,10 @@ struct Bass : Module {
 		//configParam (int paramId, float minValue, float maxValue, float defaultValue, string label="", string unit="", float displayBase=0.f, float displayMultiplier=1.f, float displayOffset=0.f)
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Bass::CUTOFF_PARAM, 0.0f, 1.0f, 0.25f, "Cutoff"," Hz",CUTOFF_KNOB_MAX/CUTOFF_KNOB_MIN, CUTOFF_KNOB_MIN);
-		configParam(Bass::RESONANCE_PARAM, 0.0f, RESONANCE_MAX, 0.85f, "Resonance", "%", 0.0f, 100.0f);
+		configParam<Param4Digits>(Bass::RESONANCE_PARAM, 0.0f, RESONANCE_MAX, 0.85f, "Resonance", "%", 0.0f, 100.0f);
 		configParam(Bass::ENV_DECAY_PARAM, DECAY_VCF_MIN, DECAY_VCF_MAX, (DECAY_VCF_MIN+DECAY_VCF_MAX)*0.5f, "Decay", " ms", 0.0f, 1000.0f);
 		configParam(Bass::ENVMOD_PARAM, 0.0f, 1.0f, 0.25f, "Sweep range", " Hz", 0.0f, CUTOFF_RANGE_FOR_ENVELOPE, CUTOFF_ENVMOD_MIN);
-		configParam(Bass::ACCENT_PARAM, ACCENT_KNOB_MINIMUM, 1.0f, 0.75f, "Accent", "%", 0.0f, 100.0f);
+		configParam<Param3Digits>(Bass::ACCENT_PARAM, ACCENT_KNOB_MINIMUM, 1.0f, 0.75f, "Accent", "%", 0.0f, 100.0f);
 		configParam(Bass::CV_CUTOFF_PARAM, 0.0f, 0.2f, 0.0f, "Cutoff CV", "%", 0.0f, 500.0f);
 		configParam(Bass::CV_RESONANCE_PARAM, 0.0f, RESONANCE_MAX/5.0f, 0.0f, "Resonance CV", "%", 0.0f, 100.0f*1.0f/(RESONANCE_MAX/5.0f));
 		configParam(Bass::CV_DECAY_PARAM, 0.0f, (DECAY_VCF_MAX-DECAY_VCF_MIN)*0.2f, 0.0f, "Decay CV", "%", 0.0f, 100.0f*1.0f/((DECAY_VCF_MAX-DECAY_VCF_MIN)*0.2f));

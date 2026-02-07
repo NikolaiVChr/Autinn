@@ -21,12 +21,6 @@
 
 **/
 
-struct RadiationQuantity : ParamQuantity {
-    int getDisplayPrecision() override {
-        return 3;
-    }
-};
-
 struct Geiger : Module {
     enum ParamIds {
         RAD_PARAM,
@@ -74,9 +68,9 @@ struct Geiger : Module {
         configParam<Param3Digits>(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "mR/h", DISP_BASE, DISP_MULT, DISP_OFFSET);
 
         /*
-        configParam<RadiationQuantity>(HZ_LOW, 20.0f, 400.0f, 40.0f, "LOW", "Hz");
-        configParam<RadiationQuantity>(HZ_HIGH, 750.0f, 5000.0f, 1250.0f, "HIGH", "Hz");
-        configParam<RadiationQuantity>(Q, 0.5f, 3.0f, 2.0f, "Q", "");
+        configParam<Param3Digits>(HZ_LOW, 20.0f, 400.0f, 40.0f, "LOW", "Hz");
+        configParam<Param3Digits>(HZ_HIGH, 750.0f, 5000.0f, 1250.0f, "HIGH", "Hz");
+        configParam<Param3Digits>(Q, 0.5f, 3.0f, 2.0f, "Q", "");
         */
 
         configInput(TRIG_INPUT, "Manual Click Trigger");
