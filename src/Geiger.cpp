@@ -191,8 +191,12 @@ struct GeigerWidget : ModuleWidget {
         addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         // Knob
-        addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Geiger::RAD_PARAM));
-
+        //addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Geiger::RAD_PARAM));
+        auto radKnob = createParamCentered<AutinnArcMidKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Geiger::RAD_PARAM);
+        radKnob->setModulation(Geiger::RAD_CV_INPUT, [](float cv, float val, float att) {
+                            return clamp(val + cv*0.1f, 0.0f, 1.0f);
+                        });
+        addParam(radKnob);
         /*
         // debug knobs
         addParam(createParam<RoundSmallAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 180), module, Geiger::HZ_LOW));

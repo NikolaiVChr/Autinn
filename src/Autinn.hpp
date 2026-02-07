@@ -1,5 +1,6 @@
 #pragma once
 #include <rack.hpp>
+#include <functional> // Required for std::function
 
 /*
 
@@ -81,82 +82,6 @@ struct RoundMediumAutinnKnob : RoundKnob {
 	}
 };
 
-//
-#include <functional> // Required for std::function
-
-struct AutinnArcKnob : RoundMediumAutinnKnob {
-    int inputId = -1;
-
-    // This function defines "How to calculate the Arc position"
-    // Arguments: (Current CV Voltage, Current Knob Value)
-    // Returns: The value where the Arc should end.
-    std::function<float(float cv, float knobVal)> calcModulation;
-
-    AutinnArcKnob() {
-        //minAngle = -0.83f * M_PI;
-        //maxAngle =  0.83f * M_PI;
-
-        // Default Behavior: Linear 1:1 (Knob + CV)
-        calcModulation = [](float cv, float val) { return val + cv; };
-    }
-
-    void setModulation(int input, std::function<float(float, float)> customMath = nullptr) {
-        inputId = input;
-        if (customMath) {
-            calcModulation = customMath;
-        }
-    }
-
-    void drawLayer(const DrawArgs& args, int layer) override {
-        RoundMediumAutinnKnob::drawLayer(args, layer);
-
-    	if (getParamQuantity() == nullptr) {
-    		return;
-    	}
-
-    	if (!module || inputId < 0) return;
-
-    	if (!module->inputs[inputId].isConnected()) {
-    		return; // Don't draw the arc if there's no CV
-    	}
-
-        if (layer == 1) {
-            float minVal = getParamQuantity()->getMinValue();
-            float maxVal = getParamQuantity()->getMaxValue();
-            float currentVal = getParamQuantity()->getValue();
-
-            float cv = module->inputs[inputId].getVoltage();
-
-        	// Calculate raw value first (Unclamped)
-        	float rawModVal = calcModulation(cv, currentVal);
-
-        	// Clamp it for the visual arc (so it stays on the knob)
-        	float modVal = clamp(rawModVal, minVal, maxVal);
-
-        	// Shift angles by -90 degrees so 0 aligns with 12 o'clock
-        	float angleCurrent = rescale(currentVal, minVal, maxVal, minAngle, maxAngle) - M_PI / 2.0f;
-        	float angleMod = rescale(modVal, minVal, maxVal, minAngle, maxAngle) - M_PI / 2.0f;
-
-        	if (std::abs(angleCurrent - angleMod) > 0.001f) {
-        		nvgBeginPath(args.vg);
-        		float r = box.size.x * 0.5f - 1.0f;
-        		nvgArc(args.vg, box.size.x/2.0f, box.size.y/2.0f, r, angleCurrent, angleMod, (angleMod > angleCurrent) ? NVG_CW : NVG_CCW);
-        		nvgStrokeWidth(args.vg, 1.5f);
-
-        		if (rawModVal > maxVal || rawModVal < minVal) {
-        			// Greater magnitude than knob limits -> Bright red
-        			nvgStrokeColor(args.vg, nvgRGBA(255, 40, 40, 255));
-        		} else {
-        			// Normal Color -> Gold (Matches Logo)
-        			nvgStrokeColor(args.vg, nvgRGBA(255, 230, 100, 240));
-        		}
-
-        		nvgStroke(args.vg);
-        	}
-        }
-    }
-};
-
 struct RoundSmallAutinnKnob : RoundKnob {
 	RoundSmallAutinnKnob() {
 		if (!pluginInstance) return;
@@ -204,7 +129,86 @@ struct RoundTinyAutinnKnob : RoundKnob {
 		setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundTinyAutinn.svg")));
 		//box.size = Vec(18, 18);
 	}
-}; 
+};
+
+template <typename TBase>
+struct AutinnArcKnob : TBase {
+    int inputId = -1;
+	int attenId = -1;
+
+    // This function defines "How to calculate the Arc position"
+    // Arguments: (Current CV Voltage, Current Knob Value)
+    // Returns: The value where the Arc should end.
+    std::function<float(float cv, float knobVal, float att)> calcModulation;
+
+    AutinnArcKnob() {
+        //minAngle = -0.83f * M_PI;
+        //maxAngle =  0.83f * M_PI;
+
+        // Default Behavior: Linear 1:1 (Knob + CV)
+        calcModulation = [](float cv, float val, float att) { return val + cv; };
+    }
+
+    void setModulation(int input, std::function<float(float, float, float)> customMath = nullptr, int attenParam = -1) {
+        inputId = input;
+    	attenId = attenParam;
+        if (customMath) {
+            calcModulation = customMath;
+        }
+    }
+
+    void drawLayer(const Widget::DrawArgs& args, int layer) override {
+        TBase::drawLayer(args, layer);
+
+    	if (this->getParamQuantity() == nullptr) {
+    		return;
+    	}
+
+    	if (!this->module || inputId < 0) return;
+
+    	if (!this->module->inputs[inputId].isConnected()) {
+    		return; // Don't draw the arc if there's no CV
+    	}
+
+        if (layer == 1) {
+            float minVal = this->getParamQuantity()->getMinValue();
+            float maxVal = this->getParamQuantity()->getMaxValue();
+            float currentVal = this->getParamQuantity()->getValue();
+
+            float cv = this->module->inputs[inputId].getVoltage();
+        	float attenVal = (attenId != -1) ? this->module->params[attenId].getValue() : 1.0f;
+
+        	// Calculate raw value first (Unclamped)
+        	float rawModVal = calcModulation(cv, currentVal, attenVal);
+
+        	// Clamp it for the visual arc (so it stays on the knob)
+        	float modVal = clamp(rawModVal, minVal, maxVal);
+
+        	// Shift angles by -90 degrees so 0 aligns with 12 o'clock
+        	float angleCurrent = rescale(currentVal, minVal, maxVal, this->minAngle, this->maxAngle) - M_PI / 2.0f;
+        	float angleMod = rescale(modVal, minVal, maxVal, this->minAngle, this->maxAngle) - M_PI / 2.0f;
+
+        	if (std::abs(angleCurrent - angleMod) > 0.001f) {
+        		nvgBeginPath(args.vg);
+        		float r = this->box.size.x * 0.5f - 1.0f;
+        		nvgArc(args.vg, this->box.size.x/2.0f, this->box.size.y/2.0f, r, angleCurrent, angleMod, (angleMod > angleCurrent) ? NVG_CW : NVG_CCW);
+        		nvgStrokeWidth(args.vg, 1.5f);
+
+        		if (rawModVal > maxVal || rawModVal < minVal) {
+        			// Greater magnitude than knob limits -> Bright red
+        			nvgStrokeColor(args.vg, nvgRGBA(255, 40, 40, 255));
+        		} else {
+        			// Normal Color -> Gold (Matches Logo)
+        			nvgStrokeColor(args.vg, nvgRGBA(255, 230, 100, 240));
+        		}
+
+        		nvgStroke(args.vg);
+        	}
+        }
+    }
+};
+using AutinnArcMidKnob   = AutinnArcKnob<RoundMediumAutinnKnob>;
+using AutinnArcSmallKnob = AutinnArcKnob<RoundSmallAutinnKnob>;
 
 struct ScrewStarAutinn : ThemedSvgScrew {
 	ScrewStarAutinn() {

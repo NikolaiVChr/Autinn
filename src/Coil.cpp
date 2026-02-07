@@ -387,40 +387,40 @@ struct CoilWidget : ModuleWidget {
         // --- Knobs ---
         // Row 1: Exciter
         //addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3-hp, 40+down), module, Coil::DRIVE_PARAM));
-        auto* driveKnob = createParamCentered<AutinnArcKnob>(Vec(div3-hp, 40+down), module, Coil::DRIVE_PARAM);
-        driveKnob->setModulation(Coil::DRIVE_CV, [](float cv, float val) {
+        auto* driveKnob = createParamCentered<AutinnArcMidKnob>(Vec(div3-hp, 40+down), module, Coil::DRIVE_PARAM);
+        driveKnob->setModulation(Coil::DRIVE_CV, [](float cv, float val, float att) {
                     return clamp(val + cv*0.3f, 0.0f, 3.0f);
                 });
         addParam(driveKnob);
         //addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*2, 40+down), module, Coil::FEEDBACK_PARAM));
-        auto* feedKnob = createParamCentered<AutinnArcKnob>(Vec(div3*2, 40+down), module, Coil::FEEDBACK_PARAM);
-        feedKnob->setModulation(Coil::FEEDBACK_CV, [](float cv, float val) {
+        auto* feedKnob = createParamCentered<AutinnArcMidKnob>(Vec(div3*2, 40+down), module, Coil::FEEDBACK_PARAM);
+        feedKnob->setModulation(Coil::FEEDBACK_CV, [](float cv, float val, float att) {
                     return clamp(val + cv*0.12f, 0.0f, 1.2f);
                 });
         addParam(feedKnob);
         //addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*3+hp, 40+down), module, Coil::MIX_PARAM));
-        auto* mixKnob = createParamCentered<AutinnArcKnob>(Vec(div3*3+hp, 40+down), module, Coil::MIX_PARAM);
-        mixKnob->setModulation(Coil::MIX_CV, [](float cv, float val) {
+        auto* mixKnob = createParamCentered<AutinnArcMidKnob>(Vec(div3*3+hp, 40+down), module, Coil::MIX_PARAM);
+        mixKnob->setModulation(Coil::MIX_CV, [](float cv, float val, float att) {
                     return clamp(val + cv*0.1f, 0.0f, 1.0f);
                 });
         addParam(mixKnob);
 
         // Row 2: Physics
         //addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3-hp, 100+down), module, Coil::TENSION_PARAM));
-        auto* tensionKnob = createParamCentered<AutinnArcKnob>(Vec(div3-hp, 100+down), module, Coil::TENSION_PARAM);
-        tensionKnob->setModulation(Coil::TENSION_CV, [](float cv, float val) {
+        auto* tensionKnob = createParamCentered<AutinnArcMidKnob>(Vec(div3-hp, 100+down), module, Coil::TENSION_PARAM);
+        tensionKnob->setModulation(Coil::TENSION_CV, [](float cv, float val, float att) {
                     return clamp(val + cv*0.1f, 0.05f, 0.95f);
                 });
         addParam(tensionKnob);
         //addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*2, 100+down), module, Coil::INERTIA_PARAM));
-        auto* inertiaKnob = createParamCentered<AutinnArcKnob>(Vec(div3*2, 100+down), module, Coil::INERTIA_PARAM);
-        inertiaKnob->setModulation(Coil::INERTIA_CV, [](float cv, float val) {
+        auto* inertiaKnob = createParamCentered<AutinnArcMidKnob>(Vec(div3*2, 100+down), module, Coil::INERTIA_PARAM);
+        inertiaKnob->setModulation(Coil::INERTIA_CV, [](float cv, float val, float att) {
                     return clamp(val + cv*15.0f, 10.0f, 160.0f);
                 });
         addParam(inertiaKnob);
         //addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*3+hp, 100+down), module, Coil::DAMP_PARAM));
-        auto* dampKnob = createParamCentered<AutinnArcKnob>(Vec(div3*3+hp, 100+down), module, Coil::DAMP_PARAM);
-        dampKnob->setModulation(Coil::DAMP_CV, [](float cv, float val) {
+        auto* dampKnob = createParamCentered<AutinnArcMidKnob>(Vec(div3*3+hp, 100+down), module, Coil::DAMP_PARAM);
+        dampKnob->setModulation(Coil::DAMP_CV, [](float cv, float val, float att) {
                     // Calculate how many Octaves the knob covers
                     const float totalOctaves = std::log2f(FREQ_MAX / FREQ_MIN);
                     // 2. Scale CV so 1V = 1 Octave of knob travel

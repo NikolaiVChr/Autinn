@@ -940,10 +940,30 @@ struct BassWidget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 1*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::CUTOFF_PARAM));
+		//addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 1*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::CUTOFF_PARAM));
+		auto cutKnob = createParamCentered<AutinnArcMidKnob>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 1*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::CUTOFF_PARAM);
+		cutKnob->setModulation(Bass::CV_CUTOFF_INPUT, [](float cv, float val, float att) {
+							return clamp(val + cv*att, 0.0f, 1.0f);
+						}, Bass::CV_CUTOFF_PARAM);
+		addParam(cutKnob);
 		addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.75-HALF_KNOB_SMALL, 1*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::RESONANCE_PARAM));
+		auto qKnob = createParamCentered<AutinnArcMidKnob>(Vec(12 * RACK_GRID_WIDTH*0.75-HALF_KNOB_SMALL, 1*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::RESONANCE_PARAM);
+		qKnob->setModulation(Bass::CV_RESONANCE_INPUT, [](float cv, float val, float att) {
+							return clamp(val + cv*att, 0.0f, RESONANCE_MAX);
+						}, Bass::CV_RESONANCE_PARAM);
+		addParam(qKnob);
 		addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.5-HALF_KNOB_SMALL, 1.625*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ENV_DECAY_PARAM));
+		auto decayKnob = createParamCentered<AutinnArcMidKnob>(Vec(12 * RACK_GRID_WIDTH*0.5-HALF_KNOB_SMALL, 1.625*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ENV_DECAY_PARAM);
+		decayKnob->setModulation(Bass::CV_DECAY_INPUT, [](float cv, float val, float att) {
+							return clamp(val + cv*att, DECAY_VCF_MIN,DECAY_VCF_MAX);
+						}, Bass::CV_DECAY_PARAM);
+		addParam(decayKnob);
 		addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 2.25*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ENVMOD_PARAM));
+		auto modKnob = createParamCentered<AutinnArcMidKnob>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 2.25*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ENVMOD_PARAM);
+		modKnob->setModulation(Bass::CV_ENVMOD_INPUT, [](float cv, float val, float att) {
+							return clamp(val + cv*att, 0.0f, 1.0f);
+						}, Bass::CV_ENVMOD_PARAM);
+		addParam(modKnob);
 		addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.75-HALF_KNOB_SMALL, 2.25*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ACCENT_PARAM));
 
 		addInput(createInput<InPortAutinn>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_PORT, 270-HALF_PORT), module, Bass::ACCENT_GATE_INPUT));
