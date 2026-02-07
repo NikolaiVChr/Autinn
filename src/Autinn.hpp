@@ -114,35 +114,41 @@ struct AutinnArcKnob : RoundMediumAutinnKnob {
     		return;
     	}
 
-        if (layer == 1 && module && inputId >= 0 && getParamQuantity()) {
+    	if (!module || inputId < 0) return;
+
+    	if (!module->inputs[inputId].isConnected()) {
+    		return; // Don't draw the arc if there's no CV
+    	}
+
+        if (layer == 1) {
             float minVal = getParamQuantity()->getMinValue();
             float maxVal = getParamQuantity()->getMaxValue();
             float currentVal = getParamQuantity()->getValue();
 
             float cv = module->inputs[inputId].getVoltage();
 
-        	// 1. Calculate RAW value first (Unclamped)
+        	// Calculate raw value first (Unclamped)
         	float rawModVal = calcModulation(cv, currentVal);
 
-        	// 2. Clamp it for the visual arc (so it stays on the knob)
+        	// Clamp it for the visual arc (so it stays on the knob)
         	float modVal = clamp(rawModVal, minVal, maxVal);
 
-        	// Shift angles by -90 degrees (M_PI/2) so 0 aligns with 12 o'clock (Up)
+        	// Shift angles by -90 degrees so 0 aligns with 12 o'clock
         	float angleCurrent = rescale(currentVal, minVal, maxVal, minAngle, maxAngle) - M_PI / 2.0f;
         	float angleMod = rescale(modVal, minVal, maxVal, minAngle, maxAngle) - M_PI / 2.0f;
 
         	if (std::abs(angleCurrent - angleMod) > 0.001f) {
-        		// ... (BeginPath and Arc code remains the same) ...
         		nvgBeginPath(args.vg);
         		float r = box.size.x * 0.5f - 1.5f;
         		nvgArc(args.vg, box.size.x/2.0f, box.size.y/2.0f, r, angleCurrent, angleMod, (angleMod > angleCurrent) ? NVG_CW : NVG_CCW);
         		nvgStrokeWidth(args.vg, 2.0f);
 
-        		// Check if the RAW value went out of bounds
         		if (rawModVal > maxVal || rawModVal < minVal) {
-        			nvgStrokeColor(args.vg, nvgRGBA(255, 220, 0, 200)); // Yellow (Clipping)
+        			// Greater magnitude than knob limits -> Bright red
+        			nvgStrokeColor(args.vg, nvgRGBA(255, 50, 50, 200));
         		} else {
-        			nvgStrokeColor(args.vg, nvgRGBA(0, 240, 255, 180)); // Cyan (Normal)
+        			// Normal Color -> Gold (Matches Logo)
+        			nvgStrokeColor(args.vg, nvgRGBA(255, 200, 60, 200));
         		}
 
         		nvgStroke(args.vg);
