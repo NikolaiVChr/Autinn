@@ -415,13 +415,18 @@ struct CoilWidget : ModuleWidget {
         //addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*2, 100+down), module, Coil::INERTIA_PARAM));
         auto* inertiaKnob = createParamCentered<AutinnArcKnob>(Vec(div3*2, 100+down), module, Coil::INERTIA_PARAM);
         inertiaKnob->setModulation(Coil::INERTIA_CV, [](float cv, float val) {
-                    return clamp(val + cv*15.0f, 10.0f, 16.0f);
+                    return clamp(val + cv*15.0f, 10.0f, 160.0f);
                 });
         addParam(inertiaKnob);
         //addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(div3*3+hp, 100+down), module, Coil::DAMP_PARAM));
         auto* dampKnob = createParamCentered<AutinnArcKnob>(Vec(div3*3+hp, 100+down), module, Coil::DAMP_PARAM);
         dampKnob->setModulation(Coil::DAMP_CV, [](float cv, float val) {
-                    return clamp(Coil::toExp(val) + std::exp2f(cv), 20.0f, 10000.0f);
+                    // Calculate how many Octaves the knob covers
+                    const float totalOctaves = std::log2f(FREQ_MAX / FREQ_MIN);
+                    // 2. Scale CV so 1V = 1 Octave of knob travel
+                    float cvNormalized = cv / totalOctaves;
+                    // 3. Add to knob position (Linear Pitch Space)
+                    return clamp(val + cvNormalized, -1.0f, 1.0f);// allow negative due to we allow CV to go down to 20hz.
                 });
         addParam(dampKnob);
 
