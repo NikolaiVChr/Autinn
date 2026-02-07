@@ -197,8 +197,8 @@ struct AutinnArcKnob : TBase {
         		nvgStrokeWidth(args.vg, stroke);
 
         		if (rawModVal > maxVal || rawModVal < minVal) {
-        			// Greater magnitude than knob limits -> Bright red
-        			nvgStrokeColor(args.vg, nvgRGBA(255, 40, 40, 255));
+        			// Greater magnitude than knob limits -> Orange
+        			nvgStrokeColor(args.vg, nvgRGBA(255, 110, 0, 255));
         		} else {
         			// Normal Color -> Gold (Matches Logo)
         			nvgStrokeColor(args.vg, nvgRGBA(255, 230, 100, 240));
