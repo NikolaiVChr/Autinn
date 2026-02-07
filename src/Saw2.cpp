@@ -265,7 +265,7 @@ struct Saw2Widget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
 		AutinnArcKnob* pitchKnob = createParamCentered<AutinnArcKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM);
-		pitchKnob->setModulation(Saw2::CV_PITCH_INPUT, [](float cv, float val, Module* module) {
+		pitchKnob->setModulation(Saw2::CV_PITCH_INPUT, [](float cv, float val) {
 					return clamp(val + cv, -4.0f, 6.0f);
 				});
 		addParam(pitchKnob);
@@ -276,7 +276,7 @@ struct Saw2Widget : ModuleWidget {
 		// 1. Source: CV_AGE_INPUT
 		// 2. Math:   Simple Linear. 5V input adds 1.0 to the parameter (Full Sweep).
 		//            (Input * 0.2 means 5V becomes 1.0)
-		ageKnob->setModulation(Saw2::CV_AGE_INPUT, [](float cv, float val, Module* module) {
+		ageKnob->setModulation(Saw2::CV_AGE_INPUT, [](float cv, float val) {
 			return clamp(val + (cv * 10.0f), 0.0f, 60.0f);
 		});
 

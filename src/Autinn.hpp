@@ -90,17 +90,17 @@ struct AutinnArcKnob : RoundMediumAutinnKnob {
     // This function defines "How to calculate the Arc position"
     // Arguments: (Current CV Voltage, Current Knob Value)
     // Returns: The value where the Arc should end.
-    std::function<float(float cv, float knobVal, Module* module)> calcModulation;
+    std::function<float(float cv, float knobVal)> calcModulation;
 
     AutinnArcKnob() {
         //minAngle = -0.83f * M_PI;
         //maxAngle =  0.83f * M_PI;
 
         // Default Behavior: Linear 1:1 (Knob + CV)
-        calcModulation = [](float cv, float val, Module* module) { return val + cv; };
+        calcModulation = [](float cv, float val) { return val + cv; };
     }
 
-    void setModulation(int input, std::function<float(float, float, Module*)> customMath = nullptr) {
+    void setModulation(int input, std::function<float(float, float)> customMath = nullptr) {
         inputId = input;
         if (customMath) {
             calcModulation = customMath;
