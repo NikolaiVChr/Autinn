@@ -110,7 +110,10 @@ struct AutinnArcKnob : RoundMediumAutinnKnob {
     void drawLayer(const DrawArgs& args, int layer) override {
         RoundMediumAutinnKnob::drawLayer(args, layer);
 
-        // paramQuantity is NULL in the constructor, but valid here!
+    	if (getParamQuantity() == nullptr) {
+    		return;
+    	}
+
         if (layer == 1 && module && inputId >= 0 && getParamQuantity()) {
             float minVal = getParamQuantity()->getMinValue();
             float maxVal = getParamQuantity()->getMaxValue();
@@ -118,7 +121,6 @@ struct AutinnArcKnob : RoundMediumAutinnKnob {
 
             float cv = module->inputs[inputId].getVoltage();
 
-            // --- EXECUTE YOUR CUSTOM MATH HERE ---
             float modVal = calcModulation(cv, currentVal);
 
             // Clamp strictly to knob limits so the arc doesn't fly off the screen
