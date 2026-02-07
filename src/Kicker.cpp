@@ -85,6 +85,17 @@ struct Kicker : Module {
         }
     }
 
+    void onReset(const ResetEvent& e) override {
+        Module::onReset(e);
+        for (int c = 0; c < MAX_CHANNELS; c++) {
+            phase[c] = 0.0f;
+            ampEnv[c] = 0.0f;
+            pitchEnv[c] = 0.0f;
+            activeState[c] = false;
+            outputs[AUDIO_OUTPUT].setVoltage(0.0f, c);
+        }
+    }
+
     void process(const ProcessArgs &args) override;
 };
 
@@ -183,7 +194,7 @@ void Kicker::process(const ProcessArgs &args) {
         float body = sin(phase[c] * 2.0f * M_PI);
         
         // Click (Short burst of noise or high pitch sine at start)
-        // trick: Add a tiny bit of squared envelope to the start
+        // Add a tiny bit of squared envelope to the start
         float white = (int32_t(noiseState[c] = noiseState[c] * 1664525 + 1013904223) >> 8) * (1.0f / 8388608.0f);
         white *= noiseGain;
         //float click = white * pitchEnv[c] * pitchEnv[c] * clickLevel;
@@ -228,7 +239,7 @@ void Kicker::process(const ProcessArgs &args) {
         outputs[AUDIO_OUTPUT].setVoltage(x * 5.0f, c);
     }
 
-    // Blink light if any drum triggered
+    // light if any drum triggered
     if (lightActive) lightDecay = 1.0f;
     float lightLambda = 1.0f - (args.sampleTime / 0.2f);
     lightDecay *= std::max(0.0f, lightLambda);
