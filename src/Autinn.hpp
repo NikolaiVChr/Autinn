@@ -229,6 +229,18 @@ inline float interpolator(float mix, float a, float b) {
 	return a + mix * (b - a);
 }
 
+struct Param3Digits : ParamQuantity {
+	int getDisplayPrecision() override {
+		return 3;
+	}
+};
+
+struct Param4Digits : ParamQuantity {
+	int getDisplayPrecision() override {
+		return 4;
+	}
+};
+
 inline float slew(const float input, float input_prev, const float maxChangePerSec, const float dt) {
 	float delta = input - input_prev;
 

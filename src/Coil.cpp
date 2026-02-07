@@ -180,12 +180,12 @@ struct Coil : Module {
     Coil() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         
-        configParam(DRIVE_PARAM, 0.f, 2.f, 1.f, "Drive");
-        configParam(FEEDBACK_PARAM, 0.f, 1.2f, 0.85f, "Reflection"); // Goes > 1.0 for self oscillation
-        configParam(MIX_PARAM, 0.f, 1.f, 1.f, "Mix");
+        configParam<Param3Digits>(DRIVE_PARAM, 0.f, 2.f, 1.f, "Drive");
+        configParam<Param3Digits>(FEEDBACK_PARAM, 0.f, 1.2f, 0.85f, "Reflection"); // Goes > 1.0 for self oscillation
+        configParam<Param3Digits>(MIX_PARAM, 0.f, 1.f, 1.f, "Mix");
 
-        configParam(TENSION_PARAM, 0.1f, 0.95f, 0.4f, "Tension", "");
-        configParam(INERTIA_PARAM, 20.f, 160.f, 50.f, "Inertia", "");
+        configParam<Param3Digits>(TENSION_PARAM, 0.1f, 0.95f, 0.4f, "Tension", "");
+        configParam<Param3Digits>(INERTIA_PARAM, 20.f, 160.f, 50.f, "Inertia", "");
         configParam(DAMP_PARAM, 0.f, 1.f, 0.75f, "Damp", "", FREQ_MAX/FREQ_MIN, FREQ_MIN);
 
         configInput(DRIVE_CV, "Drive CV");

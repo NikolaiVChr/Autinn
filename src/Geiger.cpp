@@ -71,7 +71,7 @@ struct Geiger : Module {
 
     Geiger() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam<RadiationQuantity>(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "mR/h", DISP_BASE, DISP_MULT, DISP_OFFSET);
+        configParam<Param3Digits>(RAD_PARAM, 0.0f, 1.0f, 0.0f, "Radiation", "mR/h", DISP_BASE, DISP_MULT, DISP_OFFSET);
 
         /*
         configParam<RadiationQuantity>(HZ_LOW, 20.0f, 400.0f, 40.0f, "LOW", "Hz");

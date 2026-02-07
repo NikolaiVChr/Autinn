@@ -52,7 +52,7 @@ struct VectorDriver : Module {
 
 	VectorDriver() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(VectorDriver::SPEED_PARAM, 0.25f, 5.0f, 3.5f, "");
+		configParam<Param3Digits>(VectorDriver::SPEED_PARAM, 0.25f, 5.0f, 3.5f, "");
 		configOutput(X_OUTPUT, "±5V X CV");
 		configOutput(Y_OUTPUT, "±5V Y CV");
 	}
