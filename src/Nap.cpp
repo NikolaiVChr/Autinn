@@ -27,8 +27,8 @@
 static constexpr int oversample2 = 2;
 static constexpr int oversample4 = 4;
 
-#define SNORING_MAX 24.0f
-#define SNORING_MIN 1.0f
+#define SNORING_MAX 25.0f
+#define SNORING_MIN 0.0f
 #define DREAMING_MIN 0.5f
 #define DREAMING_MAX 2.0f
 
@@ -132,6 +132,9 @@ void Nap::process(const ProcessArgs &args) {
 		}
 
 		for (int i = 0; i < current_oversample; i++) {
+
+			// Distortion
+
 			float out = this->fwdEuler(out_prev[c], inInter[i], current_oversample);
 
 			if (!std::isfinite(out)) {

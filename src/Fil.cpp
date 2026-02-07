@@ -25,7 +25,7 @@ static const int oversample2 = 2;
 static const int oversample4 = 4;
 static const int oversample8 = 8;
 
-#define DRIVE_MAX 10.0f
+#define DRIVE_MAX 25.0f
 #define DRIVE_MIN 0.0f
 
 struct SimpleDCBlocker {
@@ -146,6 +146,8 @@ void Fil::process(const ProcessArgs &args) {
 		for (int i = 0; i < current_oversample; i++) {
 			float x = inInter[i];
 			if (std::abs(x) < 1e-15f) x = 0.0f; // Denormal protection
+
+			// Overdrive
 
 			// Asymmetric Tube Bias
 			// Adding x*x creates Even Harmonics (Warmth).
