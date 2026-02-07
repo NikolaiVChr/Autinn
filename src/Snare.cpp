@@ -80,6 +80,18 @@ struct Snare : Module {
         }
     }
 
+    void onReset(const ResetEvent& e) override {
+        Module::onReset(e);
+        for (int c = 0; c < MAX_CHANNELS; c++) {
+            phase[c] = 0.0f;
+            ampEnv[c] = 0.0f;
+            pitchEnv[c] = 0.0f;
+            noiseEnv[c] = 0.0f;
+            outputs[AUDIO_OUTPUT].setVoltage(0.0f, c);
+            wireFilter[c].reset();
+        }
+    }
+
     void process(const ProcessArgs &args) override;
 };
 
@@ -132,11 +144,12 @@ void Snare::process(const ProcessArgs &args) {
             phase[c] = 0.0f; 
             active = true;
 
-            // Configure the Filter (You can do this in the trigger logic to save CPU)
-            // Use BANDPASS to isolate the 'sizzle' or PEAK to just boost it.
+            // Configure the Filter
+            // Using bandpass to isolate the sizzle.
             float wireFreq = 2500.0f;
-            float wireQ = 1.0f;     // A Q of 1.0 is broad and natural
+            float wireQ = 1.0f;     // Q of 1.0 is broad and natural
             wireFilter[c].setParameters(wireFilter[c].BANDPASS, wireFreq / args.sampleRate, wireQ, 1.0f);
+            wireFilter[c].reset(); // Clear old filter energy for a fresh hit
         }
 
         // Envelopes
@@ -144,8 +157,15 @@ void Snare::process(const ProcessArgs &args) {
         noiseEnv[c] *= noiseCoeff;
         pitchEnv[c] *= pitchDecayCoeff;
 
-        if (ampEnv[c] < 0.001f) ampEnv[c] = 0.0f;
-        if (noiseEnv[c] < 0.001f) noiseEnv[c] = 0.0f;
+        // If both envelopes are effectively zero, go to sleep.
+        if (ampEnv[c] <= 0.001f && pitchEnv[c] <= 0.001f) {
+            // Also prevents denormals
+            ampEnv[c] = 0.0f;
+            pitchEnv[c] = 0.0f;
+            noiseEnv[c] = 0.0f;
+            outputs[AUDIO_OUTPUT].setVoltage(0.0f, c);
+            continue;
+        }
 
         // Tonal Body (Triangle/Sine mix for body)
         float voct = inputs[VOCT_INPUT].getPolyVoltage(c);
