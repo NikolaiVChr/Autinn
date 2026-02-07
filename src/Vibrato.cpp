@@ -198,9 +198,24 @@ struct VibratoWidget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 75), module, Vibrato::FREQ_PARAM));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(6 * RACK_GRID_WIDTH*0.75-HALF_KNOB_MED, 75), module, Vibrato::WIDTH_PARAM));
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(9 * RACK_GRID_WIDTH*0.8333-HALF_KNOB_MED, 75), module, Vibrato::FLANGER_PARAM));
+		//addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 75), module, Vibrato::FREQ_PARAM));
+		auto frqKnob = createParam<AutinnArcMidKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 75), module, Vibrato::FREQ_PARAM);
+		frqKnob->setModulation(Vibrato::FREQ_INPUT, [](float cv, float val, float att) {
+					return clamp(val + cv*att, 1.0f, 20.0f);
+				}, Vibrato::CV_FREQ_PARAM);
+		addParam(frqKnob);
+		//addParam(createParam<RoundMediumAutinnKnob>(Vec(6 * RACK_GRID_WIDTH*0.75-HALF_KNOB_MED, 75), module, Vibrato::WIDTH_PARAM));
+		auto widthKnob = createParam<AutinnArcMidKnob>(Vec(6 * RACK_GRID_WIDTH*0.75-HALF_KNOB_MED, 75), module, Vibrato::WIDTH_PARAM);
+		widthKnob->setModulation(Vibrato::WIDTH_INPUT, [](float cv, float val, float att) {
+					return clamp(val + cv*att, 0.001f, 0.020f);
+				}, Vibrato::CV_WIDTH_PARAM);
+		addParam(widthKnob);
+		//addParam(createParam<RoundMediumAutinnKnob>(Vec(9 * RACK_GRID_WIDTH*0.8333-HALF_KNOB_MED, 75), module, Vibrato::FLANGER_PARAM));
+		auto qKnob = createParam<AutinnArcMidKnob>(Vec(9 * RACK_GRID_WIDTH*0.8333-HALF_KNOB_MED, 75), module, Vibrato::FLANGER_PARAM);
+		qKnob->setModulation(Vibrato::FLANGER_INPUT, [](float cv, float val, float att) {
+					return clamp(val + cv*att, 0.0f, 1.0f);
+				}, Vibrato::CV_FLANGER_PARAM);
+		addParam(qKnob);
 
 		addInput(createInput<InPortAutinn>(Vec(6 * RACK_GRID_WIDTH*0.25-HALF_PORT, 140), module, Vibrato::FREQ_INPUT));
 		addParam(createParam<RoundSmallAutinnKnob>(Vec(6 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 175), module, Vibrato::CV_FREQ_PARAM));
