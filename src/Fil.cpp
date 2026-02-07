@@ -152,9 +152,11 @@ void Fil::process(const ProcessArgs &args) {
 			// At high volumes, large negative values will 'fold' back positive (Grit).
 			float tube_bias = x + 0.25f * x * x;
 
+			float drive_amount = tube_bias * 0.5f;
+
 			// Soft Saturation (The Tube Limit)
 			// non_lin handles the clipping smoothly like a vacuum tube.
-			float saturated = non_lin_func(tube_bias);
+			float saturated = non_lin_func(drive_amount);
 
 			// Safety Check
 			if (!std::isfinite(saturated)) {
@@ -165,7 +167,7 @@ void Fil::process(const ProcessArgs &args) {
 
 			// Update Lights based on saturation intensity
 			if (c == 0 && i == 0) {
-				float signal_abs = std::abs(x);
+				float signal_abs = std::abs(drive_amount);
 				// Green: Signal present
 				lights[LOW_LIGHT].value  = (signal_abs > 0.1f) ? 1.0f : 0.0f;
 				// Yellow: Tube is warming up (saturation starting)

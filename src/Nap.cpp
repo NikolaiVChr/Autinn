@@ -140,7 +140,10 @@ void Nap::process(const ProcessArgs &args) {
 			} else {
 				out_prev[c] = out;
 			}
-			outBuf[i] = non_lin_func(out/12.0f);
+			float x = out / 10.0f; // Slightly more gain into the clipper
+			if (x > 1.0f) x = 1.0f;
+			else if (x < -1.0f) x = -1.0f;
+			outBuf[i] = x;
 		}
 		float final;
 		if (current_oversample == oversample2) {
@@ -149,7 +152,7 @@ void Nap::process(const ProcessArgs &args) {
 			final = decimator4[c].process(outBuf);
 		}
 
-		outputs[NAP_OUTPUT].setVoltage(final*12.0f, c);
+		outputs[NAP_OUTPUT].setVoltage(final*5.0f, c);
 
 		if (c == 0) {
 			float pre_abs = fabsf(pre);
