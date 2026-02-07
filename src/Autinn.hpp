@@ -121,23 +121,32 @@ struct AutinnArcKnob : RoundMediumAutinnKnob {
 
             float cv = module->inputs[inputId].getVoltage();
 
-            float modVal = calcModulation(cv, currentVal);
+        	// 1. Calculate RAW value first (Unclamped)
+        	float rawModVal = calcModulation(cv, currentVal);
 
-            // Clamp strictly to knob limits so the arc doesn't fly off the screen
-            modVal = clamp(modVal, minVal, maxVal);
+        	// 2. Clamp it for the visual arc (so it stays on the knob)
+        	float modVal = clamp(rawModVal, minVal, maxVal);
 
-            // Draw
-            float angleCurrent = rescale(currentVal, minVal, maxVal, minAngle, maxAngle);
-            float angleMod = rescale(modVal, minVal, maxVal, minAngle, maxAngle);
+        	// Shift angles by -90 degrees (M_PI/2) so 0 aligns with 12 o'clock (Up)
+        	float angleCurrent = rescale(currentVal, minVal, maxVal, minAngle, maxAngle) - M_PI / 2.0f;
+        	float angleMod = rescale(modVal, minVal, maxVal, minAngle, maxAngle) - M_PI / 2.0f;
 
-            if (std::abs(angleCurrent - angleMod) > 0.001f) {
-                nvgBeginPath(args.vg);
-                float r = box.size.x * 0.5f - 1.5f;
-                nvgArc(args.vg, box.size.x/2.0f, box.size.y/2.0f, r, angleCurrent, angleMod, (angleMod > angleCurrent) ? NVG_CW : NVG_CCW);
-                nvgStrokeWidth(args.vg, 2.0f);
-                nvgStrokeColor(args.vg, nvgRGBA(0, 240, 255, 180));
-                nvgStroke(args.vg);
-            }
+        	if (std::abs(angleCurrent - angleMod) > 0.001f) {
+        		// ... (BeginPath and Arc code remains the same) ...
+        		nvgBeginPath(args.vg);
+        		float r = box.size.x * 0.5f - 1.5f;
+        		nvgArc(args.vg, box.size.x/2.0f, box.size.y/2.0f, r, angleCurrent, angleMod, (angleMod > angleCurrent) ? NVG_CW : NVG_CCW);
+        		nvgStrokeWidth(args.vg, 2.0f);
+
+        		// Check if the RAW value went out of bounds
+        		if (rawModVal > maxVal || rawModVal < minVal) {
+        			nvgStrokeColor(args.vg, nvgRGBA(255, 220, 0, 200)); // Yellow (Clipping)
+        		} else {
+        			nvgStrokeColor(args.vg, nvgRGBA(0, 240, 255, 180)); // Cyan (Normal)
+        		}
+
+        		nvgStroke(args.vg);
+        	}
         }
     }
 };
