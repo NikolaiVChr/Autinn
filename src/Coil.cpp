@@ -40,6 +40,11 @@ struct AllPassFilter {
         c = tension;
     }
 
+    void reset() {
+        x1 = 0.f;
+        y1 = 0.f;
+    }
+
     float process(float x) {
         // y[n] = -c * x[n] + x[n-1] - c * y[n-1]
         float y = -c * x + x1 + c * y1;
@@ -76,6 +81,13 @@ struct SpringTank {
 
     void setCoils(int c) {
         curr_coils = c;
+    }
+
+    void reset() {
+        damper.reset();
+        for (auto & coil : ap) {
+            coil.reset();
+        }
     }
 
     float process(float input, float feedbackAmt, float tension, float inertia, float dampFreq, float sampleRate) {
@@ -225,6 +237,12 @@ struct Coil : Module {
             tankL.setCoils(curr_coils);
             tankR.setCoils(curr_coils);
         }
+    }
+
+    void onReset(const ResetEvent& e) override {
+        tankL.reset();
+        tankR.reset();
+        Module::onReset(e);
     }
 
     void onRandomize(const RandomizeEvent& e) override {
