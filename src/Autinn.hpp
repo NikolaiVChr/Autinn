@@ -139,9 +139,9 @@ struct AutinnArcKnob : RoundMediumAutinnKnob {
 
         	if (std::abs(angleCurrent - angleMod) > 0.001f) {
         		nvgBeginPath(args.vg);
-        		float r = box.size.x * 0.5f - 1.5f;
+        		float r = box.size.x * 0.5f - 1.0f;
         		nvgArc(args.vg, box.size.x/2.0f, box.size.y/2.0f, r, angleCurrent, angleMod, (angleMod > angleCurrent) ? NVG_CW : NVG_CCW);
-        		nvgStrokeWidth(args.vg, 2.0f);
+        		nvgStrokeWidth(args.vg, 1.5f);
 
         		if (rawModVal > maxVal || rawModVal < minVal) {
         			// Greater magnitude than knob limits -> Bright red
