@@ -154,7 +154,7 @@ void Fil::process(const ProcessArgs &args) {
 
 			float drive_amount = tube_bias * 0.5f;
 
-			// Soft Saturation (The Tube Limit)
+			// Soft saturation (The tube limit)
 			// non_lin handles the clipping smoothly like a vacuum tube.
 			float saturated = non_lin_func(drive_amount);
 
@@ -167,13 +167,19 @@ void Fil::process(const ProcessArgs &args) {
 
 			// Update Lights based on saturation intensity
 			if (c == 0 && i == 0) {
-				float signal_abs = std::abs(drive_amount);
-				// Green: Signal present
-				lights[LOW_LIGHT].value  = (signal_abs > 0.1f) ? 1.0f : 0.0f;
-				// Yellow: Tube is warming up (saturation starting)
-				lights[MID_LIGHT].value  = (signal_abs > 1.5f) ? 1.0f : 0.0f;
-				// Red: The "Grit" zone (Foldover/Hard clipping)
-				lights[HIGH_LIGHT].value = (signal_abs > 3.0f) ? 1.0f : 0.0f;
+				float drive_abs = std::abs(drive_amount);
+
+				// Green: Signal Indicator (Fades in quickly)
+				// Shows if any signal is present.
+				lights[LOW_LIGHT].value = clamp(drive_abs * 10.0f, 0.0f, 1.0f);
+
+				// Yellow: Warmth Indicator (Fades in from 0.4 to 0.8)
+				// Turns on when the tube starts "bending" the waveform.
+				lights[MID_LIGHT].value = clamp((drive_abs - 0.4f) * 2.5f, 0.0f, 1.0f);
+
+				// Red: Overdrive Indicator (Fades in from 1.0 to 1.4)
+				// Turns on when you hit the saturation ceiling.
+				lights[HIGH_LIGHT].value = clamp((drive_abs - 1.0f) * 2.5f, 0.0f, 1.0f);
 			}
 		}
 
