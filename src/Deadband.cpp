@@ -50,10 +50,10 @@ struct Deadband : Module {
 
 	Deadband() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(Deadband::WIDTH_PARAM, 0.0f, 5.0f, 0.0f, "Width", " Volt",0.0f,1.0f);
-		configParam(Deadband::CV_PARAM, 0.0f, 1.0f, 0.0f, "Width CV", "%", 0.0f, 100.0f);
-		configParam(Deadband::GAP_PARAM, 1.0f, 0.0f, 1.0f, "Gap");
-		configParam(Deadband::CV_GAP_PARAM, 0.0f, 0.2f, 0.0f, "Gap CV", "%", 0.0f, 500.0f);
+		configParam<Param3Digits>(Deadband::WIDTH_PARAM, 0.0f, 5.0f, 0.0f, "Width", " Volt",0.0f,1.0f);
+		configParam<Param4Digits>(Deadband::CV_PARAM, 0.0f, 1.0f, 0.0f, "Width CV", "%", 0.0f, 100.0f);
+		configParam<Param3Digits>(Deadband::GAP_PARAM, 1.0f, 0.0f, 1.0f, "Gap");
+		configParam<Param4Digits>(Deadband::CV_GAP_PARAM, 0.0f, 0.2f, 0.0f, "Gap CV", "%", 0.0f, 500.0f);
 		configBypass(DEADBAND_INPUT, DEADBAND_OUTPUT);
 		configInput(CV_INPUT, "Width CV");
 		configInput(CV_GAP_INPUT, "Gap CV");

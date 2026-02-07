@@ -47,8 +47,8 @@ struct Digi : Module {
 
 	Digi() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(Digi::STEP_PARAM, 0.0f, 1.0f, 0.0f, "Quantization", " Volt",0.0f,1.0f);
-		configParam(Digi::CV_PARAM, 0.0f, 0.2f, 0.0f, "CV", "%",0.0f,500.0f);
+		configParam<Param3Digits>(Digi::STEP_PARAM, 0.0f, 1.0f, 0.0f, "Quantization", " Volt",0.0f,1.0f);
+		configParam<Param4Digits>(Digi::CV_PARAM, 0.0f, 0.2f, 0.0f, "CV", "%",0.0f,500.0f);
 		configBypass(ANALOG_INPUT, DIGITAL_OUTPUT);
 		configInput(CV_INPUT, "CV");
 		configInput(ANALOG_INPUT, "Analog");

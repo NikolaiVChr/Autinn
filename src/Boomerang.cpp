@@ -42,7 +42,7 @@ struct Boomerang : Module {
 
 	Boomerang() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(Boomerang::DIAL_PARAM, 0.001f, 2.0f, 1.0f, "Gain", " dB", -10, 20);
+		configParam<Param3Digits>(Boomerang::DIAL_PARAM, 0.001f, 2.0f, 1.0f, "Gain", " dB", -10, 20);
 		configBypass(PRE_INPUT, PRE_OUTPUT);
 		configBypass(POST_INPUT, POST_OUTPUT);
 		configInput(PRE_INPUT, "Pre");
