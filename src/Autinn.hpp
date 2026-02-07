@@ -111,10 +111,10 @@ struct AutinnArcKnob : RoundMediumAutinnKnob {
         RoundMediumAutinnKnob::drawLayer(args, layer);
 
         // paramQuantity is NULL in the constructor, but valid here!
-        if (layer == 1 && module && inputId >= 0 && paramQuantity) {
-            float minVal = paramQuantity->getMinValue();
-            float maxVal = paramQuantity->getMaxValue();
-            float currentVal = paramQuantity->getValue();
+        if (layer == 1 && module && inputId >= 0 && getParamQuantity()) {
+            float minVal = getParamQuantity()->getMinValue();
+            float maxVal = getParamQuantity()->getMaxValue();
+            float currentVal = getParamQuantity()->getValue();
 
             float cv = module->inputs[inputId].getVoltage();
 
