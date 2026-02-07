@@ -59,7 +59,7 @@ struct Saw2 : Module {
 	Saw2() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Saw2::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
-		configParam<Param3Digits>(Saw2::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
+		AutinnArcKnob* ageKnob = configParam<AutinnArcKnob>(Saw2::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
 		configButton(TYPE_PARAM, "Saw or Square");
 		configInput(CV_PITCH_INPUT, "1V/Oct CV");
 		configInput(CV_AGE_INPUT, "1V/decade CV");
@@ -265,7 +265,20 @@ struct Saw2Widget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
 		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM));
-		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM));
+
+
+		AutinnArcKnob* ageKnob = createParamCentered<AutinnArcKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM);
+
+		// Link modulation:
+		// 1. Source: CV_AGE_INPUT
+		// 2. Math:   Simple Linear. 5V input adds 1.0 to the parameter (Full Sweep).
+		//            (Input * 0.2 means 5V becomes 1.0)
+		ageKnob->setModulation(Saw2::CV_AGE_INPUT, [](float cv, float val) {
+			return clamp(val + (cv * 10.0f), 0.0f, 60.0f);
+		});
+
+		addParam(ageKnob);
+		//addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM));
 
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 75+HALF_KNOB_MED), module, Saw2::CV_AGE_INPUT));
 

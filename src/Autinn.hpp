@@ -81,6 +81,65 @@ struct RoundMediumAutinnKnob : RoundKnob {
 	}
 };
 
+//
+#include <functional> // Required for std::function
+
+struct AutinnArcKnob : RoundMediumAutinnKnob {
+    int inputId = -1;
+
+    // This function defines "How to calculate the Arc position"
+    // Arguments: (Current CV Voltage, Current Knob Value)
+    // Returns: The value where the Arc should end.
+    std::function<float(float cv, float knobVal)> calcModulation;
+
+    AutinnArcKnob() {
+        //minAngle = -0.83f * M_PI;
+        //maxAngle =  0.83f * M_PI;
+
+        // Default Behavior: Linear 1:1 (Knob + CV)
+        calcModulation = [](float cv, float val) { return val + cv; };
+    }
+
+    void setModulation(int input, std::function<float(float, float)> customMath = nullptr) {
+        inputId = input;
+        if (customMath) {
+            calcModulation = customMath;
+        }
+    }
+
+    void drawLayer(const DrawArgs& args, int layer) override {
+        RoundMediumAutinnKnob::drawLayer(args, layer);
+
+        // paramQuantity is NULL in the constructor, but valid here!
+        if (layer == 1 && module && inputId >= 0 && paramQuantity) {
+            float minVal = paramQuantity->getMinValue();
+            float maxVal = paramQuantity->getMaxValue();
+            float currentVal = paramQuantity->getValue();
+
+            float cv = module->inputs[inputId].getVoltage();
+
+            // --- EXECUTE YOUR CUSTOM MATH HERE ---
+            float modVal = calcModulation(cv, currentVal);
+
+            // Clamp strictly to knob limits so the arc doesn't fly off the screen
+            modVal = clamp(modVal, minVal, maxVal);
+
+            // Draw
+            float angleCurrent = rescale(currentVal, minVal, maxVal, minAngle, maxAngle);
+            float angleMod = rescale(modVal, minVal, maxVal, minAngle, maxAngle);
+
+            if (std::abs(angleCurrent - angleMod) > 0.001f) {
+                nvgBeginPath(args.vg);
+                float r = box.size.x * 0.5f - 1.5f;
+                nvgArc(args.vg, box.size.x/2.0f, box.size.y/2.0f, r, angleCurrent, angleMod, (angleMod > angleCurrent) ? NVG_CW : NVG_CCW);
+                nvgStrokeWidth(args.vg, 2.0f);
+                nvgStrokeColor(args.vg, nvgRGBA(0, 240, 255, 180));
+                nvgStroke(args.vg);
+            }
+        }
+    }
+};
+
 struct RoundSmallAutinnKnob : RoundKnob {
 	RoundSmallAutinnKnob() {
 		if (!pluginInstance) return;
