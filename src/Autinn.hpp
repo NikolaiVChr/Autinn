@@ -139,8 +139,8 @@ struct AutinnArcKnob : TBase {
 	float stroke = 1.0f;
 	bool green = false;
 
-    // This function defines "How to calculate the Arc position"
-    // Arguments: (Current CV Voltage, Current Knob Value)
+    // This function defines how to calculate the Arc position
+    // Arguments: (Current CV Voltage, Current Knob Value, Attenuverter Value)
     // Returns: The value where the Arc should end.
     std::function<float(float cv, float knobVal, float att)> calcModulation;
 
@@ -203,7 +203,7 @@ struct AutinnArcKnob : TBase {
         		} else {
         			// Normal Color -> Gold (Matches Logo) / Green
         			if (green) {
-        				nvgStrokeColor(args.vg, nvgRGBA(0, 255, 0, 255));
+        				nvgStrokeColor(args.vg, nvgRGBA(0, 255, 240, 255));
         			} else {
         				nvgStrokeColor(args.vg, nvgRGBA(255, 230, 100, 240));
         			}
