@@ -26,7 +26,7 @@ static const int oversample4 = 4;
 static const int oversample8 = 8;
 
 #define DRIVE_MAX 10.0f
-#define DRIVE_MIN 0.1f
+#define DRIVE_MIN 0.0f
 
 struct SimpleDCBlocker {
 	float x1 = 0.0f;
@@ -70,7 +70,7 @@ struct Fil : Module {
 
 	Fil() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam<Param3Digits>(DIAL_PARAM, 0.0f, 1.0f, 0.25f, "Drive", " ", DRIVE_MAX/DRIVE_MIN, DRIVE_MIN);
+		configParam<Param3Digits>(DIAL_PARAM, 0.0f, 1.0f, 0.25f, "Drive", " ", 0.0f, DRIVE_MAX);
 		configBypass(FIL_INPUT, FIL_OUTPUT);
 		configInput(FIL_INPUT, "Audio");
 		configOutput(FIL_OUTPUT, "Audio");
@@ -127,7 +127,7 @@ void Fil::process(const ProcessArgs &args) {
 	int channels = std::max(1, inputs[FIL_INPUT].getChannels());
 	outputs[FIL_OUTPUT].setChannels(channels);
 
-	float driveGain = 0.20f * (params[DIAL_PARAM].getValue() * (DRIVE_MAX - DRIVE_MIN) + DRIVE_MIN);
+	float driveGain = 0.2f * (1.0f + params[DIAL_PARAM].getValue() * DRIVE_MAX);
 
 	for (int c = 0; c < channels; c++) {
 		float in = inputs[FIL_INPUT].getPolyVoltage(c) * driveGain;

@@ -55,7 +55,7 @@ struct Nap : Module {
 
 	Nap() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam<Param3Digits>(SNORING_PARAM, 0.0f, 1.0f, 0.0f, "Snore amount", " ", SNORING_MAX/SNORING_MIN, SNORING_MIN);
+		configParam<Param3Digits>(SNORING_PARAM, 0.0f, 1.0f, 0.0f, "Snore amount", " ", 0.0f, SNORING_MAX);
 		configParam<Param3Digits>(DREAMING_PARAM, DREAMING_MIN, DREAMING_MAX, 1.00f, "Dream amount", " ", 0.0f, 1.0f);
 		configBypass(NAP_INPUT, NAP_OUTPUT);
 		configInput(NAP_INPUT, "Audio");
@@ -120,7 +120,7 @@ void Nap::process(const ProcessArgs &args) {
 	outputs[NAP_OUTPUT].setChannels(channels);
 
 	for (int c = 0; c < channels; c++) {
-		float pre = inputs[NAP_INPUT].getPolyVoltage(c) * (params[SNORING_PARAM].getValue() * (SNORING_MAX - SNORING_MIN) + SNORING_MIN);
+		float pre = inputs[NAP_INPUT].getPolyVoltage(c) * (1.0f + params[SNORING_PARAM].getValue() * SNORING_MAX);
 
 		float inInter [4];
 		float outBuf  [4];
