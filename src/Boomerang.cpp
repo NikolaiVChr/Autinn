@@ -49,6 +49,7 @@ struct Boomerang : Module {
 		configInput(POST_INPUT, "Post");
 		configOutput(PRE_OUTPUT, "Pre");
 		configOutput(POST_OUTPUT, "Post");
+		configInput(CV_INPUT, "CV");
 	}
 
 	void process(const ProcessArgs &args) override;
