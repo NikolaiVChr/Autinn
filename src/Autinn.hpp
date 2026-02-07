@@ -90,17 +90,17 @@ struct AutinnArcKnob : RoundMediumAutinnKnob {
     // This function defines "How to calculate the Arc position"
     // Arguments: (Current CV Voltage, Current Knob Value)
     // Returns: The value where the Arc should end.
-    std::function<float(float cv, float knobVal)> calcModulation;
+    std::function<float(float cv, float knobVal, Module* module)> calcModulation;
 
     AutinnArcKnob() {
         //minAngle = -0.83f * M_PI;
         //maxAngle =  0.83f * M_PI;
 
         // Default Behavior: Linear 1:1 (Knob + CV)
-        calcModulation = [](float cv, float val) { return val + cv; };
+        calcModulation = [](float cv, float val, Module* module) { return val + cv; };
     }
 
-    void setModulation(int input, std::function<float(float, float)> customMath = nullptr) {
+    void setModulation(int input, std::function<float(float, float, Module*)> customMath = nullptr) {
         inputId = input;
         if (customMath) {
             calcModulation = customMath;
@@ -145,10 +145,10 @@ struct AutinnArcKnob : RoundMediumAutinnKnob {
 
         		if (rawModVal > maxVal || rawModVal < minVal) {
         			// Greater magnitude than knob limits -> Bright red
-        			nvgStrokeColor(args.vg, nvgRGBA(255, 50, 50, 200));
+        			nvgStrokeColor(args.vg, nvgRGBA(255, 40, 40, 255));
         		} else {
         			// Normal Color -> Gold (Matches Logo)
-        			nvgStrokeColor(args.vg, nvgRGBA(255, 200, 60, 200));
+        			nvgStrokeColor(args.vg, nvgRGBA(255, 230, 100, 240));
         		}
 
         		nvgStroke(args.vg);
