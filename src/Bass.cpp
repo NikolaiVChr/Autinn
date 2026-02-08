@@ -38,6 +38,7 @@
 #define CUTOFF_ENVELOPE_BIAS 0.3137f // Portion of VCF envelope that is negative.
 #define CUTOFF_RANGE_FOR_ENVELOPE 4500.0f // ENV MOD range
 #define CUTOFF_ENVMOD_MIN 100.0f // Zero sweep makes no sense
+#define CUTOFF_ENVMOD_OCT 5.0f // 303 was 5
 #define CUTOFF_KNOB_MIN 40.0f // Multiple sources: 300.
 #define CUTOFF_KNOB_MAX 4500.0f// multiple sources: 2400
 #define CUTOFF_MIN 16.0f // Min absolute that can be asked of the filter.
@@ -178,6 +179,7 @@ struct Bass : Module {
 	int current_oversample = 2;// 2 for minimal anti-aliasing or 4 for better if you can spare the CPU time.
 	bool tunedResonance = false;// If true then resonance power will be tuned to equal power no matter the cutoff. However for this module it sounds best to have this false.
 	bool firstPoleOneOctHigher = false;// For more accurate physical sim of TB-303 filter. However a 24dB transistor filter sounds better than what 303 had, so keeping it at false.
+	bool useOctaveEnvMod = true;// for backwards compat of ENVMOD type.
 	// =================================
 	
 	float accentAttackBase = 0.0f;
@@ -197,7 +199,8 @@ struct Bass : Module {
 		configParam(Bass::CUTOFF_PARAM, 0.0f, 1.0f, 0.25f, "Cutoff"," Hz",CUTOFF_KNOB_MAX/CUTOFF_KNOB_MIN, CUTOFF_KNOB_MIN);
 		configParam<Param4Digits>(Bass::RESONANCE_PARAM, 0.0f, RESONANCE_MAX, 0.85f, "Resonance", "%", 0.0f, 100.0f);
 		configParam(Bass::ENV_DECAY_PARAM, DECAY_VCF_MIN, DECAY_VCF_MAX, (DECAY_VCF_MIN+DECAY_VCF_MAX)*0.5f, "Decay", " ms", 0.0f, 1000.0f);
-		configParam<Param3Digits>(Bass::ENVMOD_PARAM, 0.0f, 1.0f, 0.25f, "Sweep range", " Oct", 0.0f, 5.0f, 0.0f);
+		configParam(Bass::ENVMOD_PARAM, 0.0f, 1.0f, 0.25f, "Sweep range", " Oct", 0.0f, CUTOFF_ENVMOD_OCT, 0.0f)
+			->displayPrecision = 3;
 		configParam<Param3Digits>(Bass::ACCENT_PARAM, ACCENT_KNOB_MINIMUM, 1.0f, 0.75f, "Accent", "%", 0.0f, 100.0f);
 		configParam(Bass::CV_CUTOFF_PARAM, 0.0f, 0.2f, 0.0f, "Cutoff CV", "%", 0.0f, 500.0f);
 		configParam(Bass::CV_RESONANCE_PARAM, 0.0f, RESONANCE_MAX/5.0f, 0.0f, "Resonance CV", "%", 0.0f, 100.0f*1.0f/(RESONANCE_MAX/5.0f));
@@ -244,12 +247,14 @@ struct Bass : Module {
 	float accentAttackCurveInverse(float y);
 	float toExp(float x, float min, float max);
 	float accent_env(bool gateRising, bool accent, float knob_accent, float dt);
+	void setEnvMod(bool envmod_oct);
 	void process(const ProcessArgs &args) override;
 
 	json_t *dataToJson() override {
 		json_t *root = json_object();
 		json_object_set_new(root, "gateInput", json_boolean(gateInputType));
 		json_object_set_new(root, "oversample", json_integer(current_oversample));
+		json_object_set_new(root, "envmod_oct", json_boolean(useOctaveEnvMod));
 		//json_object_set_new(root, "Gcomp", json_real((double) priority));
 		return root;
 	}
@@ -265,6 +270,15 @@ struct Bass : Module {
 				current_oversample = 4;
 			}
 		}
+		json_t *ext_env = json_object_get(rootJ, "envmod_oct");
+		if (ext_env) {
+			// Tag found: Load the saved state
+			setEnvMod(json_boolean_value(ext_env));
+		} else {
+			// Tag not found: This is an old patch.
+			// Force Legacy (Hz) mode to preserve the old sound.
+			setEnvMod(false);
+		}
 		//json_t *ext2 = json_object_get(rootJ, "Gcomp");
 		//if (ext2)
 		//	priority = (float) json_number_value(ext2);
@@ -273,6 +287,7 @@ struct Bass : Module {
 	void onReset(const ResetEvent& e) override {
 		priority = 1.0f;
 		gateInputType = true;
+		setEnvMod(true);
 		schmittGate.reset();
 		schmittButton.reset();
 		Module::onReset(e);
@@ -323,7 +338,8 @@ Questions
 Was there any sustain on VCA or VCF? What happens when the note gate closes? [found out]
 What was VCF attack for accent? And was it linear, exp or something else? [soft, not linear]
 What was ENV MOD range? Was it absolute or a fraction of current cutoff setting. [It was number of octaves depending on knob. Fixed Hz atm.]
-Was the slide really at beginning of next note and 60ms? [Yes, and gate stayed open so note 2 would use note 1's envelope)
+Was the slide really at beginning of next note and 60ms? [Yes, and gate stayed open so note 2 would use note 1's envelope]
+DECAY_VCA_SECS should be 3500, not sure if I will change it.
 
 Some of the sources used:
 - Devilfish manual and webpage
@@ -409,16 +425,21 @@ void Bass::process(const ProcessArgs &args) {
 	}
 
 	//float cutoff_setting = this->toExp(knob_cutoff, CUTOFF_KNOB_MIN, CUTOFF_KNOB_MAX);
-	float cutoff_setting = CUTOFF_KNOB_MIN * std::exp2f(knob_cutoff * LOG2_CUTOFF_RANGE);// much faster
-/*
-    // Autinn way:
-	float range_hz = knob_envmod * CUTOFF_RANGE_FOR_ENVELOPE + CUTOFF_ENVMOD_MIN;//knob_envmod * maxf(cutoff_setting * 2.0f, CUTOFF_RANGE_FOR_ENVELOPE) + CUTOFF_ENVMOD_MIN;
-	float cutoff_env_Hz = (cutoff_env_norm-CUTOFF_ENVELOPE_BIAS) * range_hz;// Can be negative
-	float cutoff_hz = cutoff_setting+cutoff_env_Hz;
-*/
-	// 303 way:
-	float mod_octaves = knob_envmod * 5.0f;
-	float cutoff_hz = cutoff_setting * std::exp2f((cutoff_env_norm - CUTOFF_ENVELOPE_BIAS) * mod_octaves);
+	float cutoff_setting_hz = CUTOFF_KNOB_MIN * std::exp2f(knob_cutoff * LOG2_CUTOFF_RANGE);// much faster
+
+	float cutoff_hz;
+	if (useOctaveEnvMod) {
+		// TB way:
+    	float envmod_octaves = knob_envmod * CUTOFF_ENVMOD_OCT;
+
+		// cutoff_setting is 31% of sweep range from high to low.
+		cutoff_hz = cutoff_setting_hz * std::exp2f((cutoff_env_norm - CUTOFF_ENVELOPE_BIAS) * envmod_octaves);
+	} else {
+		// Autinn old way:
+		float range_hz = knob_envmod * CUTOFF_RANGE_FOR_ENVELOPE + CUTOFF_ENVMOD_MIN;//knob_envmod * maxf(cutoff_setting * 2.0f, CUTOFF_RANGE_FOR_ENVELOPE) + CUTOFF_ENVMOD_MIN;
+		float cutoff_env_Hz = (cutoff_env_norm-CUTOFF_ENVELOPE_BIAS) * range_hz;// Can be negative
+		cutoff_hz = cutoff_setting_hz+cutoff_env_Hz;
+	}
 
 	cutoff_hz = clamp(cutoff_hz, CUTOFF_MIN, CUTOFF_MAX);
 
@@ -531,6 +552,25 @@ float Bass::accentAttackCurveInverse(float y) {
 float Bass::toExp(float xx, float min, float max) {
 	// 0 to 1 to exp range
 	return min * expf( xx*logf(max/min) );
+}
+
+void Bass::setEnvMod(bool oct) {
+	useOctaveEnvMod = oct;
+
+	// Get the existing parameter quantity
+	auto* pq = paramQuantities[ENVMOD_PARAM];
+
+	if (useOctaveEnvMod) {
+		pq->unit = " Oct";
+		pq->displayMultiplier = CUTOFF_ENVMOD_OCT;
+		pq->displayOffset = 0.0f;
+		pq->displayPrecision = 3;
+	} else {
+		pq->unit = " Hz";
+		pq->displayMultiplier = CUTOFF_RANGE_FOR_ENVELOPE;
+		pq->displayOffset = CUTOFF_ENVMOD_MIN;
+		pq->displayPrecision = 5;
+	}
 }
 
 
@@ -969,6 +1009,19 @@ struct PrioMenuItem : MenuItem {
 	}
 };
 
+struct EnvModModeItem : MenuItem {
+	Bass* _module;
+	EnvModModeItem(Bass* module) : _module(module) {
+		this->text = "ENVMOD Octaves mode";
+	}
+	void onAction(const event::Action &e) override {
+		_module->setEnvMod(!_module->useOctaveEnvMod);
+	}
+	void step() override {
+		rightText = _module->useOctaveEnvMod ? "✔" : "";
+	}
+};
+
 struct BassWidget : ModuleWidget {
 	BassWidget(Bass *module) {
 		setModule(module);
@@ -1049,7 +1102,8 @@ struct BassWidget : ModuleWidget {
 		menu->addChild(new MenuLabel());
 		menu->addChild(new OversampleBassMenuItem(a, "Oversample x2", 2));
 		menu->addChild(new OversampleBassMenuItem(a, "Oversample x4", 4));
-		//menu->addChild(new MenuLabel());
+		menu->addChild(new MenuLabel());
+		menu->addChild(new EnvModModeItem(a));
 		//menu->addChild(new ResTuneMenuItem(a, "Tuned Resonance"));
 		//menu->addChild(new MenuLabel());
 		//menu->addChild(new PoleMenuItem(a, "1st Pole Oct Up"));
