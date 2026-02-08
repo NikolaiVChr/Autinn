@@ -107,7 +107,13 @@ struct DigiWidget : ModuleWidget {
 		//addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
 		//addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 75), module, Digi::STEP_PARAM));
+		//addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 75), module, Digi::STEP_PARAM));
+		auto stepKnob = createParam<AutinnArcMidKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 75), module, Digi::STEP_PARAM);
+		stepKnob->setModulation(Digi::CV_INPUT, [](float cv, float val, float att) {
+					return clamp(val + cv*att, 0.0f, 1.0f);
+				}, Digi::CV_PARAM);
+		addParam(stepKnob);
+
 		addInput(createInput<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 140), module, Digi::CV_INPUT));
 		addParam(createParam<RoundSmallAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_SMALL, 175), module, Digi::CV_PARAM));
 
