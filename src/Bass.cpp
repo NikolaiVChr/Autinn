@@ -197,7 +197,7 @@ struct Bass : Module {
 		configParam(Bass::CUTOFF_PARAM, 0.0f, 1.0f, 0.25f, "Cutoff"," Hz",CUTOFF_KNOB_MAX/CUTOFF_KNOB_MIN, CUTOFF_KNOB_MIN);
 		configParam<Param4Digits>(Bass::RESONANCE_PARAM, 0.0f, RESONANCE_MAX, 0.85f, "Resonance", "%", 0.0f, 100.0f);
 		configParam(Bass::ENV_DECAY_PARAM, DECAY_VCF_MIN, DECAY_VCF_MAX, (DECAY_VCF_MIN+DECAY_VCF_MAX)*0.5f, "Decay", " ms", 0.0f, 1000.0f);
-		configParam(Bass::ENVMOD_PARAM, 0.0f, 1.0f, 0.25f, "Sweep range", " Hz", 0.0f, CUTOFF_RANGE_FOR_ENVELOPE, CUTOFF_ENVMOD_MIN);
+		configParam<Param3Digits>(Bass::ENVMOD_PARAM, 0.0f, 1.0f, 0.25f, "Sweep range", " Oct", 0.0f, 5.0f, 0.0f);
 		configParam<Param3Digits>(Bass::ACCENT_PARAM, ACCENT_KNOB_MINIMUM, 1.0f, 0.75f, "Accent", "%", 0.0f, 100.0f);
 		configParam(Bass::CV_CUTOFF_PARAM, 0.0f, 0.2f, 0.0f, "Cutoff CV", "%", 0.0f, 500.0f);
 		configParam(Bass::CV_RESONANCE_PARAM, 0.0f, RESONANCE_MAX/5.0f, 0.0f, "Resonance CV", "%", 0.0f, 100.0f*1.0f/(RESONANCE_MAX/5.0f));
@@ -302,11 +302,11 @@ Make more params for a Bass+ module:
 - accent decay
 Make first filter pole's cutoff be 1 octave higher like in the TB-303 (use the float g2) Maybe means increasing the max resonance again. https://www.kvraudio.com/forum/viewtopic.php?f=33&t=257220
 - Tried it, did not sound super, this needs to be done proper if done, and all filter tunings redone.
-Consider an option for oversampling like Flora has.
+Consider an option for oversampling like Flora has. [done]
 Proper slew on accent env on top of VCA [done]
 Stacking is only VCF not VCA [done]
 Filter env goes negative and gimmick circuit [done]
-Accent is gate and can be done at any time
+Accent is gate and can be done at any time [atm. can be done during attack phase]
 
 From devilfish manual:  (devilfish was a modified TB-303 that has more knobs and greater range on the knobs)
 ======================
@@ -322,8 +322,8 @@ Questions
 =========
 Was there any sustain on VCA or VCF? What happens when the note gate closes? [found out]
 What was VCF attack for accent? And was it linear, exp or something else? [soft, not linear]
-What was ENV MOD range? Was it absolute or a fraction of current cutoff setting. [Tried both, settled for fixed]
-Was the slide really at beginning of next note and 60ms?
+What was ENV MOD range? Was it absolute or a fraction of current cutoff setting. [It was number of octaves depending on knob. Fixed Hz atm.]
+Was the slide really at beginning of next note and 60ms? [Yes, and gate stayed open so note 2 would use note 1's envelope)
 
 Some of the sources used:
 - Devilfish manual and webpage
@@ -410,12 +410,15 @@ void Bass::process(const ProcessArgs &args) {
 
 	//float cutoff_setting = this->toExp(knob_cutoff, CUTOFF_KNOB_MIN, CUTOFF_KNOB_MAX);
 	float cutoff_setting = CUTOFF_KNOB_MIN * std::exp2f(knob_cutoff * LOG2_CUTOFF_RANGE);// much faster
-
+/*
+    // Autinn way:
 	float range_hz = knob_envmod * CUTOFF_RANGE_FOR_ENVELOPE + CUTOFF_ENVMOD_MIN;//knob_envmod * maxf(cutoff_setting * 2.0f, CUTOFF_RANGE_FOR_ENVELOPE) + CUTOFF_ENVMOD_MIN;
-
 	float cutoff_env_Hz = (cutoff_env_norm-CUTOFF_ENVELOPE_BIAS) * range_hz;// Can be negative
-	
 	float cutoff_hz = cutoff_setting+cutoff_env_Hz;
+*/
+	// 303 way:
+	float mod_octaves = knob_envmod * 5.0f;
+	float cutoff_hz = cutoff_setting * std::exp2f((cutoff_env_norm - CUTOFF_ENVELOPE_BIAS) * mod_octaves);
 
 	cutoff_hz = clamp(cutoff_hz, CUTOFF_MIN, CUTOFF_MAX);
 
