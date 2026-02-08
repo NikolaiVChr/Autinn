@@ -615,9 +615,17 @@ void Melody::process(const ProcessArgs &args) {
 			}
 		} else {
 			float out_prev = this->note2vPoct(phrase[c][prev_idx]);
-			float glideTime = std::min(float(double(clockCount_last[c])*gap[c]), GLIDE_MAXIMUM/args.sampleTime);
+
+			// glides are constant time (60ms),
+			// but constrained by the step length so they don't overrun into the next step if the tempo is crazy fast.
+			float noteSamples = float(clockCount_last[c]);
+			float maxSlideSamples = GLIDE_MAXIMUM / args.sampleTime;
+
+			// Use the full note duration as the upper limit
+			float glideTime = std::min(noteSamples, maxSlideSamples);
 			if (glideTime > 0.0f) {
-				outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount[c], 0, glideTime, out_prev, out), out_prev, out), c);// 60ms glide at start of note
+				// 60ms glide at start of note if prev note was marked as glide:
+				outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(float(clockCount[c]), 0, glideTime, out_prev, out), out_prev, out), c);
 			} else {
 				// prevent divide by zero
 				outputs[FREQ_OUTPUT].setVoltage(out, c);
