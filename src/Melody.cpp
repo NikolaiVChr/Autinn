@@ -570,11 +570,12 @@ void Melody::process(const ProcessArgs &args) {
 			*/
 		if (clockTrigger[c].process(inputs[CLOCK_INPUT].getPolyVoltage(clock_idx))) {
 			if (resting[c] == 0) {
-				if (passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1) {
-					passedClocks[c] = 0;
-					phrase_index[c]++;
+				// we are not in rest inbetween phrases
+				if (passedClocks[c] >= phraseDurations[c][phrase_index[c]]) {//TODO: Used to be phraseDurations[c][phrase_index[c]]-1, but that was flawed.
+					passedClocks[c] = 0;// reset clock index
+					phrase_index[c]++;// increment note index
 				} else {
-					passedClocks[c]++;
+					passedClocks[c]++;// increment clock index
 				}
 			} else {
 				resting[c]--;
@@ -609,6 +610,7 @@ void Melody::process(const ProcessArgs &args) {
 		}
 		float out = this->note2vPoct(phrase[c][phrase_index[c]]);
 		if (!slideFromPrev || passedClocks[c] > 0) {
+			// No slide or not at start of note, but inside it.
 			if (resting[c] == 0) {
 				// Only if not between phrase do we set voltage, so that previous voltage can be allowed to 'decay' if envelope is put on output.
 				outputs[FREQ_OUTPUT].setVoltage(out, c);
