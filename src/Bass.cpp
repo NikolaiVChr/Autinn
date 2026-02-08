@@ -808,7 +808,7 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected, 
 	in += 1e-16f;
 	float voltage_drive = VCV_TO_MOOG*INPUT_TO_CAPACITOR;// 0.18 to convert from VCV audio rate voltages. 0.035 to convert from input to voltage over first capacitor.
 	in *= voltage_drive;
-	F_s   = dt*float(oversample_protected);
+	F_s   = APP->engine->getSampleRate()*float(oversample_protected);
 
 	auto w_c = float(2.0f*M_PI*F_c/F_s);// cutoff in radians per sample.
 	//g = V_t * (0.0008116984f + 0.9724111f*w_c - 0.5077766f*w_c*w_c + 0.1534058f*w_c*w_c*w_c);// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
