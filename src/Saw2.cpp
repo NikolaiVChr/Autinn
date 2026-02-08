@@ -140,7 +140,7 @@ struct Saw2 : Module {
 
 		for (int c = 0; c < channels; c++) {
 			float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
-			cv_age *= 10.0f;
+			cv_age *= 4.0f;
 
 			// 30Hz is the magic number for a new TB-303 capacitor droop
 			const float age = clamp(cv_age+params[AGE_PARAM].getValue(), 0.0f, 60.0f);
@@ -280,7 +280,7 @@ struct Saw2Widget : ModuleWidget {
 		// 2. Math:   Simple Linear. 5V input adds 1.0 to the parameter (Full Sweep).
 		//            (Input * 0.2 means 5V becomes 1.0)
 		ageKnob->setModulation(Saw2::CV_AGE_INPUT, [](float cv, float val, float att) {
-			return clamp(val + (cv * 10.0f), 0.0f, 60.0f);
+			return clamp(val + (cv * 4.0f), 0.0f, 60.0f);
 		});
 
 		addParam(ageKnob);
