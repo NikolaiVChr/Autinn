@@ -118,6 +118,8 @@ struct Melody : Module {
 	std::vector<bool> nextPhraseAccents[16] = {};
 	/// @brief Current phrase note glide bools.
 	std::vector<bool> phraseGlides[16] = {};
+	/// @brief If gliding also mean keep gate open when doing that.
+	bool closeGateWhenGliding = false;
 	/// @brief Next phrase note glide bools.
 	std::vector<bool> nextPhraseGlides[16] = {};
 
@@ -599,17 +601,21 @@ void Melody::process(const ProcessArgs &args) {
 		outputs[START_PHRASE_OUTPUT].setVoltage(p1 ? 10.0f : 0.0f, c);
 		outputs[NEW_PHRASE_OUTPUT].setVoltage(p2 ? 10.0f : 0.0f, c);
 
+		int prev_idx = phrase_index[c] - 1;
+		if (prev_idx < 0) prev_idx = phrase_length[c] - 1;
+		bool slideFromPrev= phraseGlides[c][prev_idx];
+		if (phrase_index[c] == 0 && rest_amount[c] > 0) {
+			slideFromPrev = false;
+		}
 		float out = this->note2vPoct(phrase[c][phrase_index[c]]);
-		if (!phraseGlides[c][phrase_index[c]] || passedClocks[c] > 0) {
+		if (!slideFromPrev || passedClocks[c] > 0) {
 			if (resting[c] == 0) {
 				// Only if not between phrase do we set voltage, so that previous voltage can be allowed to 'decay' if envelope is put on output.
 				outputs[FREQ_OUTPUT].setVoltage(out, c);
 			}
 		} else {
-			int phrase_index_prev = phrase_index[c] - 1;
-			if (phrase_index_prev < 0) phrase_index_prev = phrase_length[c] - 1;
-			float out_prev = this->note2vPoct(phrase[c][phrase_index_prev]);
-			float glideTime = fmin(float(double(clockCount_last[c])*gap[c]), GLIDE_MAXIMUM/args.sampleTime);
+			float out_prev = this->note2vPoct(phrase[c][prev_idx]);
+			float glideTime = std::min(float(double(clockCount_last[c])*gap[c]), GLIDE_MAXIMUM/args.sampleTime);
 			if (glideTime > 0.0f) {
 				outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(clockCount[c], 0, glideTime, out_prev, out), out_prev, out), c);// 60ms glide at start of note
 			} else {
@@ -618,11 +624,20 @@ void Melody::process(const ProcessArgs &args) {
 			}
 		}
 		outputs[ACCENT_OUTPUT].setVoltage(float(phraseAccents[c][phrase_index[c]])*10.0f, c);
-		if (resting[c] > 0 || (clockCount[c] > clockCount_last[c]*gap[c] && passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1)) {// Normal
+
+		bool isGliding = phraseGlides[c][phrase_index[c]];
+		bool isGap = (clockCount[c] > clockCount_last[c]*gap[c] && passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1);
+		if (phrase_index[c] == phrase_length[c] - 1 && rest_amount[c] > 0) {
+			isGliding = false;
+		}
+
+		if (resting[c] > 0 || (isGap && (closeGateWhenGliding || !isGliding))) {
+			// We drop the gate only if we are in the Gap time, and we are not gliding to the next note (unless closeGateWhenGliding==true).
 			outputs[GATE_OUTPUT].setVoltage(0.0f, c);
 		} else {
 			outputs[GATE_OUTPUT].setVoltage(10.0f, c);
 		}
+
 		//clockExt_prev[c] = clockExt;
 	}
 }
