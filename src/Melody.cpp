@@ -120,6 +120,8 @@ struct Melody : Module {
 	std::vector<bool> phraseGlides[16] = {};
 	/// @brief If gliding mean keep gate open instead of making a rest before the sliding note
 	bool gateOnWhenGliding = false;
+	/// @brief When true, the note before the glide is always 1-clock duration.
+	bool only1step = false;
 	/// @brief Next phrase note glide bools.
 	std::vector<bool> nextPhraseGlides[16] = {};
 
@@ -243,6 +245,7 @@ struct Melody : Module {
 	    json_t *root = json_object();
 
 		json_object_set_new(root, "gateOnWhenGliding", json_boolean(gateOnWhenGliding));
+		json_object_set_new(root, "only1stepBeforeGlide", json_boolean(only1step));
 
 		json_t *voicesJ = json_array();
 
@@ -291,6 +294,10 @@ struct Melody : Module {
 		json_t *keepOpen = json_object_get(root, "gateOnWhenGliding");
 		if (keepOpen)
 			gateOnWhenGliding = json_boolean_value(keepOpen);
+
+		json_t *only1 = json_object_get(root, "only1stepBeforeGlide");
+		if (only1)
+			only1step = json_boolean_value(only1);
 
 		if (voicesJ) {
 			for (int c = 0; c < 16; c++) {
@@ -760,7 +767,11 @@ void Melody::generateMelody (int c) {
 	for (int i = 0; i < next_phrase_length; i++) {
 		nextPhraseDurations[c].push_back(1 + (int)(rack::random::uniform() * 2)); // 1 or 2
 		nextPhraseAccents[c].push_back((rack::random::uniform() * 100.0f) < chance);
-		nextPhraseGlides[c].push_back((i==0?false:(rack::random::uniform() * 100.0f) < chance_g));//the first note does never glide
+		bool glide = (i==0?false:(rack::random::uniform() * 100.0f) < chance_g);//the first note does never glide
+		nextPhraseGlides[c].push_back(glide);
+		if (only1step && glide) {
+			nextPhraseDurations[c][i-1] = 1;
+		}
 	}
 
 	// Rest
@@ -920,7 +931,6 @@ struct MelodyWidget : ModuleWidget {
 		}
 	};
 
-	/*
 	struct GlideOldItem : MenuItem {
 		Melody* _module;
 
@@ -930,14 +940,13 @@ struct MelodyWidget : ModuleWidget {
 		}
 
 		void onAction(const event::Action& e) override {
-			_module->oldGlides = !_module->oldGlides;
+			_module->only1step = !_module->only1step;
 		}
 		void step() override {
-			rightText = (_module->oldGlides) ? "✔" : "";
+			rightText = (_module->only1step) ? "✔" : "";
 			MenuItem::step();
 		}
 	};
-	*/
 
 	void appendContextMenu(Menu* menu) override {
 		auto* a = dynamic_cast<Melody*>(module);
@@ -945,7 +954,7 @@ struct MelodyWidget : ModuleWidget {
 
 		menu->addChild(new MenuLabel());
 		menu->addChild(new GlideGateItem(a, "Glides keeps gate open"));
-		//menu->addChild(new GlideOldItem(a, "Old glides"));
+		menu->addChild(new GlideOldItem(a, "Only 1-step before glides"));
 	}
 };
 
