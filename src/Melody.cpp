@@ -131,10 +131,10 @@ struct Melody : Module {
 	dsp::SchmittTrigger clockTrigger[16];
 	/// @brief Process steps counter tracking 'time' since the last clock pulse.
 	/// Used to calculate the linear interpolation for Glide effects.
-	long int clockCount[16] = {};
+	long int frameCount[16] = {};
 	/// @brief The total process steps duration of the previous clock cycle.
 	/// Used as a reference to ensure Glide timing scales relative to the BPM.
-	long int clockCount_last[16] = {};
+	long int frameCount_last[16] = {};
 	/// @brief Counter for how many clock ticks have passed during the current note.
 	/// Compares against #phraseDurations to determine when to advance to the next note.
 	int passedClocks[16] = {};
@@ -186,8 +186,8 @@ struct Melody : Module {
 			phrase_index[c] = 0;
 			passedClocks[c] = 0;
 			resting[c] = 0;
-			clockCount[c] = 0;
-			clockCount_last[c] = 0;
+			frameCount[c] = 0;
+			frameCount_last[c] = 0;
 			//clockExt_prev[c] = false;
 			clockTrigger[c].reset();
 
@@ -351,7 +351,7 @@ struct Melody : Module {
 				}
 				phrase_index[c] = 0;
 				passedClocks[c] = 0;
-				clockCount[c] = 0;
+				frameCount[c] = 0;
             }
 		} else {
 			json_t *sequence_json_array = json_object_get(root, JSON_SEQ);
@@ -549,48 +549,35 @@ void Melody::process(const ProcessArgs &args) {
 	for (int c = 0; c < active_voices; c++) {
 		int clock_idx = (clock_channels > 1) ? c : 0;
 
-		/*
-		float clockVolt = inputs[CLOCK_INPUT].getPolyVoltage(clock_idx);
-		bool clockExt = clockVolt >= 1.0f;
-		float start = 0.0f;
-		float newStart = 0.0f;
-
-		if (clockExt && !clockExt_prev[c]) {
-			*/
 		if (clockTrigger[c].process(inputs[CLOCK_INPUT].getPolyVoltage(clock_idx))) {
 			if (resting[c] == 0) {
 				// we are not in rest inbetween phrases
-				//int old = oldGlides?-1:0;
+				passedClocks[c]++;// increment clock index
 				if (passedClocks[c] >= phraseDurations[c][phrase_index[c]]) {
 					passedClocks[c] = 0;// reset clock index
 					phrase_index[c]++;// increment note index
-				} else {
-					passedClocks[c]++;// increment clock index
 				}
 			} else {
 				resting[c]--;
 			}
 			if (phrase_index[c] > phrase[c].size() - 1) {
+				// this will set index to 0 and resting to rest_amount
 				switch_to_next_phrase(c);
 			}
-			clockCount_last[c] = clockCount[c];
-			clockCount[c] = 0;
-
-
-			//outputs[START_PHRASE_OUTPUT].setVoltage(start, c);
-			//outputs[NEW_PHRASE_OUTPUT].setVoltage(newStart, c);
+			frameCount_last[c] = frameCount[c];
+			frameCount[c] = 0;
 		} else {
-			clockCount[c]++;
-			if (clockCount[c] > 10000000) {
-				clockCount[c] = 0;
+			frameCount[c]++;
+			if (frameCount[c] > 10000000) {
+				frameCount[c] = 0;
 			}
 		}
 
-		bool p1 = startPulse[c].process(args.sampleTime);
-		bool p2 = newPhrasePulse[c].process(args.sampleTime);
+		bool startPulse = startPulse[c].process(args.sampleTime);
+		bool startNewPulse = newPhrasePulse[c].process(args.sampleTime);
 
-		outputs[START_PHRASE_OUTPUT].setVoltage(p1 ? 10.0f : 0.0f, c);
-		outputs[NEW_PHRASE_OUTPUT].setVoltage(p2 ? 10.0f : 0.0f, c);
+		outputs[START_PHRASE_OUTPUT].setVoltage(startPulse ? 10.0f : 0.0f, c);
+		outputs[NEW_PHRASE_OUTPUT].setVoltage(startNewPulse ? 10.0f : 0.0f, c);
 
 
 		bool gliding = phraseGlides[c][phrase_index[c]];//slide in present.
@@ -604,7 +591,7 @@ void Melody::process(const ProcessArgs &args) {
 
 			// glides are constant time (60ms),
 			// but constrained by the step length so they don't overrun into the next step if the tempo is crazy fast.
-			auto clockFrames = float(clockCount_last[c]);
+			auto clockFrames = float(frameCount_last[c]);
 			float maxGlideFrames = GLIDE_MAXIMUM / args.sampleTime;
 			float glideFrames;
 			// Use the full note duration as the upper limit
@@ -612,7 +599,7 @@ void Melody::process(const ProcessArgs &args) {
 
 			if (glideFrames > 0.0f) {
 				// 60ms glide at start of note if prev note was marked as glide:
-				outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(float(clockCount[c]), 0, glideFrames, out_prev, out), out_prev, out), c);
+				outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(float(frameCount[c]), 0, glideFrames, out_prev, out), out_prev, out), c);
 			} else {
 				// prevent divide by zero
 				outputs[FREQ_OUTPUT].setVoltage(out, c);
@@ -627,7 +614,7 @@ void Melody::process(const ProcessArgs &args) {
 		outputs[ACCENT_OUTPUT].setVoltage(float(phraseAccents[c][phrase_index[c]])*10.0f, c);
 
 		bool isNextGliding = phrase_index[c]==phrase[c].size()-1?false:phraseGlides[c][phrase_index[c]];
-		bool isGap = (clockCount[c] > clockCount_last[c]*gap[c] && passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1);
+		bool isGap = (frameCount[c] > frameCount_last[c]*gap[c] && passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1);
 		bool keepGateOpenForGlide = isNextGliding && gateOnWhenGliding;
 		if (resting[c] > 0 || (isGap && !keepGateOpenForGlide)) {
 			// We drop the gate only if we are in the Gap time, and we are not gliding to the next note (unless closeGateWhenGliding==true).
