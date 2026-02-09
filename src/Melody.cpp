@@ -595,10 +595,10 @@ void Melody::process(const ProcessArgs &args) {
 		int prev_idx = phrase_index[c] - 1;
 		if (prev_idx < 0) prev_idx = phrase[c].size() - 1;
 		bool slideFromPrev= phraseGlides[c][prev_idx];
+		if (oldGlides) slideFromPrev = phraseGlides[c][phrase_index[c]];//slide in present.
 		if (phrase_index[c] == 0 && rest_amount[c] > 0) {
 			slideFromPrev = false;
 		}
-		if (oldGlides) slideFromPrev = phraseGlides[c][phrase_index[c]];//slide in present.
 		float out = this->note2vPoct(phrase[c][phrase_index[c]]);
 		if (!slideFromPrev || passedClocks[c] > 0) {
 			// No slide, or not at start of note, but inside it.
