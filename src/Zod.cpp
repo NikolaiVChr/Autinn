@@ -398,10 +398,10 @@ void Zod::process(const ProcessArgs &args) {
 		writeIndex++;
 		if (writeIndex >= BUFFER_SIZE) writeIndex = 0;
 
-		double stereo = std::abs(left) + std::abs(right);
+		double stereo = std::max(std::abs(left), std::abs(right));
 
 		if (inputs[SIDE_LEFT_INPUT].isConnected() || inputs[SIDE_RIGHT_INPUT].isConnected()) {
-			stereo = std::abs(inputs[SIDE_LEFT_INPUT].getVoltage()) + std::abs(inputs[SIDE_RIGHT_INPUT].getVoltage());
+			stereo = std::max(std::abs(inputs[SIDE_LEFT_INPUT].getVoltage()), std::abs(inputs[SIDE_RIGHT_INPUT].getVoltage()));
 		}
 
 		double knee = params[KNEE_PARAM].getValue();//dB

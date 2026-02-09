@@ -401,17 +401,18 @@ void Non::process(const ProcessArgs &args) {
 		bufferR[writeIndex] = right;
 
 		// Read from ring buffer (Lookahead D samples behind)
-		// We add 256 to ensure the result is positive before modulo
+		// We add to ensure the result is positive before modulo
 		int readIndex = (writeIndex - (int)D + BUFFER_SIZE) % BUFFER_SIZE;
 		float pastL = bufferL[readIndex];
 		float pastR = bufferR[readIndex];
 
-		// Increment index wrapping around 256
+		// Increment index wrapping
 		writeIndex = (writeIndex + 1) % BUFFER_SIZE;
-		double stereo = left + right;
+
+		double stereo = std::max(std::abs(left), std::abs(right));
 
 		if (inputs[SIDE_LEFT_INPUT].isConnected() || inputs[SIDE_RIGHT_INPUT].isConnected()) {
-			stereo = inputs[SIDE_LEFT_INPUT].getVoltage() + inputs[SIDE_RIGHT_INPUT].getVoltage();
+			stereo = std::max(std::abs(inputs[SIDE_LEFT_INPUT].getVoltage()), std::abs(inputs[SIDE_RIGHT_INPUT].getVoltage()));
 		}
 
 		// some values:
