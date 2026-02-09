@@ -73,7 +73,7 @@ struct Kicker : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(FREQ_PARAM, 30.0f, 200.0f, dsp::FREQ_C4/4.0f, "Tune", " Hz");
         configParam<Param3Digits>(VOL_DECAY_PARAM, 0.1f, 0.8f, 0.2f, "Vol Decay", " s");
-        configParam<Param4Digits>(SWEEP_PARAM, 0.0f, 1.4f, 1.0f, "Sweep", "%",0, 100);
+        configParam<Param4Digits>(SWEEP_PARAM, 0.0f, 1.4f, 0.35f, "Sweep", "%",0, 100);
         configParam<Param4Digits>(CLICK_PARAM, 0.0f, 1.0f, 0.5f, "Click", "%",0, 100);
         configParam<Param3Digits>(DRIVE_PARAM, 0.0f, 5.0f, 1.0f, "Drive", ""); // 0 to 5x gain
         configParam<Param3Digits>(PITCH_DECAY_PARAM, 0.005f, 0.1f, 0.035f, "Pitch Decay", " ms",0,1000);
@@ -183,7 +183,11 @@ void Kicker::process(const ProcessArgs &args) {
 
         // Sound Generation
 
-        // Main Body (Sine)
+        // We use a sine for body with the freq from knob and apply the pitch sweep onto it plus the vca envelope.
+        // The vca envelope is linear at high decay knob settings, and squared at low settings.
+        // We make a click from filtered noise.
+        // Then we apply some drive gain to it all.
+
         float body = sin(phase[c] * 2.0f * M_PI);
         
         // Click (Short burst of noise)
@@ -203,11 +207,13 @@ void Kicker::process(const ProcessArgs &args) {
         // So no clicking when turn the knob.
         float finalVcaEnv = squaredEnv + (linearEnv - squaredEnv) * envBlend;
 
+        // click
         float filteredClick = lastClickFilter[c] + clickAlpha * (white - lastClickFilter[c]);
         lastClickFilter[c] = filteredClick;
-
-        // Short envelope
-        float click = filteredClick * (pitchEnv[c] * pitchEnv[c]) * clickLevel;
+        float highPass = white - filteredClick;// reverse the filter, cause to lazy to change the code
+        float pEnv2 = pitchEnv[c] * pitchEnv[c];
+        float clickEnv = pEnv2 * pEnv2;
+        float click = highPass * clickEnv * clickLevel;
 
         // Mix & Saturate
         float signal = (body * finalVcaEnv + click) * drive;
