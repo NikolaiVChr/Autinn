@@ -573,11 +573,11 @@ void Melody::process(const ProcessArgs &args) {
 			}
 		}
 
-		bool startPulse = startPulse[c].process(args.sampleTime);
-		bool startNewPulse = newPhrasePulse[c].process(args.sampleTime);
+		bool startSignal = startPulse[c].process(args.sampleTime);
+		bool startNewSignal = newPhrasePulse[c].process(args.sampleTime);
 
-		outputs[START_PHRASE_OUTPUT].setVoltage(startPulse ? 10.0f : 0.0f, c);
-		outputs[NEW_PHRASE_OUTPUT].setVoltage(startNewPulse ? 10.0f : 0.0f, c);
+		outputs[START_PHRASE_OUTPUT].setVoltage(startSignal ? 10.0f : 0.0f, c);
+		outputs[NEW_PHRASE_OUTPUT].setVoltage(startNewSignal ? 10.0f : 0.0f, c);
 
 
 		bool gliding = phraseGlides[c][phrase_index[c]];//slide in present.
