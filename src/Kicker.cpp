@@ -25,10 +25,11 @@
 struct Kicker : Module {
     enum ParamIds {
         FREQ_PARAM,
-        DECAY_PARAM,
+        VOL_DECAY_PARAM,
         SWEEP_PARAM, // Pitch Envelope Depth
         CLICK_PARAM, // Transient Level
         DRIVE_PARAM,
+        PITCH_DECAY_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
@@ -60,21 +61,22 @@ struct Kicker : Module {
     int stepDivider = 33;
     float noiseGain = 1.0f;
     float baseFreq = 60.0f;
-    float sweepDepth = 0.0f;
+    float sweepDepthOct = 0.0f;
     float clickLevel = 0.0f;
     float drive = 1.0f;
     float clickAlpha = 0.0f;
-    float decayCoeff = 0.0f;
+    float vcaDecayCoeff = 0.0f;
     float pitchDecayCoeff = 0.0f;
     float envBlend = 0.0f;
 
     Kicker() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(FREQ_PARAM, 30.0f, 200.0f, dsp::FREQ_C4/4.0f, "Tune", " Hz");
-        configParam<Param3Digits>(DECAY_PARAM, 0.1f, 0.8f, 0.2f, "Decay", " s");
-        configParam<Param4Digits>(SWEEP_PARAM, 0.0f, 1.0f, 1.0f, "Sweep", "%",0, 100);
+        configParam<Param3Digits>(VOL_DECAY_PARAM, 0.1f, 0.8f, 0.2f, "Vol Decay", " s");
+        configParam<Param4Digits>(SWEEP_PARAM, 0.0f, 1.4f, 1.0f, "Sweep", "%",0, 100);
         configParam<Param4Digits>(CLICK_PARAM, 0.0f, 1.0f, 0.5f, "Click", "%",0, 100);
         configParam<Param3Digits>(DRIVE_PARAM, 0.0f, 5.0f, 1.0f, "Drive", ""); // 0 to 5x gain
+        configParam<Param3Digits>(PITCH_DECAY_PARAM, 0.005f, 0.1f, 0.035f, "Pitch Decay", " ms",0,1000);
 
         configInput(TRIG_INPUT, "Trigger");
         configInput(VOCT_INPUT, "V/Oct");
@@ -114,31 +116,25 @@ void Kicker::process(const ProcessArgs &args) {
         noiseGain = std::sqrt(args.sampleRate / 44100.0f);
 
         baseFreq = params[FREQ_PARAM].getValue();
-        sweepDepth = params[SWEEP_PARAM].getValue() * 400.0f;
+        sweepDepthOct = params[SWEEP_PARAM].getValue() * 5.0f;
         clickLevel = params[CLICK_PARAM].getValue();
         drive = 1.0f + params[DRIVE_PARAM].getValue();
+        float decayValVca = params[VOL_DECAY_PARAM].getValue();
+        float decayValPitch = params[PITCH_DECAY_PARAM].getValue();
 
         // We calculate a new coefficient clickAlpha that keeps the 2500Hz tone
         // regardless of the user's sample rate.
         float clickCutoffFreq = 2500.0f;
         clickAlpha = 1.0f - std::exp(-2.0f * M_PI * clickCutoffFreq * dt);
 
-        // envelope decay by 60dB (factor of 0.001) over decayTime seconds.
-        // Coefficient = exp(-6.9 / (decayTime * SampleRate))
-        //float decayParam = params[DECAY_PARAM].getValue();
-        //float decayCoeff = 1.0f - (6.9f * dt / decayParam);
-        //decayCoeff = clamp(decayCoeff, 0.999f, 0.99999f); // Safety limits
-        float decayVal = std::max(params[DECAY_PARAM].getValue(), 0.01f);
-        decayCoeff = std::exp(-1.0f / (decayVal * args.sampleRate));
+        // vca envelope decay
+        vcaDecayCoeff = std::exp(-1.0f / (decayValVca * args.sampleRate));
 
-        // Pitch envelope creates the "Thump" - needs to be faster than amp envelope
-        //float pitchDecayCoeff = 1.0f - (20.0f * dt); // Fixed fast decay for punch
-        //float pitchDecayCoeff = std::exp(-1.0f / (0.02f * args.sampleRate)); // 20ms fixed sweep
-        float pitchTime = 0.005f + (decayVal * 0.015f);
-        pitchDecayCoeff = std::exp(-1.0f / (pitchTime * args.sampleRate));
+        // Pitch envelope creates the thump - needs to be faster than amp envelope
+        pitchDecayCoeff = std::exp(-1.0f / (decayValPitch * args.sampleRate));
 
-        // Adaptive Envelope Blend
-        envBlend = clamp((decayVal - 0.4f) * 5.0f, 0.0f, 1.0f);
+        // Adaptive envelope blend
+        envBlend = clamp((decayValVca - 0.4f) * 5.0f, 0.0f, 1.0f);
     }
 
 
@@ -161,7 +157,7 @@ void Kicker::process(const ProcessArgs &args) {
         }
 
         // Envelopes
-        ampEnv[c] *= decayCoeff;
+        ampEnv[c] *= vcaDecayCoeff;
         pitchEnv[c] *= pitchDecayCoeff;
 
         // If both envelopes are effectively zero, go to sleep.
@@ -169,7 +165,7 @@ void Kicker::process(const ProcessArgs &args) {
             // Also prevents denormals
             ampEnv[c] = 0.0f;
             pitchEnv[c] = 0.0f;
-            activeState[c] = false; // Goodnight.
+            activeState[c] = false;
             outputs[AUDIO_OUTPUT].setVoltage(0.0f, c);
             continue;
         }
@@ -177,10 +173,7 @@ void Kicker::process(const ProcessArgs &args) {
         // Oscillator
         // Pitch = Base + V/Oct + SweepEnvelope
         float voct = inputs[VOCT_INPUT].getPolyVoltage(c);
-        //float pitchMod = sweepDepth * pitchEnv[c];
-        //float freq = baseFreq * powf(2.0f, voct) + pitchMod;
-        //float freq = baseFreq * powf(2.0f, voct + (pitchEnv[c] * 3.0f * params[SWEEP_PARAM].getValue()));
-        float mod = pitchEnv[c] * pitchEnv[c] * 5.0f * params[SWEEP_PARAM].getValue();
+        float mod = pitchEnv[c] * pitchEnv[c] * sweepDepthOct;
         float freq = baseFreq * std::exp2f(voct + mod);
 
 
@@ -193,13 +186,9 @@ void Kicker::process(const ProcessArgs &args) {
         // Main Body (Sine)
         float body = sin(phase[c] * 2.0f * M_PI);
         
-        // Click (Short burst of noise or high pitch sine at start)
-        // Add a tiny bit of squared envelope to the start
+        // Click (Short burst of noise)
         float white = (int32_t(noiseState[c] = noiseState[c] * 1664525 + 1013904223) >> 8) * (1.0f / 8388608.0f);
         white *= noiseGain;
-        //float click = white * pitchEnv[c] * pitchEnv[c] * clickLevel;
-        //float click = clamp(white * 5.0f, -1.0f, 1.0f) * pitchEnv[c] * pitchEnv[c] * clickLevel;
-        //float click = (std::rand() % 2000 / 1000.0f - 1.0f) * pitchEnv[c] * clickLevel;
 
         //Adaptive Envelope
         // If decay is short (< 0.5s), square the env to make it "Dry/Tight".
@@ -211,9 +200,8 @@ void Kicker::process(const ProcessArgs &args) {
         // When Knob < 0.4, factor is 0.0 (Pure Squared/Dry)
         // When Knob > 0.6, factor is 1.0 (Pure Linear/Boomy)
         // Between 0.4 and 0.6, it blends smoothly.
-
-        // no clicking when turn the knob.
-        float finalEnv = squaredEnv + (linearEnv - squaredEnv) * envBlend;
+        // So no clicking when turn the knob.
+        float finalVcaEnv = squaredEnv + (linearEnv - squaredEnv) * envBlend;
 
         float filteredClick = lastClickFilter[c] + clickAlpha * (white - lastClickFilter[c]);
         lastClickFilter[c] = filteredClick;
@@ -221,14 +209,8 @@ void Kicker::process(const ProcessArgs &args) {
         // Short envelope
         float click = filteredClick * (pitchEnv[c] * pitchEnv[c]) * clickLevel;
 
-        //float click = white * (pitchEnv[c] * pitchEnv[c]) * clickLevel;
-
-        // Apply adaptive envelope to body
-        float signal = (body * finalEnv + click) * drive;
-
         // Mix & Saturate
-        //float signal = (body + click) * ampEnv[c] * drive;
-        //float signal = (body * ampEnv[c] + click) * ampEnv[c] * drive;
+        float signal = (body * finalVcaEnv + click) * drive;
 
         // Fast Tanh approximation for Analog feel
         float x = signal;
@@ -258,20 +240,22 @@ struct KickerWidget : ModuleWidget {
 
         float down = 20;
         float up = 4 * RACK_GRID_WIDTH;
+        float fullX = this->getBox().size.x;
 
         // Row 1 (Large knobs)
         addParam(createParam<RoundMediumAutinnKnob>(Vec(34 - HALF_KNOB_MED, 60 + down - RACK_GRID_WIDTH/2), module, Kicker::FREQ_PARAM));
-        addParam(createParam<RoundMediumAutinnKnob>(Vec(101 - HALF_KNOB_MED, 60 + down - RACK_GRID_WIDTH/2), module, Kicker::DECAY_PARAM));
+        addParam(createParam<RoundMediumAutinnKnob>(Vec(101 - HALF_KNOB_MED, 60 + down - RACK_GRID_WIDTH/2), module, Kicker::VOL_DECAY_PARAM));
 
         // Row 2 (Small knobs)
-        addParam(createParam<RoundSmallAutinnKnob>(Vec(34 - HALF_KNOB_SMALL, 120 + down), module, Kicker::SWEEP_PARAM));
-        addParam(createParam<RoundSmallAutinnKnob>(Vec(101 - HALF_KNOB_SMALL, 120 + down), module, Kicker::CLICK_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(fullX * 0.25f, 120 + down + HALF_KNOB_SMALL), module, Kicker::SWEEP_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(fullX * 0.75f, 120 + down + HALF_KNOB_SMALL), module, Kicker::CLICK_PARAM));
 
-        // Row 3 (Drive - centered)
-        addParam(createParam<RoundSmallAutinnKnob>(Vec(67.5 - HALF_KNOB_SMALL, 175 + down), module, Kicker::DRIVE_PARAM));
+        // Row 3 (Small knobs)
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(fullX * 0.25f, 175 + down + HALF_KNOB_SMALL), module, Kicker::PITCH_DECAY_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(fullX * 0.75f, 175 + down + HALF_KNOB_SMALL), module, Kicker::DRIVE_PARAM));
 
-        // Light (Next to drive)
-        addChild(createLight<SmallLight<GreenLight>>(Vec(85, 182 + down), module, Kicker::ACT_LIGHT));
+        // Light
+        addChild(createLight<SmallLight<GreenLight>>(Vec(fullX * 0.5f, 182 + down), module, Kicker::ACT_LIGHT));
 
         // Ports (Evenly distributed: x = 23, 67.5, 112)
         addInput(createInput<InPortAutinn>(Vec(23 - HALF_PORT, 320 + down - up), module, Kicker::TRIG_INPUT));
