@@ -674,10 +674,30 @@ void Melody::generateMelody (int c) {
 	int minOffset = -2;
 	int maxOffset =  4;
 	nextPhrase[c].clear(); // Keeps capacity, just sets size to 0
-	nextPhrase[c].push_back(tonic);
-	int lastNote = tonic;
-	int lastIndex = 0;
-	int distanceToTonic = 0;
+	int startStep = 0;
+
+	// figure out start note
+	float startRoll = rack::random::uniform();
+	if (next_phrase_length > 12) {
+		if (startRoll > 0.85f)      startStep = 6; // 15% chance: Start on 7th (Leading Tone)
+		else if (startRoll > 0.60f) startStep = 4; // 25% chance: Start on 5th (Dominant)
+		else if (startRoll > 0.45f) startStep = 2; // 15% chance: Start on 3rd (Mediant)
+		else                        startStep = 0; // 45% chance: Start on Root (Tonic)
+	} else if (next_phrase_length > 8) {
+		if (startRoll > 0.70f) startStep = 4;      // 30% chance: Start on 5th (Dominant)
+		else if (startRoll > 0.55f) startStep = 2; // 15% chance: Start on 3rd (Mediant)
+		else                        startStep = 0; // 55% chance: Start on Root (Tonic)
+	} else {
+		if (startRoll > 0.55f) startStep = 2; // 45% chance: Start on 3rd (Mediant)
+		else                   startStep = 0; // 55% chance: Start on Root (Tonic)
+	}
+
+	int startSemi = getSemiNoteOffset(startStep, 0, mode);
+	int startNote = tonic + startSemi;
+	nextPhrase[c].push_back(startNote);
+	int lastNote = startNote;
+	int lastIndex = startStep % mode.size();
+	int distanceToTonic = startStep;
 	int closure = next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
 	int stepsTillEstablish = 12 + (int)(rack::random::uniform() * 5.0f); // 12 to 16
 	//int direction = 0;
