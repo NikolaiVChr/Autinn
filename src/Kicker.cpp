@@ -74,7 +74,7 @@ struct Kicker : Module {
         configParam(FREQ_PARAM, 30.0f, 200.0f, dsp::FREQ_C4/4.0f, "Tune", " Hz");
         configParam<Param3Digits>(VOL_DECAY_PARAM, 0.1f, 0.8f, 0.2f, "Vol Decay", " s");
         configParam<Param4Digits>(SWEEP_PARAM, 0.0f, 1.4f, 0.35f, "Sweep", "%",0, 100);
-        configParam<Param4Digits>(CLICK_PARAM, 0.0f, 1.0f, 0.5f, "Click", "%",0, 100);
+        configParam<Param4Digits>(CLICK_PARAM, 0.0f, 1.00f, 0.5f, "Click", "%",0, 100);
         configParam<Param3Digits>(DRIVE_PARAM, 0.0f, 5.0f, 1.0f, "Drive", ""); // 0 to 5x gain
         configParam<Param3Digits>(PITCH_DECAY_PARAM, 0.005f, 0.1f, 0.035f, "Pitch Decay", " ms",0,1000);
 
@@ -124,7 +124,7 @@ void Kicker::process(const ProcessArgs &args) {
 
         // We calculate a new coefficient clickAlpha that keeps the 2500Hz tone
         // regardless of the user's sample rate.
-        float clickCutoffFreq = 2500.0f;
+        float clickCutoffFreq = 1750.0f;// 1000=wood/knock, 2500=synth click.
         clickAlpha = 1.0f - std::exp(-2.0f * M_PI * clickCutoffFreq * dt);
 
         // vca envelope decay
