@@ -118,9 +118,8 @@ struct Melody : Module {
 	std::vector<bool> nextPhraseAccents[16] = {};
 	/// @brief Current phrase note glide bools.
 	std::vector<bool> phraseGlides[16] = {};
-	/// @brief If gliding also mean keep gate open when doing that.
+	/// @brief If gliding mean keep gate open instead of making a rest before the sliding note
 	bool gateOnWhenGliding = false;
-	//bool oldGlides = true;
 	/// @brief Next phrase note glide bools.
 	std::vector<bool> nextPhraseGlides[16] = {};
 
@@ -243,6 +242,8 @@ struct Melody : Module {
 	json_t *dataToJson() override {
 	    json_t *root = json_object();
 
+		json_object_set_new(root, "gateOnWhenGliding", json_boolean(gateOnWhenGliding));
+
 		json_t *voicesJ = json_array();
 
 		int active_voices = inputs[CLOCK_INPUT].getChannels();
@@ -286,6 +287,10 @@ struct Melody : Module {
 	{
 		// Try to find the new Polyphonic format
 		json_t *voicesJ = json_object_get(root, JSON_POLY);
+
+		json_t *keepOpen = json_object_get(root, "gateOnWhenGliding");
+		if (keepOpen)
+			gateOnWhenGliding = json_boolean_value(keepOpen);
 
 		if (voicesJ) {
 			for (int c = 0; c < 16; c++) {
@@ -613,7 +618,7 @@ void Melody::process(const ProcessArgs &args) {
 		}
 		outputs[ACCENT_OUTPUT].setVoltage(float(phraseAccents[c][phrase_index[c]])*10.0f, c);
 
-		bool isNextGliding = phrase_index[c]==phrase[c].size()-1?false:phraseGlides[c][phrase_index[c]];
+		bool isNextGliding = phrase_index[c]==phrase[c].size()-1?false:phraseGlides[c][phrase_index[c]+1];
 		bool isGap = (frameCount[c] > frameCount_last[c]*gap[c] && passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1);
 		bool keepGateOpenForGlide = isNextGliding && gateOnWhenGliding;
 		if (resting[c] > 0 || (isGap && !keepGateOpenForGlide)) {
