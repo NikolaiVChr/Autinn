@@ -443,7 +443,7 @@ struct Melody : Module {
 												{2,1,2,2,2,1,2},  //  II Dorian
 												{1,2,2,2,1,2,2},  // III Phrygian
 												{2,2,2,1,2,2,1},  //  IV Lydian
-												{2,1,2,2,2,1,2},  //   V Mixolydian
+												{2,2,1,2,2,1,2},  //   V Mixolydian
 												{2,1,2,2,1,2,2},  //  VI Minor
 												{1,2,2,1,2,2,2},  // VII Locrian
 												{1,3,1,2,1,3,1},  //   Double Harmonic Major
