@@ -11,17 +11,12 @@ Old panels use px unit. With 3.779527px per user unit.
 TODO
 ====
 Bass: Be able to trigger accent in middle of envelope.
-Stomp and Punch: CV or knob to control pitch envelopes.
 Fluencerator: Be able to trigger new phrase in middle of phrase playback.
-
+Apply oversampling only at lower sample-rates (like 44.1KHz) and auto reduce oversampling at higher rates.
 
 
 Anti-aliasing
 =============
-
-TODO:
-    Apply oversampling only at lower sample-rates (like 44.1KHz) and auto reduce oversampling at higher rates.
-
 
 Oscillators & Generators
 
