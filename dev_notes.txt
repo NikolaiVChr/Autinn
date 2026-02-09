@@ -1,0 +1,81 @@
+SVG artwork
+===========
+Autinn logo: font:Calligraph421 BT   color:ffd700
+Other text: font:oldsans color: ffffff size: 9pt
+Heading: font:oldsans color: ffffff size: 14pt
+Stripe: 16px wide. color #5e110a.
+Panel: color #202020. 128.5 mm height and HP x 5.08 mm width.
+Old panels use px unit. With 3.779527px per user unit.
+
+
+TODO
+====
+Bass: Be able to trigger accent in middle of envelope.
+Stomp and Punch: CV or knob to control pitch envelopes.
+Fluencerator: Be able to trigger new phrase in middle of phrase playback.
+
+
+
+Anti-aliasing
+=============
+
+TODO:
+    Apply oversampling only at lower sample-rates (like 44.1KHz) and auto reduce oversampling at higher rates.
+
+
+Oscillators & Generators
+
+Module  Oversampling  Anti-Aliasing      Notes
+---------------------------------------------------------------------------------
+Axe     4x (Fixed)    PolyBLEP           For square waveforms polyBLEP is applied twice
+Oxcart  No            MinBLEP
+Jette   No            Harmonic Limiting  Chebyshev recursion stops at Nyquist
+Sjip    No            Harmonic Limiting  Fades out harmonics near Nyquist
+Square  4x (Fixed)    Wavetable          Interpolated band-limited LUTs
+Saw     4x (Fixed)    Wavetable          Interpolated band-limited LUTs
+Punch   No            None               Sine body + filtered noise
+Stomp   No            None               Sine body + noise click
+Rad     No            None               Filter pings and noise pulses
+
+
+Effects & Processors
+
+Module       Oversampling              Notes
+-------------------------------------------------------------------------------
+Fil          Selectable (2x, 4x, 8x)   Defaults to 4x
+Nap          Selectable (2x, 4x)       Defaults to 2x
+Flora        Selectable (2x, 4x)       Defaults to 2x
+Bass         Selectable (2x, 4x)       Defaults to 2x
+Zod          4x (Fixed)                Limiter/Compressor detection
+Non          4x (Fixed)                Limiter/Compressor detection
+Digi         2x (Fixed)                Bit-crusher/Quantizer
+Flopper      2x (Fixed)                Audio Clipper/Folder
+Deadband     2x (Fixed)
+Amp          No                        Standard VCA
+Mera         No                        Gain/Attenuator
+Coil         No                        Physical Spring Model
+DC           No                        DC Detector
+Imp          No                        EQ
+Vibrato      No                        B-Spline interpolation
+Chord        No
+Mixer6       No
+Vxy          No
+Fluencerator No
+Conv         No
+
+
+
+Polyphony
+=========
+
+Dual
+----
+Flora, Non, Zod
+
+Mono
+----
+Bass, Mera, Flopper, Sjip
+
+Polyphony
+----
+The rest. But Vxy only support 4 channels.

@@ -288,16 +288,19 @@ struct Melody : Module {
 
 	void dataFromJson(json_t *root) override
 	{
-		// Try to find the new Polyphonic format
 		json_t *voicesJ = json_object_get(root, JSON_POLY);
 
 		json_t *keepOpen = json_object_get(root, "gateOnWhenGliding");
 		if (keepOpen)
 			gateOnWhenGliding = json_boolean_value(keepOpen);
+		else
+			gateOnWhenGliding = false;
 
 		json_t *only1 = json_object_get(root, "only1stepBeforeGlide");
 		if (only1)
 			only1step = json_boolean_value(only1);
+		else
+			only1step = false;
 
 		if (voicesJ) {
 			for (int c = 0; c < 16; c++) {
