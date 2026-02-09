@@ -124,10 +124,6 @@ struct Melody : Module {
 	/// @brief Next phrase note glide bools.
 	std::vector<bool> nextPhraseGlides[16] = {};
 
-	/// @brief Current phrase number of notes.
-	int phrase_length[16] = {};
-	/// @brief Next phrase number of notes.
-	int next_phrase_length[16] = {};
 	/// @brief Current phrase index in #phrase where we are currently playing
 	int phrase_index[16] = {};
 	/// @brief Schmitt trigger state for detecting the rising edge of the external clock input.
@@ -185,7 +181,6 @@ struct Melody : Module {
 			phraseAccents[c].assign(init_phrase_acc, init_phrase_acc+6);
 			phraseGlides[c].assign(init_phrase_glide, init_phrase_glide+6);
 
-			phrase_length[c] = 6;
 			nextGap[c] = GAP_NORMAL;
 			rest_amount[c] = 2; // Default rest
 			phrase_index[c] = 0;
@@ -346,15 +341,12 @@ struct Melody : Module {
 					|| phraseGlides[c].size() != phrase[c].size() || phrase[c].size() < PHRASE_LENGTH_MIN) {
 					// Illegal Json, we generate new phrase instead
 					this->generateMelody(c);
-					phrase_length[c] = fmin(phrase[c].size(), phraseDurations[c].size());// fmin to prevent index being bigger than any of the vectors.
 				} else {
-					phrase_length[c] = phrase[c].size();
 					resting[c] = 0;
 					nextPhrase[c].clear();// else it will switch to constructor generated one, right after loading json.
 					nextPhraseDurations[c].clear();
 					nextPhraseAccents[c].clear();
 					nextPhraseGlides[c].clear();
-					next_phrase_length[0] = 0;
 					nextGap[c] = 0.0f;
 				}
 				phrase_index[c] = 0;
@@ -420,15 +412,12 @@ struct Melody : Module {
 				|| phraseGlides[0].size() != phrase[0].size() || phrase[0].size() < PHRASE_LENGTH_MIN) {
 				// Illegal Json, we generate new phrase instead
 				this->generateMelody(0);
-				phrase_length[0] = fmin(phrase[0].size(), phraseDurations[0].size());// fmin to prevent index being bigger than any of the vectors.
 			} else {
-				phrase_length[0] = phrase[0].size();
 				nextPhrase[0].resize(0);// else it will switch to constructor generated one, right after loading json.
 				nextPhraseDurations[0].resize(0);
 				nextPhraseAccents[0].resize(0);
 				nextPhraseGlides[0].resize(0);
 				nextGap[0] = gap[0];
-				next_phrase_length[0] = 0;
 			}
 			phrase_index[0] = 0;
 		}
@@ -499,7 +488,6 @@ void Melody::switch_to_next_phrase(int c) {
 		phraseGlides[c].resize(nextPhraseGlides[c].size());
 		std::copy(nextPhraseGlides[c].begin(), nextPhraseGlides[c].end(), phraseGlides[c].begin());
 
-		phrase_length[c] = next_phrase_length[c];
 		nextPhrase[c].resize(0);
 		gap[c] = nextGap[c];
 	}
@@ -582,7 +570,7 @@ void Melody::process(const ProcessArgs &args) {
 			} else {
 				resting[c]--;
 			}
-			if (phrase_index[c] > phrase_length[c] - 1) {
+			if (phrase_index[c] > phrase[c].size() - 1) {
 				switch_to_next_phrase(c);
 			}
 			clockCount_last[c] = clockCount[c];
@@ -605,7 +593,7 @@ void Melody::process(const ProcessArgs &args) {
 		outputs[NEW_PHRASE_OUTPUT].setVoltage(p2 ? 10.0f : 0.0f, c);
 
 		int prev_idx = phrase_index[c] - 1;
-		if (prev_idx < 0) prev_idx = phrase_length[c] - 1;
+		if (prev_idx < 0) prev_idx = phrase[c].size() - 1;
 		bool slideFromPrev= phraseGlides[c][prev_idx];
 		if (phrase_index[c] == 0 && rest_amount[c] > 0) {
 			slideFromPrev = false;
@@ -645,7 +633,7 @@ void Melody::process(const ProcessArgs &args) {
 
 		bool isGliding = phraseGlides[c][phrase_index[c]];
 		bool isGap = (clockCount[c] > clockCount_last[c]*gap[c] && passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1);
-		if (phrase_index[c] == phrase_length[c] - 1 && rest_amount[c] > 0) {
+		if (phrase_index[c] == phrase[c].size() - 1 && rest_amount[c] > 0) {
 			isGliding = false;
 		}
 		bool keepGateOpenForGlide = isGliding && gateOnWhenGliding;
@@ -682,7 +670,7 @@ void Melody::generateMelody (int c) {
 	// Melody
 	int tonic = int(std::round(params[TONIC_PARAM].getValue()));
 	std::vector<int> mode = modes[int(std::round(params[MODE_PARAM].getValue()))];
-	next_phrase_length[c] = int(std::round(params[PHRASE_PARAM].getValue()));
+	int next_phrase_length = int(std::round(params[PHRASE_PARAM].getValue()));
 	int minOffset = -2;
 	int maxOffset =  4;
 	nextPhrase[c].clear(); // Keeps capacity, just sets size to 0
@@ -690,13 +678,13 @@ void Melody::generateMelody (int c) {
 	int lastNote = tonic;
 	int lastIndex = 0;
 	int distanceToTonic = 0;
-	int closure = next_phrase_length[c] >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
+	int closure = next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_RESOLUTION?-1:0;
 	int stepsTillEstablish = 12 + (int)(rack::random::uniform() * 5.0f); // 12 to 16
 	//int direction = 0;
 	//std::cout << "    :::: \n";
 	//std::cout << "    :::: \n";
 	//std::cout << "    :::: \n";
-	for (int i = 1; i < next_phrase_length[c]+closure; i++) {
+	for (int i = 1; i < next_phrase_length+closure; i++) {
 		if (distanceToTonic > 4) maxOffset = 2;
 		if (distanceToTonic > 3) maxOffset = 3;
 		else maxOffset = 4;
@@ -706,20 +694,20 @@ void Melody::generateMelody (int c) {
 			// Skipping resolution
 			minClamp =  minOffset;
 			maxClamp =  maxOffset;
-		} else if (i == next_phrase_length[c]-2 && next_phrase_length[c] >= PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
+		} else if (i == next_phrase_length-2 && next_phrase_length >= PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
 			// We are at cadence in larger phrase
 			maxClamp = std::min(maxOffset, -distanceToTonic+1);
 			minClamp = std::max(minOffset, -distanceToTonic-1);
-		} else if (next_phrase_length[c] < PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
+		} else if (next_phrase_length < PHRASE_LENGTH_THAT_DEMANDS_CADENCE) {
 			// Small phrase target resolution
-			int stepsLeft  = next_phrase_length[c]-i; // steps left including tonic step
+			int stepsLeft  = next_phrase_length-i; // steps left including tonic step
 			int howFarDown = stepsLeft * minOffset; // How far towards tonic can we get from now till tonic (negative number)
 			int howFarUp   = stepsLeft * maxOffset;
 			int maxUp   = minOffset-(distanceToTonic+howFarDown);
 			int maxDown = maxOffset-(howFarUp+distanceToTonic);
 			maxClamp = std::min(maxOffset, maxUp);
 			minClamp = std::max(minOffset, maxDown);
-		} else if (stepsTillEstablish < next_phrase_length[c]-i-1) {
+		} else if (stepsTillEstablish < next_phrase_length-i-1) {
 			// Longer phrase target establish
 			int stepsLeft  = stepsTillEstablish; // steps left including tonic step
 			if (stepsTillEstablish == 1) stepsTillEstablish = 12 + (int)(rack::random::uniform() * 5.0f);
@@ -731,7 +719,7 @@ void Melody::generateMelody (int c) {
 			minClamp = std::max(minOffset, maxDown);
 		} else {
 			// Longer phrase target cadence
-			int stepsLeft  = next_phrase_length[c]-i-1; // steps left including cadence step
+			int stepsLeft  = next_phrase_length-i-1; // steps left including cadence step
 			int howFarDown = stepsLeft * minOffset; // How far towards cadence can we get from now till cadence (negative number)
 			int howFarUp   = stepsLeft * maxOffset;
 			int maxUp   = minOffset-((distanceToTonic-1)+howFarDown);// note the asymmetry here, as we can approach from either side.
@@ -765,7 +753,7 @@ void Melody::generateMelody (int c) {
 	nextPhraseAccents[c].clear();
 	float chance_g = int(std::round(params[GLIDE_PARAM].getValue()));
 	nextPhraseGlides[c].clear();
-	for (int i = 0; i < next_phrase_length[c]; i++) {
+	for (int i = 0; i < next_phrase_length; i++) {
 		nextPhraseDurations[c].push_back(1 + (int)(rack::random::uniform() * 2)); // 1 or 2
 		nextPhraseAccents[c].push_back((rack::random::uniform() * 100.0f) < chance);
 		nextPhraseGlides[c].push_back((rack::random::uniform() * 100.0f) < chance_g);
@@ -776,17 +764,6 @@ void Melody::generateMelody (int c) {
 
 	// Gaps
 	nextGap[c] = rescale(params[GAP_PARAM].getValue(), 0, 3, GAP_STACCATISSIMO, GAP_LEGATO);
-	/*switch(int(params[GAP_PARAM].getValue())) {
-		case 0:
-			nextGap = GAP_STACCATO;
-			break;
-		case 1:
-			nextGap = GAP_NORMAL;
-			break;
-		case 2:
-			nextGap = GAP_LEGATO;
-			break;
-	}*/
 }
 
 void Melody::attenuvertInt(int CV, int KNOB, int min_result, int max_result) {
