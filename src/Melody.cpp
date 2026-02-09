@@ -736,7 +736,8 @@ void Melody::generateMelody (int c) {
 		int miniRand = -maxOffset;
 		//maxiRand = std::min(miniRand+1, direction>2?-1:maxiRand);
 		int range = (maxiRand - (miniRand)) + 1; // 9
-		int noteOffset = miniRand + (int)(rack::random::uniform() * range);
+		int rawOffset = miniRand + (int)(rack::random::uniform() * range);
+		int noteOffset = clamp(rawOffset, minClamp, maxClamp);
 		int note = lastNote + getSemiNoteOffset(noteOffset, lastIndex, mode);
 		nextPhrase[c].push_back(note);
 		distanceToTonic += noteOffset;
