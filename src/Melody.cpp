@@ -119,7 +119,8 @@ struct Melody : Module {
 	/// @brief Current phrase note glide bools.
 	std::vector<bool> phraseGlides[16] = {};
 	/// @brief If gliding also mean keep gate open when doing that.
-	bool closeGateWhenGliding = false;
+	bool gateOnWhenGliding = false;
+	bool oldGlides = true;
 	/// @brief Next phrase note glide bools.
 	std::vector<bool> nextPhraseGlides[16] = {};
 
@@ -571,7 +572,8 @@ void Melody::process(const ProcessArgs &args) {
 		if (clockTrigger[c].process(inputs[CLOCK_INPUT].getPolyVoltage(clock_idx))) {
 			if (resting[c] == 0) {
 				// we are not in rest inbetween phrases
-				if (passedClocks[c] >= phraseDurations[c][phrase_index[c]]) {//TODO: Used to be phraseDurations[c][phrase_index[c]]-1, but that was flawed.
+				int old = oldGlides?-1:0;
+				if (passedClocks[c] >= phraseDurations[c][phrase_index[c]]+old) {
 					passedClocks[c] = 0;// reset clock index
 					phrase_index[c]++;// increment note index
 				} else {
@@ -608,9 +610,10 @@ void Melody::process(const ProcessArgs &args) {
 		if (phrase_index[c] == 0 && rest_amount[c] > 0) {
 			slideFromPrev = false;
 		}
+		if (oldGlides) slideFromPrev = phraseGlides[c][phrase_index[c]];//slide in present.
 		float out = this->note2vPoct(phrase[c][phrase_index[c]]);
 		if (!slideFromPrev || passedClocks[c] > 0) {
-			// No slide or not at start of note, but inside it.
+			// No slide, or not at start of note, but inside it.
 			if (resting[c] == 0) {
 				// Only if not between phrase do we set voltage, so that previous voltage can be allowed to 'decay' if envelope is put on output.
 				outputs[FREQ_OUTPUT].setVoltage(out, c);
@@ -620,11 +623,16 @@ void Melody::process(const ProcessArgs &args) {
 
 			// glides are constant time (60ms),
 			// but constrained by the step length so they don't overrun into the next step if the tempo is crazy fast.
-			float noteSamples = float(clockCount_last[c]);
+			auto noteSamples = float(clockCount_last[c]);
 			float maxSlideSamples = GLIDE_MAXIMUM / args.sampleTime;
+			float glideTime;
+			if (oldGlides) {
+				glideTime = std::min(noteSamples*gap[c], maxSlideSamples);
+			} else {
+				// Use the full note duration as the upper limit
+				glideTime = std::min(noteSamples, maxSlideSamples);
+			}
 
-			// Use the full note duration as the upper limit
-			float glideTime = std::min(noteSamples, maxSlideSamples);
 			if (glideTime > 0.0f) {
 				// 60ms glide at start of note if prev note was marked as glide:
 				outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(float(clockCount[c]), 0, glideTime, out_prev, out), out_prev, out), c);
@@ -640,8 +648,8 @@ void Melody::process(const ProcessArgs &args) {
 		if (phrase_index[c] == phrase_length[c] - 1 && rest_amount[c] > 0) {
 			isGliding = false;
 		}
-
-		if (resting[c] > 0 || (isGap && (closeGateWhenGliding || !isGliding))) {
+		bool keepGateOpenForGlide = isGliding && gateOnWhenGliding;
+		if (resting[c] > 0 || (isGap && !keepGateOpenForGlide)) {
 			// We drop the gate only if we are in the Gap time, and we are not gliding to the next note (unless closeGateWhenGliding==true).
 			outputs[GATE_OUTPUT].setVoltage(0.0f, c);
 		} else {
@@ -912,6 +920,49 @@ struct MelodyWidget : ModuleWidget {
 		addOutput(createOutput<OutPortAutinn>(Vec(16 * RACK_GRID_WIDTH*0.35-HALF_PORT, 320), module, Melody::FREQ_OUTPUT));
 		addOutput(createOutput<OutPortAutinn>(Vec(16 * RACK_GRID_WIDTH*0.55-HALF_PORT, 320), module, Melody::ACCENT_OUTPUT));
 		addOutput(createOutput<OutPortAutinn>(Vec(16 * RACK_GRID_WIDTH*0.75-HALF_PORT, 320), module, Melody::GATE_OUTPUT));
+	}
+
+	struct GlideGateItem : MenuItem {
+		Melody* _module;
+
+		GlideGateItem(Melody* module, const char* label)
+		: _module(module) {
+			this->text = label;
+		}
+
+		void onAction(const event::Action& e) override {
+			_module->gateOnWhenGliding = !_module->gateOnWhenGliding;
+		}
+		void step() override {
+			rightText = (_module->gateOnWhenGliding) ? "✔" : "";
+			MenuItem::step();
+		}
+	};
+
+	struct GlideOldItem : MenuItem {
+		Melody* _module;
+
+		GlideOldItem(Melody* module, const char* label)
+		: _module(module) {
+			this->text = label;
+		}
+
+		void onAction(const event::Action& e) override {
+			_module->oldGlides = !_module->oldGlides;
+		}
+		void step() override {
+			rightText = (_module->oldGlides) ? "✔" : "";
+			MenuItem::step();
+		}
+	};
+
+	void appendContextMenu(Menu* menu) override {
+		auto* a = dynamic_cast<Melody*>(module);
+		assert(a);
+
+		menu->addChild(new MenuLabel());
+		menu->addChild(new GlideGateItem(a, "Glides forces legato"));
+		menu->addChild(new GlideOldItem(a, "Old glides"));
 	}
 };
 
