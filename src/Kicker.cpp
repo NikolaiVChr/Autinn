@@ -116,14 +116,12 @@ void Kicker::process(const ProcessArgs &args) {
         noiseGain = std::sqrt(args.sampleRate / 44100.0f);
 
         baseFreq = params[FREQ_PARAM].getValue();
-        sweepDepthOct = params[SWEEP_PARAM].getValue() * 5.0f;
+        sweepDepthOct = params[SWEEP_PARAM].getValue() * 5.0f;//since we allow up to 140%, we allow up to 7 octaves
         clickLevel = params[CLICK_PARAM].getValue();
         drive = 1.0f + params[DRIVE_PARAM].getValue();
         float decayValVca = params[VOL_DECAY_PARAM].getValue();
         float decayValPitch = params[PITCH_DECAY_PARAM].getValue();
 
-        // We calculate a new coefficient clickAlpha that keeps the 2500Hz tone
-        // regardless of the user's sample rate.
         float clickCutoffFreq = 1750.0f;// 1000=wood/knock, 2500=synth click.
         clickAlpha = 1.0f - std::exp(-2.0f * M_PI * clickCutoffFreq * dt);
 
@@ -217,12 +215,7 @@ void Kicker::process(const ProcessArgs &args) {
 
         // Mix & Saturate
         float signal = (body * finalVcaEnv + click) * drive;
-
-        // Fast Tanh approximation for Analog feel
-        float x = signal;
-        if (x < -3.0f) x = -1.0f;
-        else if (x > 3.0f) x = 1.0f;
-        else x = x * (27.0f + x * x) / (27.0f + 9.0f * x * x);
+        float x = non_lin_fast_func(signal);
 
         outputs[AUDIO_OUTPUT].setVoltage(x * 5.0f, c);
     }

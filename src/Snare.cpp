@@ -29,6 +29,7 @@ struct Snare : Module {
         SWEEP_PARAM,
         SNAP_PARAM,
         DRIVE_PARAM,
+        PITCH_DECAY_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
@@ -58,8 +59,16 @@ struct Snare : Module {
     float noiseHp[MAX_CHANNELS] = {};
     dsp::BiquadFilter wireFilter[MAX_CHANNELS];
     uint32_t noiseState[16] = {};
+
     int stepDivider = 33;
-    float noiseGain = 1.0f;
+    float baseFreq;
+    float sweepDepth;
+    float snapLevel;
+    float drive;
+    float bodyCoeff;
+    float noiseCoeff;
+    float pitchDecayCoeff;
+    float noiseGain;
 
 
     Snare() {
@@ -69,6 +78,7 @@ struct Snare : Module {
         configParam<Param4Digits>(SWEEP_PARAM, 0.0f, 1.0f, 0.2f, "Sweep", "%",0, 100);
         configParam<Param4Digits>(SNAP_PARAM, 0.0f, 1.0f, 0.25f, "Snappy", "%",0, 100);
         configParam<Param3Digits>(DRIVE_PARAM, 0.0f, 5.0f, 1.0f, "Drive", "");
+        configParam<Param3Digits>(PITCH_DECAY_PARAM, 0.005f, 0.100f, 0.040f, "Pitch Decay", " ms",0,1000);
 
         configInput(TRIG_INPUT, "Trigger");
         configInput(VOCT_INPUT, "V/Oct");
@@ -101,37 +111,33 @@ void Snare::process(const ProcessArgs &args) {
     int channels = std::max(1, inputs[TRIG_INPUT].getChannels());
     outputs[AUDIO_OUTPUT].setChannels(channels);
 
+    float dt = args.sampleTime;
+
     if (stepDivider++ >= 32) {
         stepDivider = 0;
+
+        baseFreq = params[FREQ_PARAM].getValue();
+        sweepDepth = params[SWEEP_PARAM].getValue() * 200.0f;
+        snapLevel = params[SNAP_PARAM].getValue();
+        drive = 1.0f + params[DRIVE_PARAM].getValue();
+
+        // Decay Coefficients
+        float decayParam = params[DECAY_PARAM].getValue();
+
+        // Body decays slightly faster than noise
+        bodyCoeff = 1.0f - (10.0f * dt / decayParam);
+        // Noise tail
+        noiseCoeff = 1.0f - (5.0f * dt / decayParam);
+
+        bodyCoeff = clamp(bodyCoeff, 0.0f, 1.0f);
+        noiseCoeff = clamp(noiseCoeff, 0.0f, 1.0f);
+
+        float pitchDecaySeconds = params[PITCH_DECAY_PARAM].getValue();// 1 ms to 100 ms (must not be lower than 1 ms)
+        pitchDecayCoeff = 1.0f - (1.0f/pitchDecaySeconds * dt); // Very fast pitch drop
 
         // As rate goes up, we boost the noise to maintain constant Power Density
         noiseGain = std::sqrt(args.sampleRate / 44100.0f);
     }
-
-    float dt = args.sampleTime;
-    float baseFreq = params[FREQ_PARAM].getValue();
-    float sweepDepth = params[SWEEP_PARAM].getValue() * 200.0f; 
-    float snapLevel = params[SNAP_PARAM].getValue();
-    float drive = 1.0f + params[DRIVE_PARAM].getValue();
-    
-    // Decay Coefficients
-    float decayParam = params[DECAY_PARAM].getValue();
-    
-    // Body decays slightly faster than noise
-    float bodyCoeff = 1.0f - (10.0f * dt / decayParam); 
-    // Noise tail
-    float noiseCoeff = 1.0f - (5.0f * dt / decayParam);
-    
-    bodyCoeff = clamp(bodyCoeff, 0.0f, 1.0f);
-    noiseCoeff = clamp(noiseCoeff, 0.0f, 1.0f);
-
-    float pitchDecayCoeff = 1.0f - (25.0f * dt); // Very fast pitch drop
-
-    /*
-    // Simple HPF Coefficient (Cutoff ~800Hz)
-    float rc = 1.0f / (2.0f * M_PI * 800.0f);
-    float alpha = rc / (rc + dt);
-    */
 
     bool active = false;
 
@@ -181,8 +187,6 @@ void Snare::process(const ProcessArgs &args) {
         float body = sine + 0.2f * sin(phase[c] * 6.0f * M_PI);
 
         // Snappy Layer (White Noise -> Highpass)
-        //float white = (float)std::rand() / RAND_MAX * 2.0f - 1.0f;
-
         uint32_t& s = noiseState[c];
         s ^= s << 13;
         s ^= s >> 17;
@@ -206,10 +210,7 @@ void Snare::process(const ProcessArgs &args) {
         float signal = mix * drive;
 
         // Saturation
-        float x = signal;
-        if (x < -3.0f) x = -1.0f;
-        else if (x > 3.0f) x = 1.0f;
-        else x = x * (27.0f + x * x) / (27.0f + 9.0f * x * x);
+        float x = non_lin_fast_func(signal);
 
         outputs[AUDIO_OUTPUT].setVoltage(x * 5.0f, c);
     }
@@ -232,6 +233,7 @@ struct SnareWidget : ModuleWidget {
 
         float down = 20;
         float up = 4 * RACK_GRID_WIDTH;
+        float fullX = this->getBox().size.x;
 
         // Row 1 (Large knobs)
         addParam(createParam<RoundMediumAutinnKnob>(Vec(34 - HALF_KNOB_MED, 60 + down - RACK_GRID_WIDTH/2), module, Snare::FREQ_PARAM));
@@ -242,10 +244,16 @@ struct SnareWidget : ModuleWidget {
         addParam(createParam<RoundSmallAutinnKnob>(Vec(101 - HALF_KNOB_SMALL, 120 + down), module, Snare::SNAP_PARAM));
 
         // Row 3 (Drive - centered)
-        addParam(createParam<RoundSmallAutinnKnob>(Vec(67.5 - HALF_KNOB_SMALL, 175 + down), module, Snare::DRIVE_PARAM));
+        //addParam(createParam<RoundSmallAutinnKnob>(Vec(67.5 - HALF_KNOB_SMALL, 175 + down), module, Snare::DRIVE_PARAM));
+        // Row 3 (Small knobs)
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(fullX * 0.25f, 175 + down + HALF_KNOB_SMALL), module, Snare::PITCH_DECAY_PARAM));
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(fullX * 0.75f, 175 + down + HALF_KNOB_SMALL), module, Snare::DRIVE_PARAM));
+
+        // Light
+        addChild(createLightCentered<SmallLight<GreenLight>>(Vec(fullX * 0.5f, 182 + down), module, Snare::ACT_LIGHT));
 
         // Light (Next to drive)
-        addChild(createLight<SmallLight<GreenLight>>(Vec(85, 182 + down), module, Snare::ACT_LIGHT));
+        //addChild(createLight<SmallLight<GreenLight>>(Vec(85, 182 + down), module, Snare::ACT_LIGHT));
 
         // Ports
         addInput(createInput<InPortAutinn>(Vec(23 - HALF_PORT, 320 + down - up), module, Snare::TRIG_INPUT));
