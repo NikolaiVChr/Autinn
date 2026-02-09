@@ -120,7 +120,7 @@ struct Melody : Module {
 	std::vector<bool> phraseGlides[16] = {};
 	/// @brief If gliding also mean keep gate open when doing that.
 	bool gateOnWhenGliding = false;
-	bool oldGlides = true;
+	//bool oldGlides = true;
 	/// @brief Next phrase note glide bools.
 	std::vector<bool> nextPhraseGlides[16] = {};
 
@@ -560,8 +560,8 @@ void Melody::process(const ProcessArgs &args) {
 		if (clockTrigger[c].process(inputs[CLOCK_INPUT].getPolyVoltage(clock_idx))) {
 			if (resting[c] == 0) {
 				// we are not in rest inbetween phrases
-				int old = oldGlides?-1:0;
-				if (passedClocks[c] >= phraseDurations[c][phrase_index[c]]+old) {
+				//int old = oldGlides?-1:0;
+				if (passedClocks[c] >= phraseDurations[c][phrase_index[c]]) {
 					passedClocks[c] = 0;// reset clock index
 					phrase_index[c]++;// increment note index
 				} else {
@@ -592,51 +592,43 @@ void Melody::process(const ProcessArgs &args) {
 		outputs[START_PHRASE_OUTPUT].setVoltage(p1 ? 10.0f : 0.0f, c);
 		outputs[NEW_PHRASE_OUTPUT].setVoltage(p2 ? 10.0f : 0.0f, c);
 
-		int prev_idx = phrase_index[c] - 1;
-		if (prev_idx < 0) prev_idx = phrase[c].size() - 1;
-		bool slideFromPrev= phraseGlides[c][prev_idx];
-		if (oldGlides) slideFromPrev = phraseGlides[c][phrase_index[c]];//slide in present.
-		if (phrase_index[c] == 0 && rest_amount[c] > 0) {
-			slideFromPrev = false;
-		}
+
+		bool gliding = phraseGlides[c][phrase_index[c]];//slide in present.
 		float out = this->note2vPoct(phrase[c][phrase_index[c]]);
-		if (!slideFromPrev || passedClocks[c] > 0) {
-			// No slide, or not at start of note, but inside it.
-			if (resting[c] == 0) {
-				// Only if not between phrase do we set voltage, so that previous voltage can be allowed to 'decay' if envelope is put on output.
-				outputs[FREQ_OUTPUT].setVoltage(out, c);
-			}
-		} else {
+		if (gliding && resting[c] == 0 && passedClocks[c] == 0) {
+			// gliding
+
+			int prev_idx = phrase_index[c] - 1;
+			if (prev_idx < 0) prev_idx = phrase[c].size() - 1;
 			float out_prev = this->note2vPoct(phrase[c][prev_idx]);
 
 			// glides are constant time (60ms),
 			// but constrained by the step length so they don't overrun into the next step if the tempo is crazy fast.
-			auto noteSamples = float(clockCount_last[c]);
-			float maxSlideSamples = GLIDE_MAXIMUM / args.sampleTime;
-			float glideTime;
-			if (oldGlides) {
-				glideTime = std::min(noteSamples*gap[c], maxSlideSamples);
-			} else {
-				// Use the full note duration as the upper limit
-				glideTime = std::min(noteSamples, maxSlideSamples);
-			}
+			auto clockFrames = float(clockCount_last[c]);
+			float maxGlideFrames = GLIDE_MAXIMUM / args.sampleTime;
+			float glideFrames;
+			// Use the full note duration as the upper limit
+			glideFrames = std::min(clockFrames, maxGlideFrames);
 
-			if (glideTime > 0.0f) {
+			if (glideFrames > 0.0f) {
 				// 60ms glide at start of note if prev note was marked as glide:
-				outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(float(clockCount[c]), 0, glideTime, out_prev, out), out_prev, out), c);
+				outputs[FREQ_OUTPUT].setVoltage(clampSafe(rescale(float(clockCount[c]), 0, glideFrames, out_prev, out), out_prev, out), c);
 			} else {
 				// prevent divide by zero
+				outputs[FREQ_OUTPUT].setVoltage(out, c);
+			}
+		} else {
+			// not gliding
+			if (resting[c] == 0) {
+				// Only if not between phrase do we set voltage, so that previous voltage can be allowed to 'decay' if envelope is put on output.
 				outputs[FREQ_OUTPUT].setVoltage(out, c);
 			}
 		}
 		outputs[ACCENT_OUTPUT].setVoltage(float(phraseAccents[c][phrase_index[c]])*10.0f, c);
 
-		bool isGliding = phraseGlides[c][phrase_index[c]];
+		bool isNextGliding = phrase_index[c]==phrase[c].size()-1?false:phraseGlides[c][phrase_index[c]];
 		bool isGap = (clockCount[c] > clockCount_last[c]*gap[c] && passedClocks[c] >= phraseDurations[c][phrase_index[c]]-1);
-		if (phrase_index[c] == phrase[c].size() - 1 && rest_amount[c] > 0) {
-			isGliding = false;
-		}
-		bool keepGateOpenForGlide = isGliding && gateOnWhenGliding;
+		bool keepGateOpenForGlide = isNextGliding && gateOnWhenGliding;
 		if (resting[c] > 0 || (isGap && !keepGateOpenForGlide)) {
 			// We drop the gate only if we are in the Gap time, and we are not gliding to the next note (unless closeGateWhenGliding==true).
 			outputs[GATE_OUTPUT].setVoltage(0.0f, c);
@@ -776,7 +768,7 @@ void Melody::generateMelody (int c) {
 	for (int i = 0; i < next_phrase_length; i++) {
 		nextPhraseDurations[c].push_back(1 + (int)(rack::random::uniform() * 2)); // 1 or 2
 		nextPhraseAccents[c].push_back((rack::random::uniform() * 100.0f) < chance);
-		nextPhraseGlides[c].push_back((rack::random::uniform() * 100.0f) < chance_g);
+		nextPhraseGlides[c].push_back((i==0?false:(rack::random::uniform() * 100.0f) < chance_g));//the first note does never glide
 	}
 
 	// Rest
@@ -936,6 +928,7 @@ struct MelodyWidget : ModuleWidget {
 		}
 	};
 
+	/*
 	struct GlideOldItem : MenuItem {
 		Melody* _module;
 
@@ -952,14 +945,15 @@ struct MelodyWidget : ModuleWidget {
 			MenuItem::step();
 		}
 	};
+	*/
 
 	void appendContextMenu(Menu* menu) override {
 		auto* a = dynamic_cast<Melody*>(module);
 		assert(a);
 
 		menu->addChild(new MenuLabel());
-		menu->addChild(new GlideGateItem(a, "Glides forces legato"));
-		menu->addChild(new GlideOldItem(a, "Old glides"));
+		menu->addChild(new GlideGateItem(a, "Glides keeps gate open"));
+		//menu->addChild(new GlideOldItem(a, "Old glides"));
 	}
 };
 
