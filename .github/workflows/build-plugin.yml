@@ -92,7 +92,7 @@ jobs:
           gitrev=`git rev-parse --short HEAD`
           pluginversion=`jq -r '.version' plugin.json`
           echo "Set plugin version from $pluginversion to $pluginversion-$gitrev"
-          cat <<< `jq --arg VERSION "$pluginversion-$gitrev" '.version=$VERSION' plugin.json` > plugin.json
+          jq --arg VERSION "$pluginversion-$gitrev" '.version=$VERSION' plugin.json > plugin.json.tmp && mv plugin.json.tmp plugin.json
       - name: Initialize CodeQL
         if: runner.os == 'Linux' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/'))
         uses: github/codeql-action/init@v4
@@ -122,6 +122,7 @@ jobs:
         with:
           path: dist
           name: ${{ matrix.config.name }}
+          retention-days: 2
       - name: Perform CodeQL Analysis
         if: runner.os == 'Linux' && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/'))
         uses: github/codeql-action/analyze@v4
@@ -135,35 +136,26 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v4
-      - uses: FranzDiebold/github-env-vars-action@v2
       - name: Check if plugin version matches tag
         run: |
           pluginversion=`jq -r '.version' plugin.json`
-          if [ "v$pluginversion" != "${{ env.CI_REF_NAME }}" ]; then
-            echo "Plugin version from plugin.json 'v$pluginversion' doesn't match with tag version '${{ env.CI_REF_NAME }}'"
+          if [ "v$pluginversion" != "${{ github.ref_name }}" ]; then
+            echo "Plugin version 'v$pluginversion' doesn't match tag '${{ github.ref_name }}'"
             exit 1
           fi
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          #Unexpected input(s) 'release_name', valid inputs are ['body', 'body_path', 'name', 'tag_name', 'draft', 'prerelease', 'preserve_order', 'files', 'working_directory', 'overwrite_files', 'fail_on_unmatched_files', 'repository', 'token', 'target_commitish', 'discussion_category_name', 'generate_release_notes', 'append_body', 'make_latest']
-          name: Release ${{ env.CI_REF_NAME }}
-          body: |
-            ${{ env.GITHUB_REPOSITORY_NAME }} VCV Rack Plugin ${{ env.CI_REF_NAME }}
-          draft: false
-          prerelease: false
       - uses: actions/download-artifact@v4
         with:
           path: _artifacts
           pattern: '*'
           merge-multiple: true
-      - name: Upload release assets
-        uses: svenstaro/upload-release-action@v2
+      - name: Create Release
+        # specific commit SHA for security
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: _artifacts/**/*.vcvplugin
-          tag: ${{ github.ref }}
-          file_glob: true
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.ref_name }}
+          body: |
+             ${{ github.event.repository.name }} VCV Rack Plugin ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+          files: _artifacts/**/*.vcvplugin
