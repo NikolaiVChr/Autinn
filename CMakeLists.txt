@@ -18,6 +18,7 @@ if(DEFINED METAMODULE_SDK_DIR)
             PLUGIN_NAME     Autinn
             SOURCE_ASSETS   "${CMAKE_CURRENT_LIST_DIR}/res" # assets folder (with png)
             PLUGIN_JSON     "${CMAKE_CURRENT_LIST_DIR}/plugin.json"
+            DESTINATION     "${CMAKE_BINARY_DIR}"
     )
 else()
     project(Autinn_IDE)
