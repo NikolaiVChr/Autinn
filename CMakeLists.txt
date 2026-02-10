@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.22)
+
+# Check if building with MetaModule SDK
+if(DEFINED METAMODULE_SDK_DIR)
+    include(${METAMODULE_SDK_DIR}/plugin.cmake)
+
+    project(Autinn VERSION 2.0 DESCRIPTION "Autinn VCV Plugin Modules" LANGUAGES C CXX ASM)
+
+    add_library(Autinn STATIC)
+
+    file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.hpp")
+    target_sources(Autinn PRIVATE ${SOURCES})
+
+    mm_plugin_target(Autinn)
+else()
+    project(Autinn_IDE)
+    set(CMAKE_CXX_STANDARD 11)
+
+    # Allow overriding SDK path, but default to your local path if missing
+    if(NOT DEFINED RACK_SDK_DIR)
+        set(RACK_SDK_DIR "D:/Rack-SDK")
+    endif()
+
+    include_directories("${RACK_SDK_DIR}/include")
+    include_directories("${RACK_SDK_DIR}/dep/include")
+    include_directories("src")
+
+    file(GLOB_RECURSE SOURCES "src/*.cpp")
+    add_library(AutinnDummy SHARED ${SOURCES})
+endif()
