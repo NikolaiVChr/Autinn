@@ -12,6 +12,9 @@ jobs:
   build:
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
+    permissions:
+      security-events: write
+      packages: read
     strategy:
       matrix:
         config:
@@ -43,7 +46,7 @@ jobs:
             prepare-os2: "",
             postfix: mac-arm64
           }
-        language: [ 'cpp' ]
+        language: [ 'c-cpp' ]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -126,9 +129,6 @@ jobs:
       - name: Perform CodeQL Analysis
         if: runner.os == 'Linux'
         uses: github/codeql-action/analyze@v4
-    permissions:
-      security-events: write
-      packages: read
 
   publish:
     name: Publish plugin
