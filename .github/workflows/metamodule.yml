@@ -48,7 +48,7 @@ jobs:
         with:
           name: MetaModule-Plugin
           path: plugin/build/*.mmplugin
-          retention-days: 5
+          retention-days: 2
 
   publish-mm:
     name: Add to Release

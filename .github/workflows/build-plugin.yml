@@ -125,7 +125,7 @@ jobs:
         with:
           path: dist
           name: ${{ matrix.config.name }}
-          retention-days: 2
+          retention-days: 1
       - name: Perform CodeQL Analysis
         if: runner.os == 'Linux'
         uses: github/codeql-action/analyze@v4
