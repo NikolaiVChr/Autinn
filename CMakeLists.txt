@@ -7,8 +7,8 @@ if(DEFINED METAMODULE_SDK_DIR)
     project(Autinn VERSION 2.0 DESCRIPTION "Autinn VCV Plugin Modules" LANGUAGES C CXX ASM)
 
     add_subdirectory(
-        "${METAMODULE_SDK_DIR}/metamodule-rack-interface"
-        "${CMAKE_BINARY_DIR}/metamodule-rack-interface"
+        "${METAMODULE_SDK_DIR}/rack-interface"
+        "${CMAKE_BINARY_DIR}/rack-interface"
     )
 
     add_library(Autinn STATIC)
