@@ -27,20 +27,19 @@ jobs:
           # install Inkscape
           sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi inkscape
 
-      # NEW STEP: Convert SVGs to PNGs
+      # Convert SVGs to PNGs
       - name: Convert Assets (SVG -> PNG)
         run: |
           # 4ms script
-          # Usage: python3 SvgToPng.py <source_dir> <recursive?>
           python3 metamodule-plugin-sdk/scripts/SvgToPng.py --input plugin/res/ComponentLibrary --output plugin/res/ComponentLibrary
           python3 metamodule-plugin-sdk/scripts/SvgToPng.py --input plugin/res --output plugin/res
 
-      # Build using the CMake
+      # Build using CMake
       - name: Configure and Build
         run: |
           cd plugin
-          # pass the SDK path, which triggers the Production block in CMakeLists.txt
-          cmake -B build -G Ninja -DMETAMODULE_SDK_DIR=../metamodule-plugin-sdk
+          # pass the SDK path, which triggers the metamodule condition in CMakelists
+          cmake -B build -G Ninja -DMETAMODULE_SDK_DIR=$GITHUB_WORKSPACE/metamodule-plugin-sdk
           cmake --build build
 
       # Upload result
