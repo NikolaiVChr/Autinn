@@ -121,12 +121,15 @@ struct Non : Module {
 	//double tavKnob = -150.0;
 	double gainKnob = 0.0;
 	double makeupGain = 1.0;
+	double LT = THRESHOLD_DEFAULT_LIMITER_DB;
 	double rate   = 0.0;
 	double RT = 0.1;
 	//double AT = 0.1;
 	double ATp = 0.1;
 	//double TAV = 0.03;
 	//double k_prev = 1.0 - exp(-2.2 * 0.0000226 / 0.001 );// Just a starting value in aprox the range its going to be used in.
+
+	bool maximizer = false;
 
 	// Oversampling objects
 	static const int OVERSAMPLE = 4;
@@ -192,6 +195,23 @@ struct Non : Module {
 	double toExp10(double x, double min, double max);
 
 	void process(const ProcessArgs &args) override;
+
+	json_t *dataToJson() override {
+		json_t *root = json_object();
+		json_object_set_new(root, "maximizer", json_boolean(maximizer));
+		return root;
+	}
+
+	void dataFromJson(json_t *rootJ) override {
+		json_t *ext = json_object_get(rootJ, "maximizer");
+		if (ext)
+			maximizer = json_boolean_value(ext);
+	}
+
+	void onReset(const ResetEvent& e) override {
+		maximizer = false;
+		Module::onReset(e);
+	}
 };
 
 /*
@@ -316,7 +336,6 @@ void Non::process(const ProcessArgs &args) {
 	}
 	step++;
 
-	double LT = params[T_LIMITER_PARAM].getValue();
 	//double CT = params[T_COMPRESSOR_PARAM].getValue();
 	//double ET = params[T_EXPANDER_PARAM].getValue();
 	//double NT = params[T_NOISEGATE_PARAM].getValue();
@@ -345,7 +364,9 @@ void Non::process(const ProcessArgs &args) {
 	double TS = (args.sampleTime / OVERSAMPLE) * 1000.0; //ms
 
 	//if (taKnob != params[ATTACK_PARAM].getValue() || tapKnob != params[ATTACK_PEAK_PARAM].getValue() || trKnob != params[RELEASE_PARAM].getValue() || erKnob != params[RATIO_EXPANDER_PARAM].getValue() || crKnob != params[RATIO_COMPRESSOR_PARAM].getValue() || rate != args.sampleRate || tavKnob != params[AVERAGE_TIME_PARAM].getValue() || gainKnob != params[OUT_GAIN_PARAM].getValue()) {
-	if (tapKnob != params[ATTACK_PEAK_PARAM].getValue() || trKnob != params[RELEASE_PARAM].getValue() || rate != args.sampleRate || gainKnob != params[OUT_GAIN_PARAM].getValue()) {
+	if (tapKnob != params[ATTACK_PEAK_PARAM].getValue() || trKnob != params[RELEASE_PARAM].getValue()
+		|| rate != args.sampleRate || gainKnob != params[OUT_GAIN_PARAM].getValue()
+		|| (maximizer && LT != params[T_LIMITER_PARAM].getValue())) {
 		rate = args.sampleRate;
 		//tavKnob = params[AVERAGE_TIME_PARAM].getValue();
 		//D   = (unsigned)(rate * tavKnob * 0.001);
@@ -356,6 +377,7 @@ void Non::process(const ProcessArgs &args) {
 		//erKnob = params[RATIO_EXPANDER_PARAM].getValue();
 		//crKnob = params[RATIO_COMPRESSOR_PARAM].getValue();
 		gainKnob = params[OUT_GAIN_PARAM].getValue();
+		LT = params[T_LIMITER_PARAM].getValue();
 
 		D   = (unsigned)(rate * LOOKAHEAD_MS * 0.001 * OVERSAMPLE);
 		if (D >= BUFFER_SIZE) D = BUFFER_SIZE - 1;       // Safety clamp
@@ -366,6 +388,11 @@ void Non::process(const ProcessArgs &args) {
 		//ER = this->toExp10(erKnob,  EXPANDER_RATIO_MIN, 1.00);
 		//CR = this->toExp10(crKnob,  1.00, COMPRESSOR_RATIO_MAX);
 		makeupGain = this->toExp10(gainKnob, 1.00, MAKEUP_GAIN_MAX);
+		if (maximizer) {
+			double automaticMakeupDB = - LT; // Auto-gain to hit 0.0dB ceiling
+			if (automaticMakeupDB < 0) automaticMakeupDB = 0;
+			makeupGain *= this->toGain(automaticMakeupDB);
+		}
 
 		RT  = 1.0 - exp(-2.2 * TS / tr );
 		//AT  = 1.0 - exp(-2.2 * TS / ta );
@@ -373,6 +400,8 @@ void Non::process(const ProcessArgs &args) {
 
 		//double t_M = TS * D;
 		//TAV = 1.0 - exp(-2.2 * TS / t_M);
+	} else {
+		LT = params[T_LIMITER_PARAM].getValue();
 	}
 
 	//unsigned hyst_max = (unsigned)((HYSTERESIS_TIME_SEC / args.sampleTime) * OVERSAMPLE);
@@ -500,13 +529,6 @@ void Non::process(const ProcessArgs &args) {
 
 }
 
-
-
-double Non::toExp10(double x, double min, double max) {
-	// 0 to 1 to exp range
-	return min * pow(10.0, x * log10(max / min));
-}
-
 //double Non::staticCurve(double rms, double peak, double LT, double LS, double CS, double CT, double CR, 
 //						double NT, double ET, double ES, double ER, double knee) {
 double Non::staticCurve(double peak, double LT, double LS) {
@@ -591,6 +613,11 @@ double Non::smooth(double k, double g_prev, double f) {
 	return (1.0 - k) * g_prev + k * f;
 }
 
+double Non::toExp10(double x, double min, double max) {
+	// 0 to 1 to exp range
+	return min * pow(10.0, x * log10(max / min));
+}
+
 double Non::toDB(double volt) {
 	// Safety Check. Prevent log10(0) or log10(negative).
 	// 0.000001 is -134dB, which is effectively silence in 32-bit float.
@@ -605,6 +632,24 @@ double Non::toGain(double dB) {
 double Non::toVolt(double dB) {
 	return 5.0 * pow(10.0, (dB / 20.0));
 }
+
+struct MaximizerMenuItem : MenuItem {
+	Non* _module;
+
+	MaximizerMenuItem(Non* module, const char* label)
+	: _module(module)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->maximizer = !_module->maximizer;
+	}
+
+	void step() override {
+		rightText = _module->maximizer == true ? "✔" : "";
+	}
+};
 
 struct NonWidget : ModuleWidget {
 	NonWidget(Non *module) {
@@ -673,6 +718,14 @@ struct NonWidget : ModuleWidget {
 			addChild(createLight<SmallLight<RedLight>>(Vec(16 * RACK_GRID_WIDTH * light_x_pos - HALF_LIGHT_SMALL + light_column_dist, light_y_pos - light_y_spacing * i), module, Non::VU_OUT_LEFT_LIGHT + i));
 			addChild(createLight<SmallLight<RedLight>>(Vec(16 * RACK_GRID_WIDTH * light_x_pos - HALF_LIGHT_SMALL + light_column_dist + HALF_LIGHT_SMALL * 2.0f, light_y_pos - light_y_spacing * i), module, Non::VU_OUT_RIGHT_LIGHT + i));
 		}
+	}
+
+	void appendContextMenu(Menu* menu) override {
+		Non* a = dynamic_cast<Non*>(module);
+		assert(a);
+
+		menu->addChild(new MenuLabel());
+		menu->addChild(new MaximizerMenuItem(a, "Maximizer"));
 	}
 };
 
