@@ -11,7 +11,14 @@ if(DEFINED METAMODULE_SDK_DIR)
     file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.hpp")
     target_sources(Autinn PRIVATE ${SOURCES})
 
-    mm_plugin_target(Autinn)
+    target_link_libraries(Autinn PRIVATE metamodule-rack-interface)
+
+    create_plugin(
+            SOURCE_LIB      Autinn
+            PLUGIN_NAME     Autinn
+            SOURCE_ASSETS   "${CMAKE_CURRENT_LIST_DIR}/res" # assets folder (with png)
+            PLUGIN_JSON     "${CMAKE_CURRENT_LIST_DIR}/plugin.json"
+    )
 else()
     project(Autinn_IDE)
     set(CMAKE_CXX_STANDARD 11)
