@@ -6,17 +6,12 @@ if(DEFINED METAMODULE_SDK_DIR)
 
     project(Autinn VERSION 2.0 DESCRIPTION "Autinn VCV Plugin Modules" LANGUAGES C CXX ASM)
 
-    add_subdirectory(
-        "${METAMODULE_SDK_DIR}/rack-interface"
-        "${CMAKE_BINARY_DIR}/rack-interface"
-    )
-
     add_library(Autinn STATIC)
 
     file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.hpp")
     target_sources(Autinn PRIVATE ${SOURCES})
 
-    target_link_libraries(Autinn PRIVATE metamodule-rack-interface)
+    target_link_libraries(Autinn PRIVATE rack-interface)
 
     create_plugin(
         SOURCE_LIB      Autinn
