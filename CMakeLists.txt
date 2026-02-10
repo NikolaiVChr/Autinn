@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.22)
 
 # Check if building with MetaModule SDK
 if(DEFINED METAMODULE_SDK_DIR)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include cstdint")
+
     include(${METAMODULE_SDK_DIR}/plugin.cmake)
 
     project(Autinn VERSION 2.0 DESCRIPTION "Autinn VCV Plugin Modules" LANGUAGES C CXX ASM)
