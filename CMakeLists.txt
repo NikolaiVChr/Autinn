@@ -11,7 +11,10 @@ if(DEFINED METAMODULE_SDK_DIR)
     file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.hpp")
     target_sources(Autinn PRIVATE ${SOURCES})
 
-    target_link_libraries(Autinn PRIVATE rack-interface)
+    target_include_directories(Autinn PRIVATE
+            "${METAMODULE_SDK_DIR}/rack-interface/include"
+            "${METAMODULE_SDK_DIR}/rack-interface/dep/include"
+    )
 
     create_plugin(
         SOURCE_LIB      Autinn
