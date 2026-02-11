@@ -122,7 +122,7 @@ struct RoundSmallYelAutinnKnob : RoundKnob {
 		//box.size = Vec(28, 28);
 	}
 };
-
+/*
 struct RoundTinyAutinnKnob : RoundKnob {
 	RoundTinyAutinnKnob() {
 		if (!pluginInstance) return;
@@ -130,6 +130,7 @@ struct RoundTinyAutinnKnob : RoundKnob {
 		//box.size = Vec(18, 18);
 	}
 };
+*/
 
 template <typename TBase>
 struct AutinnArcKnob : TBase {
