@@ -648,13 +648,16 @@ struct ScopeDisplay : TransparentWidget {
 		}
 
 		const int ch = module->trigSource;
-		// If Ext trigger, we default to centered 2V scale
+
 		float scale = 2.0f; // Default 2V/Div
 		float offset = 0.0f;
 
 		if (ch < 4) {
 			scale = getScale(int(std::round(module->params[Scope::SCALE_A_PARAM + ch].getValue())));
 			offset = module->params[Scope::POS_A_PARAM + ch].getValue();
+		} else {
+			// If ext trigger then no visuals
+			return;
 		}
 
 		float y = volt2Px(currentLevel, offset, scale);
