@@ -247,6 +247,24 @@ struct Scope : Module {
 			if (period_s > 3600.0) period_s = 0.0;
 			updateLights();
 			readControls();
+			autoTime();
+		}
+	}
+
+	void autoTime () {
+		if (autoTimeMode && lastFrequency > 0.01f) {
+			// Time since last trigger
+			double period = 1.0/lastFrequency;
+
+			// Calculate ideal time/div to show 3 periods
+			// 3 periods fill 1 screen
+			double targetTimePerDiv_s = (period * 3.0) / numDivsHoriz;
+
+			// clamp to prevent log(0)
+			if (targetTimePerDiv_s < 1e-5) targetTimePerDiv_s = 1e-5;
+			float newParamVal = std::log10((float)targetTimePerDiv_s);
+
+			params[TIME_PARAM].setValue(newParamVal);
 		}
 	}
 
@@ -327,21 +345,7 @@ struct Scope : Module {
 		bool edgeFound = trigPulse.process(schmittState);
 
 		if (edgeFound) {
-			if (autoTimeMode && period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
-				// Time since last trigger
-				double period = period_s;
-
-				// Calculate ideal time/div to show 3 periods
-				// 3.0 periods fill 1 screen
-				double targetTimePerDiv_s = (period * 3.0) / numDivsHoriz;
-
-				// clamp to prevent log(0)
-				if (targetTimePerDiv_s < 1e-5) targetTimePerDiv_s = 1e-5;
-				float newParamVal = std::log10((float)targetTimePerDiv_s);
-
-				params[TIME_PARAM].setValue(newParamVal);
-			}
-			if (period_s > 0.000001) {
+			if (period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
 				lastFrequency = (float)(1.0 / period_s);
 			} else {
 				lastFrequency = 0.0f;
