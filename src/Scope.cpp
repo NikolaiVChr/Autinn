@@ -4,6 +4,24 @@
 static constexpr int BUFFER_SIZE = 1 << 20;// 2^20 (5.4 seconds at 192khz)
 static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
 
+// 8 divisions (audio scope std)
+const float numDivs = 8.0f;// total
+const float numDivsHoriz = 20.0f;
+
+static float getScale(int knob) {
+	switch (knob) {
+		case 0: return 10.0f;
+		case 1: return  5.000f;
+		case 2: return  1.000f;
+		case 3: return  0.500f;
+		case 4: return  0.100f;
+		case 5: return  0.050f;
+		case 6: return  0.010f;
+		case 7: return  0.005f;
+		case 8: return  0.001f;
+	}
+}
+
 struct Scope : Module {
 	enum ParamIds {
 		POS_A_PARAM,
@@ -17,6 +35,7 @@ struct Scope : Module {
 		TRIG_MODE_PARAM,
 		TRIG_EDGE_PARAM,
 		FREEZE_PARAM,
+		AUTO_TIME_PARAM,
 		SCALE_A_PARAM,
 		SCALE_B_PARAM,
 		SCALE_C_PARAM,
@@ -42,6 +61,7 @@ struct Scope : Module {
 		TRIG_EDGE_FALL_LIGHT,
 		TRIG_EDGE_RISE_LIGHT,
 		ENUMS(FREEZE_LIGHT_RGB, 3),
+		AUTO_TIME_LIGHT,
 		NUM_LIGHTS
 	};
 
@@ -56,6 +76,7 @@ struct Scope : Module {
 	dsp::BooleanTrigger modeBtnTrig;
 	dsp::BooleanTrigger edgeBtnTrig;
 	dsp::BooleanTrigger freezeBtnTrig;
+	dsp::BooleanTrigger autoTimeBtnTrig;
 
 #define TRIG_MODE_AUTO 0
 #define TRIG_MODE_NORM 1
@@ -68,6 +89,9 @@ struct Scope : Module {
 	bool trigEdge = TRIG_EDGE_RISE;
 	bool frozen = false;
 	bool freezePending = false;
+
+	double period_s = 0.0;
+	bool autoTimeMode = false;
 
 	bool triggered = false;       // Have we found a trigger edge?
 	int triggerCandidate = 0;     // Where did the trigger happen?
@@ -87,10 +111,11 @@ struct Scope : Module {
 		configParam(POS_D_PARAM, -8.0, 8.0, 0.0, "Channel D Pos", " Div");
 
 		// scale
-		configParam(SCALE_A_PARAM, 0.1, 10.0, 0.1, "Channel A Scale", " V/Div");
-		configParam(SCALE_B_PARAM, 0.1, 10.0, 0.1, "Channel B Scale", " V/Div");
-		configParam(SCALE_C_PARAM, 0.1, 10.0, 0.1, "Channel C Scale", " V/Div");
-		configParam(SCALE_D_PARAM, 0.1, 10.0, 0.1, "Channel D Scale", " V/Div");
+		std:std::vector<std::string> scales = {"10 V/Div","5 V/Div","1 V/Div","0.5 V/Div","0.1 V/Div","50 mV/Div","10 mV/Div","5 V/Div","1 V/Div"};
+		configSwitch(SCALE_A_PARAM, 0.0f, 8.0f, 2.0f, "Channel A Scale", scales);
+		configSwitch(SCALE_B_PARAM, 0.0f, 8.0f, 2.0f, "Channel B Scale", scales);
+		configSwitch(SCALE_C_PARAM, 0.0f, 8.0f, 2.0f, "Channel C Scale", scales);
+		configSwitch(SCALE_D_PARAM, 0.0f, 8.0f, 2.0f, "Channel D Scale", scales);
 
 		// Time
 		configParam(TIME_PARAM, -5.0f, 1.0f, -3.0f, "Time / Div", " s", 10.0f);
@@ -102,6 +127,7 @@ struct Scope : Module {
 		configButton(TRIG_MODE_PARAM, "Trigger mode");
 		configButton(TRIG_EDGE_PARAM, "Trigger edge");
 		configButton(FREEZE_PARAM, "Freeze");
+		configButton(AUTO_TIME_PARAM, "Auto time");
 
 		// inputs
 		configInput(A_INPUT, "Channel A");
@@ -118,6 +144,7 @@ struct Scope : Module {
 		configLight(TRIG_EDGE_RISE_LIGHT, "Trigger on rising edge");
 		configLight(TRIG_EDGE_FALL_LIGHT, "Trigger on falling edge");
 		configLight(FREEZE_LIGHT_RGB, "Freeze");
+		configLight(AUTO_TIME_LIGHT, "Auto time");
 	}
 
 	json_t* dataToJson() override {
@@ -163,6 +190,11 @@ struct Scope : Module {
 				freezePending = true;
 			}
 		}
+		if (autoTimeBtnTrig.process((bool)params[AUTO_TIME_PARAM].getValue())) {
+			autoTimeMode = !autoTimeMode;
+		}
+
+		period_s += args.sampleTime;
 
 		if (!frozen) {
 			for (int c = 0; c < 4; c++) {
@@ -177,6 +209,7 @@ struct Scope : Module {
 		dspFrame++;
 		if (dspFrame > 1000) {
 			dspFrame = 0;
+			if (period_s > 3600.0) period_s = 0.0;
 			updateLights();
 			// TODO: update the other params to fields
 		}
@@ -188,7 +221,7 @@ struct Scope : Module {
 		float hysteresis = 0.1f; // Default for Ext (100mV)
 		if (trigSource < 4) {
 			trigSig = inputs[A_INPUT + trigSource].getVoltage();
-			float vPerDiv = params[SCALE_A_PARAM + trigSource].getValue();
+			float vPerDiv = getScale(params[SCALE_A_PARAM + trigSource].getValue());
 			hysteresis = 0.1f * vPerDiv;
 		} else {
 			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
@@ -197,8 +230,8 @@ struct Scope : Module {
 		float threshold = params[TRIG_LEVEL_PARAM].getValue();
 		float timePerDiv = std::pow(10.f, params[TIME_PARAM].getValue());
 
-		// We want to record 10 divisions after the trigger to fill the screen
-		float totalScreenTime = 10.0f * timePerDiv;
+		// We want to record numDivsHoriz divisions after the trigger to fill the screen
+		float totalScreenTime = numDivsHoriz * timePerDiv;
 		int samplesToRecord = int(totalScreenTime * sampleRate);
 
 		// TODO: min samples
@@ -240,6 +273,24 @@ struct Scope : Module {
 
 				// Use trigPulse to detect the rising edge of the Schmitt state
 				if (trigPulse.process(schmittState)) {
+
+					if (autoTimeMode && period_s < 2.0) {
+						// Time since last trigger
+						double period = period_s;
+
+						// Calculate ideal time/div to show 3 periods
+						// 3.0 periods fill 1 screen
+						double targetTimePerDiv = (period * 3.0) / numDivsHoriz;
+
+						// clamp to prevent log(0)
+						if (targetTimePerDiv < 1e-5) targetTimePerDiv = 1e-5;
+						float newParamVal = std::log10((float)targetTimePerDiv);
+
+						params[TIME_PARAM].setValue(newParamVal);
+					}
+
+					period_s = 0.0;
+
 					triggered = true;
 					//triggerCandidate = headIndex;
 					triggerIndex = headIndex;
@@ -312,6 +363,8 @@ struct Scope : Module {
 		lights[TRIG_EDGE_RISE_LIGHT].setBrightness(trigEdge == TRIG_EDGE_RISE ? 1.0f : 0.0f);
 		lights[TRIG_EDGE_FALL_LIGHT].setBrightness(trigEdge == TRIG_EDGE_FALL ? 1.0f : 0.0f);
 
+		lights[AUTO_TIME_LIGHT].setBrightness(autoTimeMode ? 1.0f : 0.0f);
+
 		lights[FREEZE_LIGHT_RGB+0].setBrightness(frozen || freezePending? 1.0f : 0.0f);
 		lights[FREEZE_LIGHT_RGB+1].setBrightness(freezePending ? 1.0f : 0.0f);
 		//lights[FREEZE_LIGHT_RGB+2].setBrightness(frozen ? 0.0f : 0.0f);
@@ -322,8 +375,7 @@ struct Scope : Module {
 struct ScopeDisplay : TransparentWidget {
 	Scope* module{};
 	int frame = 0;
-	// 8 divisions (audio scope std)
-	const float numDivs = 8.0f;
+
 	const float numDivs_inv = 1.0f/8.0f*2.0f;
 	const float maxSamplesPerPx = 16.0f;
 	const float maxPxPerSamples = 1.0f/maxSamplesPerPx;
@@ -350,7 +402,7 @@ struct ScopeDisplay : TransparentWidget {
 		if (!module) return;
 		if (!module->inputs[Scope::A_INPUT + ch].isConnected()) return;
 
-		float scale = module->params[Scope::SCALE_A_PARAM + ch].getValue();
+		float scale = getScale(module->params[Scope::SCALE_A_PARAM + ch].getValue());
 		float offset = module->params[Scope::POS_A_PARAM + ch].getValue();
 		float timePerDiv_s = std::pow(10.f, module->params[Scope::TIME_PARAM].getValue());
 
@@ -358,8 +410,7 @@ struct ScopeDisplay : TransparentWidget {
 
 
 		const float width = box.size.x;
-		// 10 horiz divs
-		const float totalTime = 10.0f * timePerDiv_s;
+		const float totalTime = numDivsHoriz * timePerDiv_s;
 		const float samplesToDraw = totalTime * module->sampleRate;
 
 		if (samplesToDraw < 2.0f) return;
@@ -487,12 +538,12 @@ struct ScopeDisplay : TransparentWidget {
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, nvgRGBA(60, 60, 60, 100));
 		nvgStrokeWidth(args.vg, 1.0);
-		for (int i = 1; i < 10; i++) {
+		for (int i = 1; i < numDivsHoriz; i++) {
 			float x = (box.size.x / 10.0f) * float(i);
 			nvgMoveTo(args.vg, x, 0);
 			nvgLineTo(args.vg, x, box.size.y);
 		}
-		for (int i = 1; i < 8; i++) {
+		for (int i = 1; i < numDivs; i++) {
 			float y = (box.size.y / 8.0f) * float(i);
 			nvgMoveTo(args.vg, 0, y);
 			nvgLineTo(args.vg, box.size.x, y);
@@ -571,6 +622,10 @@ struct ScopeWidget : ModuleWidget {
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigLevel, yRow2), module, Scope::FREEZE_PARAM));
 		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigLevel + 12, yRow2 + 12), module, Scope::FREEZE_LIGHT_RGB));
 
+		// Auto time
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTime, yRow2), module, Scope::AUTO_TIME_PARAM));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(xTime + 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
+
 		// Trig buttons (grid layout)
 		// source, mode
 		// edge, light
@@ -590,15 +645,18 @@ struct ScopeWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_RISE_LIGHT));
 		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + lightSpacingY + btnSpacingY), module, Scope::TRIG_EDGE_FALL_LIGHT));
 
+		/*
 		INFO("Freeze %.0f, %.0f", px2mm(xTrigLevel), px2mm(yRow2));
 		INFO("Time %.0f, %.0f", px2mm(xTime), px2mm(yRow1));
 		INFO("Holdoff %.0f, %.0f", px2mm(xHoldoff), px2mm(yRow1));
 		INFO("Threshold %.0f, %.0f", px2mm(xTrigLevel), px2mm(yRow1));
+		INFO("Source %.0f, %.0f", px2mm(xTrigBtns), px2mm(yRow1));
 		INFO("Auto %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow1 + btnSpacingY*2.0f - lightSpacingY));
 		INFO("Norm %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow1 + btnSpacingY*2.0f));
 		INFO("Single %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow1 + btnSpacingY*2.0f + lightSpacingY));
 		INFO("Rise %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow2 + btnSpacingY));
 		INFO("Fall %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow2 + lightSpacingY + btnSpacingY));
+		*/
 
 		// Ext trigger
 		addInput(createInputCentered<InPortAutinn>(Vec(xExtTrig, yRow2), module, Scope::CV_TRIG_EXT_INPUT));
