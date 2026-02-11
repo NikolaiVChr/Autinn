@@ -5,8 +5,10 @@ static constexpr int BUFFER_SIZE = 1 << 22;// 2^20 (5.4 seconds at 192khz) - 2^2
 static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
 
 // 8 divisions (audio scope std)
-constexpr float numDivs = 8.0f;// total
+constexpr float numDivsVert = 8.0f;// total
 constexpr float numDivsHoriz = 20.0f;
+constexpr float numDivsVert_inv = 1.0f/numDivsVert;
+constexpr float numDivsHoriz_inv = 1.0f/numDivsHoriz;
 
 #define TRIG_AUTO_TIMEOUT 2.0f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
@@ -286,7 +288,7 @@ struct Scope : Module {
 		float hysteresis = 0.1f; // Default for Ext (100mV)
 		if (trigSource < 4) {
 			trigSig = inputs[A_INPUT + trigSource].getVoltage();
-			float vPerDiv = getScale(scale[trigSource]);
+			float vPerDiv = scale[trigSource];
 			hysteresis = 0.1f * vPerDiv;
 		} else {
 			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
@@ -299,7 +301,7 @@ struct Scope : Module {
 		float totalScreenTime = numDivsHoriz * timePerDiv;
 		int samplesToRecord = int(totalScreenTime * sampleRate);
 
-		// TODO: min samples
+		if (samplesToRecord > BUFFER_SIZE) samplesToRecord = BUFFER_SIZE;
 		if (samplesToRecord < 32) samplesToRecord = 32;
 
 		// Holdoff
@@ -447,7 +449,6 @@ struct ScopeDisplay : TransparentWidget {
 	Scope* module{};
 	int frame = 0;
 
-	const float numDivs_inv = 1.0f/8.0f*2.0f;
 	const float maxSamplesPerPx = 16.0f;
 	const float maxPxPerSamples = 1.0f/maxSamplesPerPx;
 
@@ -526,6 +527,9 @@ struct ScopeDisplay : TransparentWidget {
 			const int startIdx = isNewData ? module->triggerIndex : module->lastTriggerIndex;
 
 			int sampleOffset = (int)(x * samplesPerPixel);
+			if (sampleOffset >= BUFFER_SIZE) {
+				break;
+			}
 			int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
 
 			if (!isNewData) {
@@ -587,10 +591,10 @@ struct ScopeDisplay : TransparentWidget {
 			}
 		}
 		nvgStroke(args.vg);
-		if (module->triggered && float(drawLimitPixel) < width) {
+		if (module->triggered && float(drawLimitPixel) <= width) {
 			// scanline
 			nvgBeginPath(args.vg);
-			nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 64)); // Faint white
+			nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 90)); // Faint white
 			nvgStrokeWidth(args.vg, 1.0f);
 			nvgMoveTo(args.vg, (float)drawLimitPixel, 0);
 			nvgLineTo(args.vg, (float)drawLimitPixel, box.size.y);
@@ -600,12 +604,12 @@ struct ScopeDisplay : TransparentWidget {
 
 	float volt2Px(float voltage, float offset_divs, float vPerDiv) const {
 
-		const float totalVolts = numDivs * vPerDiv;
+		const float totalVolts = numDivsVert * vPerDiv;
 
 		const float pxPerVolt = box.size.y / totalVolts;
 		const float centerY = box.size.y * 0.5f;
 
-		return centerY - voltage * pxPerVolt - box.size.y*numDivs_inv*offset_divs;
+		return centerY - voltage * pxPerVolt - box.size.y*numDivsVert_inv*offset_divs;
 	}
 
 	void draw(const DrawArgs& args) override {
@@ -788,13 +792,15 @@ struct ScopeDisplay : TransparentWidget {
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, nvgRGBA(60, 60, 60, 150));
 			nvgStrokeWidth(args.vg, 1.0);
+			// vert lines:
 			for (int i = 1; i < int(numDivsHoriz); i++) {
-				float x = (box.size.x / numDivsHoriz) * float(i);
+				float x = (box.size.x * numDivsHoriz_inv) * float(i);
 				nvgMoveTo(args.vg, x, 0);
 				nvgLineTo(args.vg, x, box.size.y);
 			}
-			for (int i = 1; i < int(numDivs); i++) {
-				float y = (box.size.y * numDivs_inv) * float(i);
+			// horiz lines:
+			for (int i = 1; i < int(numDivsVert); i++) {
+				float y = (box.size.y * numDivsVert_inv) * float(i);
 				nvgMoveTo(args.vg, 0, y);
 				nvgLineTo(args.vg, box.size.x, y);
 			}
@@ -812,8 +818,10 @@ struct ScopeDisplay : TransparentWidget {
 					const float offset = module->offset[ch];
 					const float scale = module->scale[ch];
 					const float y = volt2Px(0.0f, offset, scale);
-					nvgMoveTo(args.vg, x1, y);
-					nvgLineTo(args.vg, x2, y);
+					if (y >= 0.0f && y <= box.size.y) {
+						nvgMoveTo(args.vg, x1, y);
+						nvgLineTo(args.vg, x2, y);
+					}
 				}
 			}
 			nvgStroke(args.vg);
