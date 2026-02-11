@@ -5,8 +5,8 @@ static constexpr int BUFFER_SIZE = 1 << 20;// 2^20 (5.4 seconds at 192khz)
 static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
 
 // 8 divisions (audio scope std)
-const float numDivs = 8.0f;// total
-const float numDivsHoriz = 20.0f;
+constexpr float numDivs = 8.0f;// total
+constexpr float numDivsHoriz = 20.0f;
 
 #define TRIG_AUTO_TIMEOUT 0.5f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
@@ -46,6 +46,7 @@ struct Scope : Module {
 		TRIG_EDGE_PARAM,
 		FREEZE_PARAM,
 		AUTO_TIME_PARAM,
+		STATS_PARAM,
 		SCALE_A_PARAM,
 		SCALE_B_PARAM,
 		SCALE_C_PARAM,
@@ -87,29 +88,36 @@ struct Scope : Module {
 	dsp::BooleanTrigger edgeBtnTrig;
 	dsp::BooleanTrigger freezeBtnTrig;
 	dsp::BooleanTrigger autoTimeBtnTrig;
+	dsp::BooleanTrigger statsBtnTrig;
 
-#define TRIG_MODE_AUTO 0
-#define TRIG_MODE_NORM 1
-#define TRIG_MODE_SOLO 2
+#define TRIG_MODE_AUTO 0 // wait TRIG_AUTO_TIMEOUT then trigger even if no trigger found
+#define TRIG_MODE_NORM 1 // wait forever for trigger to be found
+#define TRIG_MODE_SOLO 2 // freeze when finding trigger
 #define TRIG_EDGE_RISE true
 #define TRIG_EDGE_FALL false
 
-	int trigSource = 0; // 0-3: Channel, 4: Ext
-	int trigMode = TRIG_MODE_AUTO;
-	bool trigEdge = TRIG_EDGE_RISE;
+	// transient
 	bool frozen = false;
 	bool freezePending = false;
-
 	double period_s = 0.0;
-	bool autoTimeMode = false;
-
 	bool triggered = false;       // Have we found a trigger edge?
-	int triggerCandidate = 0;     // Where did the trigger happen?
+	//int triggerCandidate = 0;     // Where did the trigger happen?
 	int samplesSinceTrigger = 0;  // Counter for div * time/div wait
 	float holdoffTime_s = 0.0f;     // Remaining holdoff in seconds
 	float autoTrigTimer = 0.0f;   // Auto mode timeout
-
 	int dspFrame = 1001;
+	float lastFrequency = 0.0f;
+
+	// persisted
+	bool autoTimeMode = false;
+	int trigSource = 0; // 0-3: Channel, 4: Ext
+	int trigMode = TRIG_MODE_AUTO;
+	bool trigEdge = TRIG_EDGE_RISE;
+	bool showBaselines = false;
+	bool showCenterline = false;
+	bool showGrid = true;
+	bool showStats = true;
+
 
 	Scope() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -137,6 +145,7 @@ struct Scope : Module {
 		configButton(TRIG_EDGE_PARAM, "Trigger edge");
 		configButton(FREEZE_PARAM, "Freeze");
 		configButton(AUTO_TIME_PARAM, "Auto time");
+		configButton(STATS_PARAM, "Stats");
 
 		// inputs
 		configInput(A_INPUT, "Channel A");
@@ -161,7 +170,7 @@ struct Scope : Module {
 		json_object_set_new(rootJ, "trigSource", json_integer(trigSource));
 		json_object_set_new(rootJ, "trigMode", json_integer(trigMode));
 		json_object_set_new(rootJ, "trigEdge", json_boolean(trigEdge));
-		//json_object_set_new(rootJ, "frozen", json_boolean(frozen));
+		json_object_set_new(rootJ, "autoTimeMode", json_boolean(autoTimeMode));
 		return rootJ;
 	}
 
@@ -175,8 +184,20 @@ struct Scope : Module {
 		json_t* eJ = json_object_get(rootJ, "trigEdge");
 		if (eJ) trigEdge = json_is_true(eJ);
 
-		//json_t* fJ = json_object_get(rootJ, "frozen");
-		//if (fJ) frozen = json_is_true(fJ);
+		json_t* aJ = json_object_get(rootJ, "autoTimeMode");
+		if (aJ) autoTimeMode = json_is_true(aJ);
+
+		json_t* stJ = json_object_get(rootJ, "showStats");
+		if (stJ) showStats = json_is_true(stJ);
+
+		json_t* gJ = json_object_get(rootJ, "showGrid");
+		if (gJ) showGrid = json_is_true(gJ);
+
+		json_t* cJ = json_object_get(rootJ, "showCenterline");
+		if (cJ) showCenterline = json_is_true(cJ);
+
+		json_t* bJ = json_object_get(rootJ, "showBaselines");
+		if (bJ) showBaselines = json_is_true(bJ);
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -201,6 +222,9 @@ struct Scope : Module {
 		}
 		if (autoTimeBtnTrig.process((bool)params[AUTO_TIME_PARAM].getValue())) {
 			autoTimeMode = !autoTimeMode;
+		}
+		if (statsBtnTrig.process((bool)params[STATS_PARAM].getValue())) {
+			showStats = !showStats;
 		}
 
 		period_s += args.sampleTime;
@@ -230,7 +254,7 @@ struct Scope : Module {
 		float hysteresis = 0.1f; // Default for Ext (100mV)
 		if (trigSource < 4) {
 			trigSig = inputs[A_INPUT + trigSource].getVoltage();
-			float vPerDiv = getScale(params[SCALE_A_PARAM + trigSource].getValue());
+			float vPerDiv = getScale(int(std::round(params[SCALE_A_PARAM + trigSource].getValue())));
 			hysteresis = 0.1f * vPerDiv;
 		} else {
 			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
@@ -274,6 +298,11 @@ struct Scope : Module {
 				float newParamVal = std::log10((float)targetTimePerDiv_s);
 
 				params[TIME_PARAM].setValue(newParamVal);
+			}
+			if (period_s > 0.000001) {
+				lastFrequency = (float)(1.0 / period_s);
+			} else {
+				lastFrequency = 0.0f;
 			}
 			period_s = 0.0;
 		}
@@ -334,7 +363,7 @@ struct Scope : Module {
 			case 1: return 0.9f;
 			case 2: return 0.0f;//0.2f;
 			case 3: return 0.0f;//0.2f;
-			default: return 1.0f;
+			default: return 0.0f;
 		}
 	}
 
@@ -342,9 +371,9 @@ struct Scope : Module {
 		switch (ch) {
 			case 0: return 0.0f;//0.2f;
 			case 1: return 0.8f;
-			case 2: return 1.0f;
+			case 2: return 0.8f;
 			case 3: return 0.0f;//0.6f;
-			default: return 1.0f;
+			default: return 0.0f;
 		}
 	}
 
@@ -354,7 +383,7 @@ struct Scope : Module {
 			case 1: return 0.0f;//0.2f;
 			case 2: return 0.0f;//0.2f;
 			case 3: return 1.0f;
-			default: return 1.0f;
+			default: return 0.0f;
 		}
 	}
 
@@ -387,6 +416,10 @@ struct ScopeDisplay : TransparentWidget {
 	const float maxSamplesPerPx = 16.0f;
 	const float maxPxPerSamples = 1.0f/maxSamplesPerPx;
 
+	//std::shared_ptr<Font> font;
+	float lastTrigLevel = -999.0f;
+	float trigVisibilityTimer = 0.0f;
+
 	NVGcolor color0 = nvgRGBA(255, 50, 50, 230);   // Red
 	NVGcolor color1 = nvgRGBA(255, 230, 50, 230);  // Yellow
 	NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
@@ -409,7 +442,7 @@ struct ScopeDisplay : TransparentWidget {
 		if (!module) return;
 		if (!module->inputs[Scope::A_INPUT + ch].isConnected()) return;
 
-		float scale = getScale(module->params[Scope::SCALE_A_PARAM + ch].getValue());
+		float scale = getScale(int(std::round(module->params[Scope::SCALE_A_PARAM + ch].getValue())));
 		float offset = module->params[Scope::POS_A_PARAM + ch].getValue();
 		float timePerDiv_s = std::pow(10.f, module->params[Scope::TIME_PARAM].getValue());
 
@@ -519,6 +552,8 @@ struct ScopeDisplay : TransparentWidget {
 
 	void draw(const DrawArgs& args) override {
 		drawGrid(args);
+		drawStats(args);
+		drawTrigger(args);
 	}
 
 	void drawLayer(const DrawArgs& args, const int layer) override {
@@ -533,6 +568,116 @@ struct ScopeDisplay : TransparentWidget {
 		frame++;
 		if (frame > 60) frame = 0;
 	}
+
+	void drawStats(const DrawArgs& args) const {
+		if (!module || !module->showStats) return;
+
+		//if (!font) font = APP->window->loadFont(asset::plugin(pluginInstance, "res/fonts/autinn.ttf"));
+		//if (!font) return;
+		//nvgFontFaceId(args.vg, font->handle);
+		nvgFontSize(args.vg, 13.0f);
+
+		const int ch = module->trigSource;
+		if (ch >= 4) return; // no stats for ext trigger
+		if (!module->inputs[Scope::A_INPUT + ch].isConnected()) return;
+
+		// limit
+		const int startIndex = module->triggerIndex;
+		const float timePerDiv_s = std::pow(10.f, module->params[Scope::TIME_PARAM].getValue());
+		const float totalTime = numDivsHoriz * timePerDiv_s;
+		int samplesToScan = (int)(totalTime * module->sampleRate);
+		if (samplesToScan > BUFFER_SIZE) samplesToScan = BUFFER_SIZE;
+
+		float minV = 100.0f;
+		float maxV = -100.0f;
+
+		int step = 1;
+		if (samplesToScan > 4000) step = samplesToScan / 2000;
+
+		for (int i = 0; i < samplesToScan; i += step) {
+			const int idx = (startIndex + i) & BUFFER_MASK;
+			const float v = module->buffer[ch][idx];
+			if (v < minV) minV = v;
+			if (v > maxV) maxV = v;
+		}
+
+		// Text box
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, 0, 0, box.size.x, 20.0f, 0.0f);
+		nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 128));
+		nvgFill(args.vg);
+
+		// Text
+		nvgFillColor(args.vg, getColor(ch));
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+		char text[128];
+		if (module->lastFrequency > 0.0f) {
+			snprintf(text, sizeof(text), "CH %c  Min: %.2f V   Max: %.2f V   Vpp: %.2f V   Freq: %.1f Hz",
+				'A' + ch,
+				module->lastFrequency,
+				minV,
+				maxV,
+				(maxV - minV));
+		} else {
+			snprintf(text, sizeof(text), "CH %c  Min: %.2f V   Max: %.2f V   Vpp: %.2f V",
+				'A' + ch,
+				minV,
+				maxV,
+				(maxV - minV));
+		}
+
+		nvgText(args.vg, 10, 10, text, nullptr);
+	}
+
+	void drawTrigger(const DrawArgs& args) {
+		if (!module) return;
+
+		const float currentLevel = module->params[Scope::TRIG_LEVEL_PARAM].getValue();
+
+		if (std::abs(currentLevel - lastTrigLevel) > 0.001f) {
+			// user is turning knob
+			trigVisibilityTimer = 0.5f; // Show for 0.5s at 60fps
+			lastTrigLevel = currentLevel;
+		}
+
+		if (trigVisibilityTimer > 0.0f) {
+			// Decrement Timer (60fps)
+			trigVisibilityTimer -= 0.016f;
+		} else {
+			return;
+		}
+
+		const int ch = module->trigSource;
+		// If Ext trigger, we default to centered 2V scale
+		float scale = 2.0f; // Default 2V/Div
+		float offset = 0.0f;
+
+		if (ch < 4) {
+			scale = getScale(int(std::round(module->params[Scope::SCALE_A_PARAM + ch].getValue())));
+			offset = module->params[Scope::POS_A_PARAM + ch].getValue();
+		}
+
+		float y = volt2Px(currentLevel, offset, scale);
+		if (y < 0) y = 0;
+		if (y > box.size.y) y = box.size.y;
+
+		// Line
+		nvgBeginPath(args.vg);
+		nvgStrokeColor(args.vg, getColor(ch)); // Match Source Color
+		nvgStrokeWidth(args.vg, 1.0f);
+		nvgMoveTo(args.vg, 0, y);
+		nvgLineTo(args.vg, box.size.x, y);
+		nvgStroke(args.vg);
+
+		// Label
+		nvgFontSize(args.vg, 12.0f);
+		nvgFillColor(args.vg, getColor(ch));
+		nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_BOTTOM);
+
+		char text[32];
+		snprintf(text, sizeof(text), "Trig: %.2fV", currentLevel);
+		nvgText(args.vg, box.size.x - 5, y - 2, text, nullptr);
+	}
 	
 	void drawGrid(const DrawArgs& args) const {
 		// Background
@@ -541,21 +686,103 @@ struct ScopeDisplay : TransparentWidget {
 		nvgFillColor(args.vg, nvgRGB(20, 20, 20));
 		nvgFill(args.vg);
 
-		// tmp grid
-		nvgBeginPath(args.vg);
-		nvgStrokeColor(args.vg, nvgRGBA(60, 60, 60, 100));
-		nvgStrokeWidth(args.vg, 1.0);
-		for (int i = 1; i < numDivsHoriz; i++) {
-			float x = (box.size.x / 10.0f) * float(i);
-			nvgMoveTo(args.vg, x, 0);
-			nvgLineTo(args.vg, x, box.size.y);
+		// grid
+		if (module->showGrid) {
+			nvgBeginPath(args.vg);
+			nvgStrokeColor(args.vg, nvgRGBA(60, 60, 60, 100));
+			nvgStrokeWidth(args.vg, 1.0);
+			for (int i = 1; i < int(numDivsHoriz); i++) {
+				float x = (box.size.x / numDivsHoriz) * float(i);
+				nvgMoveTo(args.vg, x, 0);
+				nvgLineTo(args.vg, x, box.size.y);
+			}
+			for (int i = 1; i < int(numDivs); i++) {
+				float y = (box.size.y * numDivs_inv) * float(i);
+				nvgMoveTo(args.vg, 0, y);
+				nvgLineTo(args.vg, box.size.x, y);
+			}
+			nvgStroke(args.vg);
 		}
-		for (int i = 1; i < numDivs; i++) {
-			float y = (box.size.y / 8.0f) * float(i);
-			nvgMoveTo(args.vg, 0, y);
-			nvgLineTo(args.vg, box.size.x, y);
+		float yCenter = box.size.y / 2.0f;
+		if (module->showBaselines) {
+			nvgBeginPath(args.vg);
+			nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 100));
+			nvgStrokeWidth(args.vg, 1.0);
+			const float x1 = 0;
+			const float x2 = box.size.x;
+			for (int ch = 0; ch < 4; ch++) {
+				if (module->inputs[Scope::A_INPUT+ch].isConnected()) {
+					float y = module->params[Scope::POS_A_PARAM + ch].getValue();
+					nvgMoveTo(args.vg, x1, yCenter-y);
+					nvgLineTo(args.vg, x2, yCenter-y);
+				}
+			}
+			nvgStroke(args.vg);
 		}
-		nvgStroke(args.vg);
+		if (module->showCenterline) {
+			nvgBeginPath(args.vg);
+			nvgStrokeColor(args.vg, nvgRGBA(200, 200, 200, 100));
+			nvgStrokeWidth(args.vg, 1.0);
+			float x1 = 0;
+			float x2 = box.size.x;
+			nvgMoveTo(args.vg, x1, yCenter);
+			nvgLineTo(args.vg, x2, yCenter);
+			nvgStroke(args.vg);
+		}
+	}
+};
+
+struct ShowCenterItem : MenuItem {
+	Scope* _module;
+
+	ShowCenterItem(Scope* module, const char* label)
+	: _module(module)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->showCenterline = !_module->showCenterline;
+	}
+
+	void step() override {
+		rightText = _module->showCenterline == true ? "✔" : "";
+	}
+};
+
+struct ShowBaseItem : MenuItem {
+	Scope* _module;
+
+	ShowBaseItem(Scope* module, const char* label)
+	: _module(module)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->showBaselines = !_module->showBaselines;
+	}
+
+	void step() override {
+		rightText = _module->showBaselines == true ? "✔" : "";
+	}
+};
+
+struct ShowGridItem : MenuItem {
+	Scope* _module;
+
+	ShowGridItem(Scope* module, const char* label)
+	: _module(module)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->showGrid = !_module->showGrid;
+	}
+
+	void step() override {
+		rightText = _module->showGrid == true ? "✔" : "";
 	}
 };
 
@@ -633,6 +860,9 @@ struct ScopeWidget : ModuleWidget {
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTime, yRow2), module, Scope::AUTO_TIME_PARAM));
 		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(xTime + 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
 
+		// Auto time
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xHoldoff, yRow2), module, Scope::STATS_PARAM));
+
 		// Trig buttons (grid layout)
 		// source, mode
 		// edge, light
@@ -667,6 +897,17 @@ struct ScopeWidget : ModuleWidget {
 
 		// Ext trigger
 		addInput(createInputCentered<InPortAutinn>(Vec(xExtTrig, yRow2), module, Scope::CV_TRIG_EXT_INPUT));
+	}
+
+	void appendContextMenu(Menu* menu) override {
+		Scope* a = dynamic_cast<Scope*>(module);
+		assert(a);
+
+		menu->addChild(new MenuLabel());
+		menu->addChild(new ShowGridItem(a, "Show grid"));
+		menu->addChild(new ShowBaseItem(a, "Show baselines"));
+		menu->addChild(new ShowCenterItem(a, "Show centerline"));
+		menu->addChild(new MenuLabel());
 	}
 };
 
