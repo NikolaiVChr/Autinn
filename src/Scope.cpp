@@ -270,20 +270,40 @@ struct Scope : Module {
 		}
 	}
 
-	void updateLights() {
-		// Source: A=Red, B=Yel, C=Grn, D=Blu, Ext=White
-		float sR=0, sG=0, sB=0;
-		switch(trigSource) {
-			case 0: sR=1; break; // A
-			case 1: sR=1; sG=1; break; // B
-			case 2: sG=1; break; // C
-			case 3: sB=1; sG=0.5; break; // D
-			case 4: sR=1; sG=1; sB=1; break; // Ext
-			default: ;
+	static float getRed(int ch) {
+		switch (ch) {
+			case 0: return 1.0f;
+			case 1: return 1.0f;
+			case 2: return 0.2f;
+			case 3: return 0.2f;
+			default: return 1.0f;
 		}
-		lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(sR);
-		lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(sG);
-		lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(sB);
+	}
+
+	static float getGreen(int ch) {
+		switch (ch) {
+			case 0: return 0.2f;
+			case 1: return 0.9f;
+			case 2: return 1.0f;
+			case 3: return 0.6f;
+			default: return 1.0f;
+		}
+	}
+
+	static float getBlue(int ch) {
+		switch (ch) {
+			case 0: return 0.2f;
+			case 1: return 0.2f;
+			case 2: return 0.2f;
+			case 3: return 1.0f;
+			default: return 1.0f;
+		}
+	}
+
+	void updateLights() {
+		lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(getRed(trigSource));
+		lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(getGreen(trigSource));
+		lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(getBlue(trigSource));
 
 		lights[TRIG_MODE_AUTO_LIGHT].setBrightness(trigMode==TRIG_MODE_AUTO ? 1.0f : 0.0f);
 		lights[TRIG_MODE_NORM_LIGHT].setBrightness(trigMode==TRIG_MODE_NORM ? 1.0f : 0.0f);
@@ -308,6 +328,23 @@ struct ScopeDisplay : TransparentWidget {
 	const float maxSamplesPerPx = 16.0f;
 	const float maxPxPerSamples = 1.0f/maxSamplesPerPx;
 
+	NVGcolor color0 = nvgRGBA(255, 50, 50, 230);   // Red
+	NVGcolor color1 = nvgRGBA(255, 230, 50, 230);  // Yellow
+	NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
+	NVGcolor color3 = nvgRGBA(50, 150, 255, 230);  // Blue
+	NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);
+
+
+
+	NVGcolor getColor(int ch) const {
+		switch (ch) {
+		case 0: return color0;
+		case 1: return color1;
+		case 2: return color2;
+		case 3: return color3;
+		default: return colorExt;
+		}
+	}
 
 	void drawWaveform(const DrawArgs& args, int ch) const {
 		if (!module) return;
@@ -317,14 +354,8 @@ struct ScopeDisplay : TransparentWidget {
 		float offset = module->params[Scope::POS_A_PARAM + ch].getValue();
 		float timePerDiv_s = std::pow(10.f, module->params[Scope::TIME_PARAM].getValue());
 
-		NVGcolor color;
-		switch (ch) {
-			case 0: color = nvgRGBA(255, 50, 50, 230); break;   // Red
-			case 1: color = nvgRGBA(255, 230, 50, 230); break;  // Yellow
-			case 2: color = nvgRGBA(50, 255, 50, 230); break;   // Green
-			case 3: color = nvgRGBA(50, 150, 255, 230); break;  // Blue
-			default: color = nvgRGBA(255, 255, 255, 255); break;
-		}
+		const NVGcolor color = getColor(ch);
+
 
 		const float width = box.size.x;
 		// 10 horiz divs
@@ -549,7 +580,7 @@ struct ScopeWidget : ModuleWidget {
 		float lightSpacingY = btnLightOffsetX*0.5f;
 
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow1 - btnSpacingY), module, Scope::TRIG_SOURCE_PARAM));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 - btnSpacingY), module, Scope::TRIG_SOURCE_LIGHT_RGB));
+		addChild(createLightCentered<MediumLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 - btnSpacingY), module, Scope::TRIG_SOURCE_LIGHT_RGB));
 
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow1 + btnSpacingY), module, Scope::TRIG_MODE_PARAM));
 		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY - lightSpacingY), module, Scope::TRIG_MODE_AUTO_LIGHT));

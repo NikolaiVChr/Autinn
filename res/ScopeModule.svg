@@ -37,7 +37,56 @@
      inkscape:window-x="-8"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
-     inkscape:current-layer="layer1" />
+     inkscape:current-layer="layer1"
+     showgrid="true">
+    <inkscape:grid
+       id="grid3"
+       units="mm"
+       originx="0"
+       originy="0"
+       spacingx="5.0800001"
+       spacingy="128.5"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="10"
+       enabled="true"
+       visible="true" />
+    <inkscape:grid
+       type="modular"
+       id="grid4"
+       units="mm"
+       originx="0"
+       originy="0"
+       spacingx="40"
+       spacingy="40.000001"
+       empcolor="#0047cb"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="0"
+       marginx="0"
+       marginy="0"
+       gapx="10"
+       gapy="10"
+       enabled="false"
+       visible="true" />
+    <inkscape:grid
+       id="grid5"
+       units="mm"
+       originx="0"
+       originy="0"
+       spacingx="5.0800001"
+       spacingy="1"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="10"
+       enabled="false"
+       visible="true" />
+  </sodipodi:namedview>
   <defs
      id="defs1">
     <rect
@@ -104,6 +153,42 @@
          d="m 19.79,291.7 v -1.58 q 0,-0.48 -0.1,-0.7 -0.1,-0.22 -0.33,-0.22 -0.03,0 -0.07,0.01 -0.04,0.01 -0.06,0.01 -0.03,0 -0.05,-0.02 -0.01,-0.02 -0.01,-0.07 0,-0.03 0.13,-0.07 0.09,-0.03 0.15,-0.05 0.21,-0.08 0.38,-0.2 0.04,-0.03 0.05,-0.03 0.07,0 0.2,0.14 0.13,0.14 0.19,0.34 0.34,-0.2 0.68,-0.32 0.34,-0.12 0.57,-0.12 0.38,0 0.56,0.29 0.17,0.29 0.17,0.98 0,0.32 -0.02,0.7 -0.01,0.38 -0.01,0.44 0,0.08 0.03,0.11 0.03,0.03 0.11,0.03 0.04,0 0.12,-0.03 0.08,-0.03 0.12,-0.03 0.02,0 0.04,0.03 0.01,0.03 0.01,0.08 0,0.07 -0.19,0.12 -0.16,0.04 -0.28,0.08 -0.16,0.06 -0.34,0.15 -0.16,0.08 -0.18,0.08 -0.03,0 -0.05,-0.02 -0.02,-0.02 -0.02,-0.05 0,0 0.01,-0.05 0.14,-0.5 0.14,-1.25 0,-0.68 -0.18,-1 -0.18,-0.31 -0.57,-0.31 -0.17,0 -0.35,0.08 -0.17,0.08 -0.32,0.23 0,0.04 0,0.2 0,0.15 0,0.25 0,0.52 0,0.97 0,0.44 -0.02,0.75 l -0.4,0.14 q 0,0 -0.01,0 -0.01,0 -0.02,0 -0.03,0 -0.04,-0.02 -0.01,-0.02 -0.01,-0.09 z"
          id="path6" />
     </g>
+    <rect
+       style="fill:#ff3232;fill-opacity:0.64102566;stroke:none;stroke-width:4.233;stroke-dasharray:none"
+       id="rect5"
+       width="17.780001"
+       height="35.880001"
+       x="2.54"
+       y="87.540001"
+       rx="5.0799999"
+       ry="5.0799999" />
+    <rect
+       style="fill:#3296ff;fill-opacity:0.63510847;stroke:none;stroke-width:4.233;stroke-dasharray:none"
+       id="rect5-5"
+       width="17.780001"
+       height="35.880001"
+       x="63.5"
+       y="87.841667"
+       rx="5.0799999"
+       ry="5.0799999" />
+    <rect
+       style="fill:#32ff32;fill-opacity:0.63510847;stroke:none;stroke-width:4.233;stroke-dasharray:none"
+       id="rect5-52"
+       width="17.780001"
+       height="35.880001"
+       x="43.18"
+       y="87.841667"
+       rx="5.0799999"
+       ry="5.0799999" />
+    <rect
+       style="fill:#ffe632;fill-opacity:0.64299804;stroke:none;stroke-width:4.233;stroke-dasharray:none"
+       id="rect5-2"
+       width="17.780001"
+       height="35.880001"
+       x="22.860001"
+       y="87.841667"
+       rx="5.0799999"
+       ry="5.0799999" />
   </g>
   <metadata
      id="metadata3">
