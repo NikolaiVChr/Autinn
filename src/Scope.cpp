@@ -10,6 +10,7 @@ constexpr float numDivsHoriz = 20.0f;
 
 #define TRIG_AUTO_TIMEOUT 0.5f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
+#define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
 
 static std::vector<std::string> scales = {
 	"10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
@@ -79,6 +80,7 @@ struct Scope : Module {
 	float buffer[4][BUFFER_SIZE] = {};
 	int headIndex = 0;
 	int triggerIndex = 0; // last valid trigger
+	int lastTriggerIndex = 0;
 	float sampleRate = 44100.0f;
 
 	dsp::SchmittTrigger trigSchmitt;
@@ -285,7 +287,7 @@ struct Scope : Module {
 		bool edgeFound = trigPulse.process(schmittState);
 
 		if (edgeFound) {
-			if (autoTimeMode && period_s < AUTO_TIME_PERIOD_MAX) {
+			if (autoTimeMode && period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
 				// Time since last trigger
 				double period = period_s;
 
@@ -328,8 +330,10 @@ struct Scope : Module {
 		} else {
 			// Waiting
 			if (holdoffTime_s <= 0.0f && edgeFound) {
+				// switch to recording
 				triggered = true;
 				//triggerCandidate = headIndex;
+				lastTriggerIndex = triggerIndex;
 				triggerIndex = headIndex;
 				samplesSinceTrigger = 0;
 				autoTrigTimer = 0.0f;
@@ -343,6 +347,7 @@ struct Scope : Module {
 
 				if (autoTrigTimer > timeout) {
 					// Force rolling trigger
+					lastTriggerIndex = triggerIndex;
 					triggerIndex = (headIndex - samplesToRecord) & BUFFER_MASK;
 					triggered = false;
 					samplesSinceTrigger = 0;
@@ -459,8 +464,6 @@ struct ScopeDisplay : TransparentWidget {
 		// > 1.0: Zoomed out
 		const double samplesPerPixel = samplesToDraw / width;
 
-		const int startIndex = module->triggerIndex;
-
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, color);
 		nvgStrokeWidth(args.vg, 1.25f); // Slightly thicker line
@@ -485,7 +488,11 @@ struct ScopeDisplay : TransparentWidget {
 			if (drawLimitPixel < 0) drawLimitPixel = 0;
 		}
 
-		for (int x = 0; x < drawLimitPixel; x += 1.0f) {
+		for (int x = 0; x < int(width); x += 1.0f) {
+			// left: new
+			// right: old
+			const int currentStart = (x < drawLimitPixel) ? module->triggerIndex : module->lastTriggerIndex;
+
 			if (samplesPerPixel > 1.0) {
 				// zoom out: Peaks
 				const int iStart = (int)(x * samplesPerPixel);
@@ -495,7 +502,7 @@ struct ScopeDisplay : TransparentWidget {
 				float minV = 100.0f;
 				float maxV = -100.0f;
 				for (int i = iStart; i < iEnd; i += step) {
-					const int idx = (startIndex + i) & BUFFER_MASK;
+					const int idx = (currentStart + i) & BUFFER_MASK;
 					const float v = module->buffer[ch][idx];
 					if (v < minV) minV = v;
 					if (v > maxV) maxV = v;
@@ -511,14 +518,14 @@ struct ScopeDisplay : TransparentWidget {
 					nvgMoveTo(args.vg, float(x), yTop);
 					first = false;
 				}
-				nvgLineTo(args.vg, float(x), yTop);
+				nvgMoveTo(args.vg, float(x), yTop);
 				nvgLineTo(args.vg, float(x), yBottom);
 
 			} else {
 				// zoom in
 				const double idxOffset = x * samplesPerPixel;
 
-				int bufferIndex = startIndex + (int)idxOffset;
+				int bufferIndex = currentStart + (int)idxOffset;
 
 				// Handle ring buffer wrap
 				bufferIndex = bufferIndex & BUFFER_MASK;
@@ -533,11 +540,24 @@ struct ScopeDisplay : TransparentWidget {
 					nvgMoveTo(args.vg, float(x), y);
 					first = false;
 				} else {
-					nvgLineTo(args.vg, float(x), y);
+					if (x == drawLimitPixel) {
+						nvgMoveTo(args.vg, float(x), y);
+					} else {
+						nvgLineTo(args.vg, float(x), y);
+					}
 				}
 			}
 		}
 		nvgStroke(args.vg);
+		if (module->triggered && float(drawLimitPixel) < width) {
+			// scanline
+			nvgBeginPath(args.vg);
+			nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 64)); // Faint white
+			nvgStrokeWidth(args.vg, 1.0f);
+			nvgMoveTo(args.vg, (float)drawLimitPixel, 0);
+			nvgLineTo(args.vg, (float)drawLimitPixel, box.size.y);
+			nvgStroke(args.vg);
+		}
 	}
 
 	float volt2Px(float voltage, float offset_divs, float vPerDiv) const {
@@ -692,7 +712,7 @@ struct ScopeDisplay : TransparentWidget {
 		// grid
 		if (module->showGrid) {
 			nvgBeginPath(args.vg);
-			nvgStrokeColor(args.vg, nvgRGBA(60, 60, 60, 100));
+			nvgStrokeColor(args.vg, nvgRGBA(60, 60, 60, 150));
 			nvgStrokeWidth(args.vg, 1.0);
 			for (int i = 1; i < int(numDivsHoriz); i++) {
 				float x = (box.size.x / numDivsHoriz) * float(i);
@@ -715,7 +735,9 @@ struct ScopeDisplay : TransparentWidget {
 			const float x2 = box.size.x;
 			for (int ch = 0; ch < 4; ch++) {
 				if (module->inputs[Scope::A_INPUT+ch].isConnected()) {
-					float y = module->params[Scope::POS_A_PARAM + ch].getValue();
+					float offset = module->params[Scope::POS_A_PARAM + ch].getValue();
+					float scale = getScale(int(std::round(module->params[Scope::SCALE_A_PARAM + ch].getValue())));
+					float y = volt2Px(0.0f, offset, scale);
 					nvgMoveTo(args.vg, x1, yCenter-y);
 					nvgLineTo(args.vg, x2, yCenter-y);
 				}
