@@ -36,9 +36,12 @@ struct Scope : Module {
 	};
 	enum LightIds {
 		ENUMS(TRIG_SOURCE_LIGHT_RGB, 3),
-		ENUMS(TRIG_MODE_LIGHT_RGB, 3),
-		ENUMS(TRIG_EDGE_LIGHT_RGB, 3),
-		FREEZE_LIGHT,
+		TRIG_MODE_AUTO_LIGHT,
+		TRIG_MODE_NORM_LIGHT,
+		TRIG_MODE_SOLO_LIGHT,
+		TRIG_EDGE_FALL_LIGHT,
+		TRIG_EDGE_RISE_LIGHT,
+		ENUMS(FREEZE_LIGHT_RGB, 3),
 		NUM_LIGHTS
 	};
 
@@ -64,6 +67,7 @@ struct Scope : Module {
 	int trigMode = TRIG_MODE_AUTO;
 	bool trigEdge = TRIG_EDGE_RISE;
 	bool frozen = false;
+	bool freezePending = false;
 
 	bool triggered = false;       // Have we found a trigger edge?
 	int triggerCandidate = 0;     // Where did the trigger happen?
@@ -105,6 +109,15 @@ struct Scope : Module {
 		configInput(C_INPUT, "Channel C");
 		configInput(D_INPUT, "Channel D");
 		configInput(CV_TRIG_EXT_INPUT, "Ext. trigger");
+
+		// lights
+		configLight(TRIG_SOURCE_LIGHT_RGB, "Trigger source");
+		configLight(TRIG_MODE_AUTO_LIGHT, "Auto trigger");
+		configLight(TRIG_MODE_NORM_LIGHT, "Norm trigger");
+		configLight(TRIG_MODE_SOLO_LIGHT, "Single trigger");
+		configLight(TRIG_EDGE_RISE_LIGHT, "Trigger on rising edge");
+		configLight(TRIG_EDGE_FALL_LIGHT, "Trigger on falling edge");
+		configLight(FREEZE_LIGHT_RGB, "Freeze");
 	}
 
 	json_t* dataToJson() override {
@@ -118,10 +131,10 @@ struct Scope : Module {
 
 	void dataFromJson(json_t* rootJ) override {
 		json_t* sJ = json_object_get(rootJ, "trigSource");
-		if (sJ) trigSource = json_integer_value(sJ);
+		if (sJ) trigSource = int(json_integer_value(sJ));
 
 		json_t* mJ = json_object_get(rootJ, "trigMode");
-		if (mJ) trigMode = json_integer_value(mJ);
+		if (mJ) trigMode = int(json_integer_value(mJ));
 
 		json_t* eJ = json_object_get(rootJ, "trigEdge");
 		if (eJ) trigEdge = json_is_true(eJ);
@@ -143,7 +156,12 @@ struct Scope : Module {
 			trigEdge = !trigEdge;
 		}
 		if (freezeBtnTrig.process((bool)params[FREEZE_PARAM].getValue())) {
-			frozen = !frozen;
+			if (freezePending || frozen) {
+				frozen = false;
+				freezePending = false;
+			} else {
+				freezePending = true;
+			}
 		}
 
 		if (!frozen) {
@@ -204,8 +222,9 @@ struct Scope : Module {
 				// Set holdoff (max 1 sec)
 				holdoffTime_s = std::pow(10.f,params[HOLDOFF_PARAM].getValue());
 
-				if (trigMode == TRIG_MODE_SOLO) {
+				if (trigMode == TRIG_MODE_SOLO || freezePending) {
 					frozen = true;
+					freezePending = false;
 				}
 			}
 		} else {
@@ -241,6 +260,11 @@ struct Scope : Module {
 					triggered = false;
 					samplesSinceTrigger = 0;
 					autoTrigTimer = 0.0f;
+
+					if (freezePending) {
+						frozen = true;
+						freezePending = false;
+					}
 				}
 			}
 		}
@@ -261,23 +285,16 @@ struct Scope : Module {
 		lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(sG);
 		lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(sB);
 
-		// Mode: Auto=green, Norm=yellow, Single=red
-		float mR=0, mG=0, mB=0;
-		switch(trigMode) {
-			case 0: mG=1; break; // Auto
-			case 1: mR=1; mG=1; break; // Norm
-			case 2: mR=1; break; // Single
-			default: ;
-		}
-		lights[TRIG_MODE_LIGHT_RGB+0].setBrightness(mR);
-		lights[TRIG_MODE_LIGHT_RGB+1].setBrightness(mG);
-		lights[TRIG_MODE_LIGHT_RGB+2].setBrightness(mB);
+		lights[TRIG_MODE_AUTO_LIGHT].setBrightness(trigMode==TRIG_MODE_AUTO ? 1.0f : 0.0f);
+		lights[TRIG_MODE_NORM_LIGHT].setBrightness(trigMode==TRIG_MODE_NORM ? 1.0f : 0.0f);
+		lights[TRIG_MODE_SOLO_LIGHT].setBrightness(trigMode==TRIG_MODE_SOLO ? 1.0f : 0.0f);
 
-		// Edge: Green=Rising, Red=Falling
-		lights[TRIG_EDGE_LIGHT_RGB+0].setBrightness(trigEdge ? 1.0f : 0.0f);
-		lights[TRIG_EDGE_LIGHT_RGB+1].setBrightness(trigEdge ? 0.0f : 1.0f);
+		lights[TRIG_EDGE_RISE_LIGHT].setBrightness(trigEdge == TRIG_EDGE_RISE ? 1.0f : 0.0f);
+		lights[TRIG_EDGE_FALL_LIGHT].setBrightness(trigEdge == TRIG_EDGE_FALL ? 1.0f : 0.0f);
 
-		lights[FREEZE_LIGHT].setBrightness(frozen ? 1.0f : 0.0f);
+		lights[FREEZE_LIGHT_RGB+0].setBrightness(frozen || freezePending? 1.0f : 0.0f);
+		lights[FREEZE_LIGHT_RGB+1].setBrightness(freezePending ? 1.0f : 0.0f);
+		//lights[FREEZE_LIGHT_RGB+2].setBrightness(frozen ? 0.0f : 0.0f);
 	}
 };
 
@@ -292,7 +309,7 @@ struct ScopeDisplay : TransparentWidget {
 	const float maxPxPerSamples = 1.0f/maxSamplesPerPx;
 
 
-	void drawWaveform(const DrawArgs& args, int ch) {
+	void drawWaveform(const DrawArgs& args, int ch) const {
 		if (!module) return;
 		if (!module->inputs[Scope::A_INPUT + ch].isConnected()) return;
 
@@ -325,6 +342,7 @@ struct ScopeDisplay : TransparentWidget {
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, color);
 		nvgStrokeWidth(args.vg, 1.25f); // Slightly thicker line
+		nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
 		bool first = true;
 
@@ -410,8 +428,11 @@ struct ScopeDisplay : TransparentWidget {
 		return centerY - voltage * pxPerVolt - box.size.y*numDivs_inv*offset_divs;
 	}
 
-	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer == 0) drawGrid(args);
+	void draw(const DrawArgs& args) override {
+		drawGrid(args);
+	}
+
+	void drawLayer(const DrawArgs& args, const int layer) override {
 		if (module && layer == 1) {// check if in plugin-browser or in rack.
 			nvgSave(args.vg);
 			nvgScissor(args.vg, 0, 0, box.size.x, box.size.y);
@@ -424,7 +445,7 @@ struct ScopeDisplay : TransparentWidget {
 		if (frame > 60) frame = 0;
 	}
 	
-	void drawGrid(const DrawArgs& args) {
+	void drawGrid(const DrawArgs& args) const {
 		// Background
 		nvgBeginPath(args.vg);
 		nvgRect(args.vg, 0, 0, box.size.x, box.size.y);
@@ -509,12 +530,12 @@ struct ScopeWidget : ModuleWidget {
 		
 		// Freeze
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xHoldoff, yRow2), module, Scope::FREEZE_PARAM));
-		addChild(createLightCentered<SmallLight<RedLight>>(Vec(xHoldoff + 12, yRow2 + 12), module, Scope::FREEZE_LIGHT));
+		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xHoldoff + 12, yRow2 + 12), module, Scope::FREEZE_LIGHT_RGB));
 
 
 		// Trigger
 		float xTrigLevel = 28.0f * hp;
-		float xTrigBtns  = 33.0f * hp;
+		float xTrigBtns  = 33.0f * hp - mm2px(7.0f);
 		float xExtTrig   = 38.0f * hp;
 
 		// Trig level
@@ -525,15 +546,19 @@ struct ScopeWidget : ModuleWidget {
 		// edge, light
 		float btnSpacingY = mm2px(18.0f/3.0f);// 12mm between them
 		float btnLightOffsetX = mm2px(7.0f); // xTrigBtns to light center
+		float lightSpacingY = btnLightOffsetX*0.5f;
 
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow1 - btnSpacingY), module, Scope::TRIG_SOURCE_PARAM));
 		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 - btnSpacingY), module, Scope::TRIG_SOURCE_LIGHT_RGB));
 
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow1 + btnSpacingY), module, Scope::TRIG_MODE_PARAM));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY), module, Scope::TRIG_MODE_LIGHT_RGB));
+		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY - lightSpacingY), module, Scope::TRIG_MODE_AUTO_LIGHT));
+		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY), module, Scope::TRIG_MODE_NORM_LIGHT));
+		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY + lightSpacingY), module, Scope::TRIG_MODE_SOLO_LIGHT));
 
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow2), module, Scope::TRIG_EDGE_PARAM));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2), module, Scope::TRIG_EDGE_LIGHT_RGB));
+		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2), module, Scope::TRIG_EDGE_RISE_LIGHT));
+		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + lightSpacingY), module, Scope::TRIG_EDGE_FALL_LIGHT));
 
 		// Ext trigger
 		addInput(createInputCentered<InPortAutinn>(Vec(xExtTrig, yRow2), module, Scope::CV_TRIG_EXT_INPUT));
