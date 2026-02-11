@@ -396,6 +396,7 @@ struct Scope : Module {
 					triggered = false;
 					samplesSinceTrigger = 0;
 					autoTrigTimer = 0.0f;
+					lastFrequency = 0.0f;
 
 					if (freezePending) {
 						frozen = true;
