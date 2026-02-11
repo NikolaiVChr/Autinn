@@ -111,6 +111,7 @@ struct Scope : Module {
 	float autoTrigTimer = 0.0f;   // Auto mode timeout
 	int dspFrame = 1001;
 	float lastFrequency = 0.0f;
+	float blinkPhase = 0.0f;
 
 	// persisted
 	bool autoTimeMode = false;
@@ -151,7 +152,7 @@ struct Scope : Module {
 		configSwitch(SCALE_D_PARAM, 0.0f, 10.0f, 4.0f, "Channel D Scale", scales);
 
 		// Time
-		configParam(TIME_PARAM, -5.0f, 1.0f, -3.0f, "Time / Div", " s", 10.0f);
+		configParam(TIME_PARAM, -5.0f, 0.0f, -3.0f, "Time / Div", " s", 10.0f);
 		configParam(HOLDOFF_PARAM, -3.0f, 0.0f, -3.0f, "Trigger holdoff", " s", 10.0f);
 
 		// Trigger
@@ -189,6 +190,10 @@ struct Scope : Module {
 		json_object_set_new(rootJ, "trigMode", json_integer(trigMode));
 		json_object_set_new(rootJ, "trigEdge", json_boolean(trigEdge));
 		json_object_set_new(rootJ, "autoTimeMode", json_boolean(autoTimeMode));
+		json_object_set_new(rootJ, "showStats", json_boolean(showStats));
+		json_object_set_new(rootJ, "showGrid", json_boolean(showGrid));
+		json_object_set_new(rootJ, "showCenterline", json_boolean(showCenterline));
+		json_object_set_new(rootJ, "showBaselines", json_boolean(showBaselines));
 		return rootJ;
 	}
 
@@ -232,6 +237,9 @@ struct Scope : Module {
 
 			headIndex = (headIndex + 1) & BUFFER_MASK;
 		}
+
+		blinkPhase += args.sampleTime * 2.0f;
+		if (blinkPhase >= 1.0f) blinkPhase -= 1.0f;
 
 		dspFrame++;
 		if (dspFrame > 1000) {
@@ -373,9 +381,9 @@ struct Scope : Module {
 
 			if (trigMode == TRIG_MODE_AUTO) {
 				autoTrigTimer += args.sampleTime;
-				// If no trigger for 0.5s (or > screen time), force update
+				// If no trigger for TRIG_AUTO_TIMEOUT (or > screen time), force update
 				float timeout = TRIG_AUTO_TIMEOUT;
-				if (timeout < totalScreenTime * 1.5f) timeout = totalScreenTime * 1.5f;
+				if (timeout < totalScreenTime * 1.25f) timeout = totalScreenTime * 1.25f;
 
 				if (autoTrigTimer > timeout) {
 					// Force rolling trigger
@@ -425,9 +433,16 @@ struct Scope : Module {
 	}
 
 	void updateLights() {
-		lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(getRed(trigSource));
-		lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(getGreen(trigSource));
-		lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(getBlue(trigSource));
+		float blinkBrightness = 1.0f;
+
+		if (!triggered && !frozen) {
+			// scanning
+			if (blinkPhase > 0.5f) blinkBrightness = 0.1f;
+		}
+
+		lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(getRed(trigSource)*blinkBrightness);
+		lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(getGreen(trigSource)*blinkBrightness);
+		lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(getBlue(trigSource)*blinkBrightness);
 
 		lights[TRIG_MODE_AUTO_LIGHT].setBrightness(trigMode==TRIG_MODE_AUTO ? 1.0f : 0.0f);
 		lights[TRIG_MODE_NORM_LIGHT].setBrightness(trigMode==TRIG_MODE_NORM ? 1.0f : 0.0f);
@@ -676,10 +691,10 @@ struct ScopeDisplay : TransparentWidget {
 		if (module->lastFrequency > 0.0f) {
 			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   Vpp: %.2f V   Freq: %.1f Hz",
 				'A' + ch,
-				module->lastFrequency,
 				minV,
 				maxV,
-				(maxV - minV));
+				(maxV - minV),
+				module->lastFrequency);
 		} else {
 			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   Vpp: %.2f V",
 				'A' + ch,
