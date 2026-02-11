@@ -77,10 +77,10 @@ struct Scope : Module {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
 		// pos
-		configParam(POS_A_PARAM, -10.0, 10.0, 0.0, "Channel A Pos", " V");
-		configParam(POS_B_PARAM, -10.0, 10.0, 0.0, "Channel B Pos", " V");
-		configParam(POS_C_PARAM, -10.0, 10.0, 0.0, "Channel C Pos", " V");
-		configParam(POS_D_PARAM, -10.0, 10.0, 0.0, "Channel D Pos", " V");
+		configParam(POS_A_PARAM, -8.0, 8.0, 0.0, "Channel A Pos", " Div");
+		configParam(POS_B_PARAM, -8.0, 8.0, 0.0, "Channel B Pos", " Div");
+		configParam(POS_C_PARAM, -8.0, 8.0, 0.0, "Channel C Pos", " Div");
+		configParam(POS_D_PARAM, -8.0, 8.0, 0.0, "Channel D Pos", " Div");
 
 		// scale
 		configParam(SCALE_A_PARAM, 0.1, 10.0, 0.1, "Channel A Scale", " V/Div");
@@ -89,7 +89,7 @@ struct Scope : Module {
 		configParam(SCALE_D_PARAM, 0.1, 10.0, 0.1, "Channel D Scale", " V/Div");
 
 		// Time
-		configParam(TIME_PARAM, -6.0f, 1.0f, -3.0f, "Time / Div", " s", 10.0f);
+		configParam(TIME_PARAM, -5.0f, 1.0f, -3.0f, "Time / Div", " s", 10.0f);
 		configParam(HOLDOFF_PARAM, -3.0f, 0.0f, -3.0f, "Trigger holdoff", " s", 10.0f);
 
 		// Trigger
@@ -105,6 +105,29 @@ struct Scope : Module {
 		configInput(C_INPUT, "Channel C");
 		configInput(D_INPUT, "Channel D");
 		configInput(CV_TRIG_EXT_INPUT, "Ext. trigger");
+	}
+
+	json_t* dataToJson() override {
+		json_t* rootJ = json_object();
+		json_object_set_new(rootJ, "trigSource", json_integer(trigSource));
+		json_object_set_new(rootJ, "trigMode", json_integer(trigMode));
+		json_object_set_new(rootJ, "trigEdge", json_boolean(trigEdge));
+		//json_object_set_new(rootJ, "frozen", json_boolean(frozen));
+		return rootJ;
+	}
+
+	void dataFromJson(json_t* rootJ) override {
+		json_t* sJ = json_object_get(rootJ, "trigSource");
+		if (sJ) trigSource = json_integer_value(sJ);
+
+		json_t* mJ = json_object_get(rootJ, "trigMode");
+		if (mJ) trigMode = json_integer_value(mJ);
+
+		json_t* eJ = json_object_get(rootJ, "trigEdge");
+		if (eJ) trigEdge = json_is_true(eJ);
+
+		//json_t* fJ = json_object_get(rootJ, "frozen");
+		//if (fJ) frozen = json_is_true(fJ);
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -123,13 +146,15 @@ struct Scope : Module {
 			frozen = !frozen;
 		}
 
-		for (int c = 0; c < 4; c++) {
-			buffer[c][headIndex] = inputs[A_INPUT + c].getVoltage();
+		if (!frozen) {
+			for (int c = 0; c < 4; c++) {
+				buffer[c][headIndex] = inputs[A_INPUT + c].getVoltage();
+			}
+
+			triggerDetect(args);
+
+			headIndex = (headIndex + 1) & BUFFER_MASK;
 		}
-
-		triggerDetect(args);
-
-		headIndex = (headIndex + 1) & BUFFER_MASK;
 
 		dspFrame++;
 		if (dspFrame > 1000) {
@@ -140,81 +165,82 @@ struct Scope : Module {
 	}
 
 	void triggerDetect(const ProcessArgs& args) {
-		if (!frozen) {
-			// Get trigger signal
-			float trigSig = 0.0f;
-			float hysteresis = 0.1f; // Default for Ext (100mV)
-			if (trigSource < 4) {
-				trigSig = inputs[A_INPUT + trigSource].getVoltage();
-				float vPerDiv = params[SCALE_A_PARAM + trigSource].getValue();
-				hysteresis = 0.1f * vPerDiv;
-			} else {
-				trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
+		// Get trigger signal
+		float trigSig = 0.0f;
+		float hysteresis = 0.1f; // Default for Ext (100mV)
+		if (trigSource < 4) {
+			trigSig = inputs[A_INPUT + trigSource].getVoltage();
+			float vPerDiv = params[SCALE_A_PARAM + trigSource].getValue();
+			hysteresis = 0.1f * vPerDiv;
+		} else {
+			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
+		}
+
+		float threshold = params[TRIG_LEVEL_PARAM].getValue();
+		float timePerDiv = std::pow(10.f, params[TIME_PARAM].getValue());
+
+		// We want to record 10 divisions after the trigger to fill the screen
+		float totalScreenTime = 10.0f * timePerDiv;
+		int samplesToRecord = int(totalScreenTime * sampleRate);
+
+		// TODO: min samples
+		if (samplesToRecord < 32) samplesToRecord = 32;
+
+		// Holdoff
+		if (holdoffTime_s > 0.0f) {
+			holdoffTime_s -= args.sampleTime;
+		}
+
+		if (triggered) {
+			// Recording
+			// We have already triggered, now we fill the buffer for the rest of the screen
+			samplesSinceTrigger++;
+
+			if (samplesSinceTrigger >= samplesToRecord) {
+				// buffer full, send to be drawn
+				//triggerIndex = triggerCandidate;
+				triggered = false;
+
+				// Set holdoff (max 1 sec)
+				holdoffTime_s = std::pow(10.f,params[HOLDOFF_PARAM].getValue());
+
+				if (trigMode == TRIG_MODE_SOLO) {
+					frozen = true;
+				}
+			}
+		} else {
+			// Waiting
+			if (holdoffTime_s <= 0.0f) {
+				// Schmitt-trigger processing
+				// Invert input for falling edge
+				float signal = trigEdge == TRIG_EDGE_FALL ? -trigSig : trigSig;
+				float thr = trigEdge == TRIG_EDGE_FALL ? -threshold : threshold;
+
+				// Hysteresis window 0.1V: Lower = Thr - 0.1, High = Thr.
+				bool schmittState = trigSchmitt.process(signal, thr - hysteresis, thr);
+
+				// Use trigPulse to detect the rising edge of the Schmitt state
+				if (trigPulse.process(schmittState)) {
+					triggered = true;
+					//triggerCandidate = headIndex;
+					triggerIndex = headIndex;
+					samplesSinceTrigger = 0;
+					autoTrigTimer = 0.0f;
+				}
 			}
 
-			float threshold = params[TRIG_LEVEL_PARAM].getValue();
-			float timePerDiv = std::pow(10.f, params[TIME_PARAM].getValue());
+			if (trigMode == TRIG_MODE_AUTO) {
+				autoTrigTimer += args.sampleTime;
+				// If no trigger for 0.5s (or > screen time), force update
+				float timeout = 0.5f;
+				if (timeout < totalScreenTime * 1.5f) timeout = totalScreenTime * 1.5f;
 
-			// We want to record 10 divisions after the trigger to fill the screen
-			float totalScreenTime = 10.0f * timePerDiv;
-			int samplesToRecord = int(totalScreenTime * sampleRate);
-
-			// TODO: min samples
-			if (samplesToRecord < 32) samplesToRecord = 32;
-
-			// Holdoff
-			if (holdoffTime_s > 0.0f) {
-				holdoffTime_s -= args.sampleTime;
-			}
-
-			if (triggered) {
-				// Recording
-				// We have already triggered, now we fill the buffer for the rest of the screen
-				samplesSinceTrigger++;
-
-				if (samplesSinceTrigger >= samplesToRecord) {
-					// buffer full, send to be drawn
-					triggerIndex = triggerCandidate;
+				if (autoTrigTimer > timeout) {
+					// Force rolling trigger
+					triggerIndex = (headIndex - samplesToRecord) & BUFFER_MASK;
 					triggered = false;
-
-					// Set holdoff (max 1 sec)
-					holdoffTime_s = std::pow(10.f,params[HOLDOFF_PARAM].getValue());
-
-					if (trigMode == TRIG_MODE_SOLO) {
-						frozen = true;
-					}
-				}
-			} else {
-				// Waiting
-				if (holdoffTime_s <= 0.0f) {
-					// Schmitt-trigger processing
-					// Invert input for falling edge
-					float signal = trigEdge == TRIG_EDGE_FALL ? -trigSig : trigSig;
-					float thr = trigEdge == TRIG_EDGE_FALL ? -threshold : threshold;
-
-					// Hysteresis window 0.1V: Lower = Thr - 0.1, High = Thr.
-					bool schmittState = trigSchmitt.process(signal, thr - hysteresis, thr);
-
-					// Use trigPulse to detect the rising edge of the Schmitt state
-					if (trigPulse.process(schmittState)) {
-						triggered = true;
-						triggerCandidate = headIndex;
-						samplesSinceTrigger = 0;
-						autoTrigTimer = 0.0f;
-					}
-				}
-
-				if (trigMode == TRIG_MODE_AUTO) {
-					autoTrigTimer += args.sampleTime;
-					// If no trigger for 0.5s (or > screen time), force update
-					float timeout = 0.5f;
-					if (timeout < totalScreenTime * 1.5f) timeout = totalScreenTime * 1.5f;
-
-					if (autoTrigTimer > timeout) {
-						// Force rolling trigger
-						triggerIndex = headIndex;
-						autoTrigTimer = 0.0f;
-					}
+					samplesSinceTrigger = 0;
+					autoTrigTimer = 0.0f;
 				}
 			}
 		}
@@ -259,6 +285,12 @@ struct Scope : Module {
 struct ScopeDisplay : TransparentWidget {
 	Scope* module{};
 	int frame = 0;
+	// 8 divisions (audio scope std)
+	const float numDivs = 8.0f;
+	const float numDivs_inv = 1.0f/8.0f*2.0f;
+	const float maxSamplesPerPx = 16.0f;
+	const float maxPxPerSamples = 1.0f/maxSamplesPerPx;
+
 
 	void drawWaveform(const DrawArgs& args, int ch) {
 		if (!module) return;
@@ -277,16 +309,16 @@ struct ScopeDisplay : TransparentWidget {
 			default: color = nvgRGBA(255, 255, 255, 255); break;
 		}
 
-		float width = box.size.x;
+		const float width = box.size.x;
 		// 10 horiz divs
-		float totalTime = 10.0f * timePerDiv_s;
-		float samplesToDraw = totalTime * module->sampleRate;
+		const float totalTime = 10.0f * timePerDiv_s;
+		const float samplesToDraw = totalTime * module->sampleRate;
 
 		if (samplesToDraw < 2.0f) return;
 
 		// < 1.0: Zoomed in
 		// > 1.0: Zoomed out
-		double samplesPerPixel = samplesToDraw / width;
+		const double samplesPerPixel = samplesToDraw / width;
 
 		const int startIndex = module->triggerIndex;
 
@@ -296,51 +328,97 @@ struct ScopeDisplay : TransparentWidget {
 
 		bool first = true;
 
-		for (int x = 0; x < width; x += 1.0f) {
+		int step = 1;
+		if (samplesPerPixel > maxSamplesPerPx) {
+			step = (int)(samplesPerPixel * maxPxPerSamples);
+			if (step < 1) step = 1;
+		}
 
-			double idxOffset = x * samplesPerPixel;
+		int drawLimitPixel = int(width)+1;
 
-			int bufferIndex = startIndex + (int)idxOffset;
+		if (module->triggered) {
+			// We are in the middle of a scan
+			double validPixels = (double)module->samplesSinceTrigger / samplesPerPixel;
+			drawLimitPixel = (int)validPixels;
 
-			// Handle ring buffer wrap
-			bufferIndex = bufferIndex & BUFFER_MASK;
+			if (drawLimitPixel > int(width)+1) drawLimitPixel = int(width)+1;
+			if (drawLimitPixel < 0) drawLimitPixel = 0;
+		}
 
-			const float v = module->buffer[ch][bufferIndex];
-			float y = volt2Px(v, offset, scale);
+		for (int x = 0; x < drawLimitPixel; x += 1.0f) {
+			if (samplesPerPixel > 1.0) {
+				// zoom out: Peaks
+				const int iStart = (int)(x * samplesPerPixel);
+				int iEnd = (int)((x + 1) * samplesPerPixel);
+				if (iEnd <= iStart) iEnd = iStart + 1;
 
-			// clamp unseen.
-			// TODO: If zoomed in on waveform and peak goes larger then peak root will be drawn wrongly.
-			//       Not sure how large nvg can handle.
-			y = clamp(y, -50.0f, box.size.y + 50.0f);
+				float minV = 100.0f;
+				float maxV = -100.0f;
+				for (int i = iStart; i < iEnd; i += step) {
+					const int idx = (startIndex + i) & BUFFER_MASK;
+					const float v = module->buffer[ch][idx];
+					if (v < minV) minV = v;
+					if (v > maxV) maxV = v;
+				}
 
-			if (first) {
-				nvgMoveTo(args.vg, float(x), y);
-				first = false;
+				float yTop = volt2Px(maxV, offset, scale);
+				float yBottom = volt2Px(minV, offset, scale);
+
+				yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
+				yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
+
+				if (first) {
+					nvgMoveTo(args.vg, float(x), yTop);
+					first = false;
+				}
+				nvgLineTo(args.vg, float(x), yTop);
+				nvgLineTo(args.vg, float(x), yBottom);
+
 			} else {
-				nvgLineTo(args.vg, float(x), y);
+				// zoom in
+				const double idxOffset = x * samplesPerPixel;
+
+				int bufferIndex = startIndex + (int)idxOffset;
+
+				// Handle ring buffer wrap
+				bufferIndex = bufferIndex & BUFFER_MASK;
+
+				const float v = module->buffer[ch][bufferIndex];
+				float y = volt2Px(v, offset, scale);
+
+				// clamp unseen.
+				y = clamp(y, -10000.0f, box.size.y+10000.0f);
+
+				if (first) {
+					nvgMoveTo(args.vg, float(x), y);
+					first = false;
+				} else {
+					nvgLineTo(args.vg, float(x), y);
+				}
 			}
 		}
 		nvgStroke(args.vg);
 	}
 
-	float volt2Px(float voltage, float offset_volt, float vPerDiv) {
-		// 8 divisions (audio scope std)
-		float numDivs = 8.0f;
+	float volt2Px(float voltage, float offset_divs, float vPerDiv) const {
 
-		float totalVolts = numDivs * vPerDiv;
+		const float totalVolts = numDivs * vPerDiv;
 
-		float pxPerVolt = box.size.y / totalVolts;
-		float centerY = box.size.y * 0.5f;
+		const float pxPerVolt = box.size.y / totalVolts;
+		const float centerY = box.size.y * 0.5f;
 
-		return centerY - (voltage + offset_volt) * pxPerVolt;
+		return centerY - voltage * pxPerVolt - box.size.y*numDivs_inv*offset_divs;
 	}
 
-	void draw(const DrawArgs& args) override {
-		drawGrid(args);
-		if (module) {// check if in plugin-browser or in rack.
+	void drawLayer(const DrawArgs& args, int layer) override {
+		if (layer == 0) drawGrid(args);
+		if (module && layer == 1) {// check if in plugin-browser or in rack.
+			nvgSave(args.vg);
+			nvgScissor(args.vg, 0, 0, box.size.x, box.size.y);
 			for (int c = 0; c < 4; c++) {
 				drawWaveform(args, c);
 			}
+			nvgRestore(args.vg);
 		}
 		frame++;
 		if (frame > 60) frame = 0;
