@@ -1,14 +1,14 @@
 #include "Autinn.hpp"
 #include <cmath>
 
-static constexpr int BUFFER_SIZE = 1 << 20;// 2^20 (5.4 seconds at 192khz)
+static constexpr int BUFFER_SIZE = 1 << 22;// 2^20 (5.4 seconds at 192khz) - 2^22 (22 seconds at 192khz)
 static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
 
 // 8 divisions (audio scope std)
 constexpr float numDivs = 8.0f;// total
 constexpr float numDivsHoriz = 20.0f;
 
-#define TRIG_AUTO_TIMEOUT 0.5f    // seconds
+#define TRIG_AUTO_TIMEOUT 2.0f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
 #define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
 
@@ -120,6 +120,18 @@ struct Scope : Module {
 	bool showGrid = true;
 	bool showStats = true;
 
+	// controls
+	bool sourceBtn;
+	bool trigModeKnob;
+	bool trigEdgeBtn;
+	bool autotimeBtn;
+	bool freezeBtn;
+	bool statsBtn;
+	float offset[4];
+	float scale[4];
+	float thresholdKnob;
+	float holdoffKnob;
+
 
 	Scope() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -165,6 +177,8 @@ struct Scope : Module {
 		configLight(TRIG_EDGE_FALL_LIGHT, "Trigger on falling edge");
 		configLight(FREEZE_LIGHT_RGB, "Freeze");
 		configLight(AUTO_TIME_LIGHT, "Auto time");
+
+		readControls();
 	}
 
 	json_t* dataToJson() override {
@@ -205,30 +219,6 @@ struct Scope : Module {
 	void process(const ProcessArgs& args) override {
 		sampleRate = args.sampleRate;
 
-		if (srcBtnTrig.process((bool)params[TRIG_SOURCE_PARAM].getValue())) {
-			trigSource = (trigSource + 1) % 5;
-		}
-		if (modeBtnTrig.process((bool)params[TRIG_MODE_PARAM].getValue())) {
-			trigMode = (trigMode + 1) % 3;
-		}
-		if (edgeBtnTrig.process((bool)params[TRIG_EDGE_PARAM].getValue())) {
-			trigEdge = !trigEdge;
-		}
-		if (freezeBtnTrig.process((bool)params[FREEZE_PARAM].getValue())) {
-			if (freezePending || frozen) {
-				frozen = false;
-				freezePending = false;
-			} else {
-				freezePending = true;
-			}
-		}
-		if (autoTimeBtnTrig.process((bool)params[AUTO_TIME_PARAM].getValue())) {
-			autoTimeMode = !autoTimeMode;
-		}
-		if (statsBtnTrig.process((bool)params[STATS_PARAM].getValue())) {
-			showStats = !showStats;
-		}
-
 		period_s += args.sampleTime;
 
 		if (!frozen) {
@@ -246,7 +236,47 @@ struct Scope : Module {
 			dspFrame = 0;
 			if (period_s > 3600.0) period_s = 0.0;
 			updateLights();
-			// TODO: update the other params to fields
+			readControls();
+		}
+	}
+
+	void readControls() {
+		sourceBtn = (bool)params[TRIG_SOURCE_PARAM].getValue();
+		trigModeKnob = (bool)params[TRIG_MODE_PARAM].getValue();
+		trigEdgeBtn = (bool)params[TRIG_EDGE_PARAM].getValue();
+		freezeBtn = (bool)params[FREEZE_PARAM].getValue();
+		autotimeBtn = (bool)params[AUTO_TIME_PARAM].getValue();
+		statsBtn = (bool)params[STATS_PARAM].getValue();
+		thresholdKnob = params[TRIG_LEVEL_PARAM].getValue();
+		holdoffKnob = std::pow(10.f,params[HOLDOFF_PARAM].getValue());
+		for (int ch = 0; ch < 4; ch++) {
+			offset[ch] = params[POS_A_PARAM + ch].getValue();
+			scale[ch] = getScale(int(std::round(params[SCALE_A_PARAM + ch].getValue())));
+		}
+		// time knob we skip here
+
+		if (srcBtnTrig.process(sourceBtn)) {
+			trigSource = (trigSource + 1) % 5;
+		}
+		if (modeBtnTrig.process(trigModeKnob)) {
+			trigMode = (trigMode + 1) % 3;
+		}
+		if (edgeBtnTrig.process(trigEdgeBtn)) {
+			trigEdge = !trigEdge;
+		}
+		if (freezeBtnTrig.process(freezeBtn)) {
+			if (freezePending || frozen) {
+				frozen = false;
+				freezePending = false;
+			} else {
+				freezePending = true;
+			}
+		}
+		if (autoTimeBtnTrig.process(autotimeBtn)) {
+			autoTimeMode = !autoTimeMode;
+		}
+		if (statsBtnTrig.process(statsBtn)) {
+			showStats = !showStats;
 		}
 	}
 
@@ -256,13 +286,13 @@ struct Scope : Module {
 		float hysteresis = 0.1f; // Default for Ext (100mV)
 		if (trigSource < 4) {
 			trigSig = inputs[A_INPUT + trigSource].getVoltage();
-			float vPerDiv = getScale(int(std::round(params[SCALE_A_PARAM + trigSource].getValue())));
+			float vPerDiv = getScale(scale[trigSource]);
 			hysteresis = 0.1f * vPerDiv;
 		} else {
 			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
 		}
 
-		float threshold = params[TRIG_LEVEL_PARAM].getValue();
+		float threshold = thresholdKnob;
 		float timePerDiv = std::pow(10.f, params[TIME_PARAM].getValue());
 
 		// We want to record numDivsHoriz divisions after the trigger to fill the screen
@@ -320,7 +350,7 @@ struct Scope : Module {
 				triggered = false;
 
 				// Set holdoff (max 1 sec)
-				holdoffTime_s = std::pow(10.f,params[HOLDOFF_PARAM].getValue());
+				holdoffTime_s = std::pow(10.f,holdoffKnob);
 
 				if (trigMode == TRIG_MODE_SOLO || freezePending) {
 					frozen = true;
@@ -347,7 +377,7 @@ struct Scope : Module {
 
 				if (autoTrigTimer > timeout) {
 					// Force rolling trigger
-					lastTriggerIndex = triggerIndex;
+					//lastTriggerIndex = triggerIndex;//TODO: not sure if thsi line is smart or not.
 					triggerIndex = (headIndex - samplesToRecord) & BUFFER_MASK;
 					triggered = false;
 					samplesSinceTrigger = 0;
@@ -447,8 +477,8 @@ struct ScopeDisplay : TransparentWidget {
 		if (!module) return;
 		if (!module->inputs[Scope::A_INPUT + ch].isConnected()) return;
 
-		float scale = getScale(int(std::round(module->params[Scope::SCALE_A_PARAM + ch].getValue())));
-		float offset = module->params[Scope::POS_A_PARAM + ch].getValue();
+		float scale = module->scale[ch];
+		float offset = module->offset[ch];
 		float timePerDiv_s = std::pow(10.f, module->params[Scope::TIME_PARAM].getValue());
 
 		const NVGcolor color = getColor(ch);
@@ -491,7 +521,23 @@ struct ScopeDisplay : TransparentWidget {
 		for (int x = 0; x < int(width); x += 1.0f) {
 			// left: new
 			// right: old
-			const int currentStart = (x < drawLimitPixel) ? module->triggerIndex : module->lastTriggerIndex;
+			// extreme right: ahead of bufferhead
+			bool isNewData = (x < drawLimitPixel);
+			const int startIdx = isNewData ? module->triggerIndex : module->lastTriggerIndex;
+
+			int sampleOffset = (int)(x * samplesPerPixel);
+			int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
+
+			if (!isNewData) {
+				// Distance from New Trigger to this Read Point
+				int distFromNew = (readIndex - module->triggerIndex) & BUFFER_MASK;
+
+				// If this distance is small and positive, it means this old pixel
+				// is wrapped in the buffer.
+				if (distFromNew >= 0 && distFromNew < module->samplesSinceTrigger) {
+					break;
+				}
+			}
 
 			if (samplesPerPixel > 1.0) {
 				// zoom out: Peaks
@@ -502,8 +548,7 @@ struct ScopeDisplay : TransparentWidget {
 				float minV = 100.0f;
 				float maxV = -100.0f;
 				for (int i = iStart; i < iEnd; i += step) {
-					const int idx = (currentStart + i) & BUFFER_MASK;
-					const float v = module->buffer[ch][idx];
+					const float v = module->buffer[ch][readIndex];
 					if (v < minV) minV = v;
 					if (v > maxV) maxV = v;
 				}
@@ -518,19 +563,12 @@ struct ScopeDisplay : TransparentWidget {
 					nvgMoveTo(args.vg, float(x), yTop);
 					first = false;
 				}
-				nvgMoveTo(args.vg, float(x), yTop);
+				nvgLineTo(args.vg, float(x), yTop);
 				nvgLineTo(args.vg, float(x), yBottom);
 
 			} else {
 				// zoom in
-				const double idxOffset = x * samplesPerPixel;
-
-				int bufferIndex = currentStart + (int)idxOffset;
-
-				// Handle ring buffer wrap
-				bufferIndex = bufferIndex & BUFFER_MASK;
-
-				const float v = module->buffer[ch][bufferIndex];
+				const float v = module->buffer[ch][readIndex];
 				float y = volt2Px(v, offset, scale);
 
 				// clamp unseen.
@@ -632,14 +670,14 @@ struct ScopeDisplay : TransparentWidget {
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 		char text[128];
 		if (module->lastFrequency > 0.0f) {
-			snprintf(text, sizeof(text), "CH %c  Min: %.2f V   Max: %.2f V   Vpp: %.2f V   Freq: %.1f Hz",
+			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   Vpp: %.2f V   Freq: %.1f Hz",
 				'A' + ch,
 				module->lastFrequency,
 				minV,
 				maxV,
 				(maxV - minV));
 		} else {
-			snprintf(text, sizeof(text), "CH %c  Min: %.2f V   Max: %.2f V   Vpp: %.2f V",
+			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   Vpp: %.2f V",
 				'A' + ch,
 				minV,
 				maxV,
@@ -652,7 +690,7 @@ struct ScopeDisplay : TransparentWidget {
 	void drawTrigger(const DrawArgs& args) {
 		if (!module) return;
 
-		const float currentLevel = module->params[Scope::TRIG_LEVEL_PARAM].getValue();
+		const float currentLevel = module->thresholdKnob;
 
 		if (std::abs(currentLevel - lastTrigLevel) > 0.001f) {
 			// user is turning knob
@@ -673,8 +711,8 @@ struct ScopeDisplay : TransparentWidget {
 		float offset = 0.0f;
 
 		if (ch < 4) {
-			scale = getScale(int(std::round(module->params[Scope::SCALE_A_PARAM + ch].getValue())));
-			offset = module->params[Scope::POS_A_PARAM + ch].getValue();
+			scale = module->scale[ch];
+			offset = module->offset[ch];
 		} else {
 			// If ext trigger then no visuals
 			return;
@@ -685,12 +723,15 @@ struct ScopeDisplay : TransparentWidget {
 		if (y > box.size.y) y = box.size.y;
 
 		// Line
+		drawDashedLine(args.vg, 0, y, box.size.x, y, 1.0f, getColor(ch));
+		/*
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, getColor(ch)); // Match Source Color
 		nvgStrokeWidth(args.vg, 1.0f);
 		nvgMoveTo(args.vg, 0, y);
 		nvgLineTo(args.vg, box.size.x, y);
 		nvgStroke(args.vg);
+		*/
 
 		// Label
 		nvgFontSize(args.vg, 12.0f);
@@ -701,8 +742,41 @@ struct ScopeDisplay : TransparentWidget {
 		snprintf(text, sizeof(text), "Trig: %.2fV", currentLevel);
 		nvgText(args.vg, box.size.x - 5, y - 2, text, nullptr);
 	}
+
+	void drawDashedLine(NVGcontext* vg, float x1, float y1, float x2, float y2, float stroke, NVGcolor color) const {
+		float dashLen = 5.0f; // Length of the solid part
+		float gapLen = 5.0f;  // Length of the empty part
+
+		float dx = x2 - x1;
+		float dy = y2 - y1;
+		float len = std::hypot(dx, dy);
+		float nx = dx / len;
+		float ny = dy / len;
+
+		nvgBeginPath(vg);
+		nvgStrokeWidth(vg, stroke);
+		nvgStrokeColor(vg, color);
+		nvgLineCap(vg, NVG_BUTT);
+
+		for (float i = 0; i < len; i += (dashLen + gapLen)) {
+			float startX = x1 + nx * i;
+			float startY = y1 + ny * i;
+
+			float distRemaining = len - i;
+			float currentDash = (distRemaining < dashLen) ? distRemaining : dashLen;
+
+			float endX = startX + nx * currentDash;
+			float endY = startY + ny * currentDash;
+
+			nvgMoveTo(vg, startX, startY);
+			nvgLineTo(vg, endX, endY);
+		}
+		nvgStroke(vg);
+	}
 	
 	void drawGrid(const DrawArgs& args) const {
+		if (!module) return;
+
 		// Background
 		nvgBeginPath(args.vg);
 		nvgRect(args.vg, 0, 0, box.size.x, box.size.y);
@@ -735,11 +809,11 @@ struct ScopeDisplay : TransparentWidget {
 			const float x2 = box.size.x;
 			for (int ch = 0; ch < 4; ch++) {
 				if (module->inputs[Scope::A_INPUT+ch].isConnected()) {
-					float offset = module->params[Scope::POS_A_PARAM + ch].getValue();
-					float scale = getScale(int(std::round(module->params[Scope::SCALE_A_PARAM + ch].getValue())));
-					float y = volt2Px(0.0f, offset, scale);
-					nvgMoveTo(args.vg, x1, yCenter-y);
-					nvgLineTo(args.vg, x2, yCenter-y);
+					const float offset = module->offset[ch];
+					const float scale = module->scale[ch];
+					const float y = volt2Px(0.0f, offset, scale);
+					nvgMoveTo(args.vg, x1, y);
+					nvgLineTo(args.vg, x2, y);
 				}
 			}
 			nvgStroke(args.vg);

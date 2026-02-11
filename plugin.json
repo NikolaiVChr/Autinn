@@ -308,11 +308,12 @@
     },
     {
       "slug": "Scope40",
-      "name": "Ursa",
-      "description": "40 HP",
-      "deprecated": true,
-      "keywords": "",
+      "name": "Scope",
+      "description": "Oscilloscope with auto-time",
+      "keywords": "measure monitor",
       "tags": [
+        "Visual",
+        "Utility"
       ]
     }
   ]
