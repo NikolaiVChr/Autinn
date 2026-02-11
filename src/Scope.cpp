@@ -8,17 +8,27 @@ static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
 const float numDivs = 8.0f;// total
 const float numDivsHoriz = 20.0f;
 
+#define TRIG_AUTO_TIMEOUT 0.5f    // seconds
+#define AUTO_TIME_PERIOD_MAX 10.0 // seconds
+
+static std::vector<std::string> scales = {
+	"10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
+	"0.2 V/Div","0.1 V/Div","50 mV/Div","20 mV/Div","10 mV/Div", "5 mV/Div"
+};
 static float getScale(int knob) {
 	switch (knob) {
-		case 0: return 10.0f;
-		case 1: return  5.000f;
-		case 2: return  1.000f;
-		case 3: return  0.500f;
-		case 4: return  0.100f;
-		case 5: return  0.050f;
-		case 6: return  0.010f;
-		case 7: return  0.005f;
-		case 8: return  0.001f;
+	case 0: return 10.0f;
+	case 1: return  5.0f;
+	case 2: return  2.0f;
+	case 3: return  1.0f;
+	case 4: return  0.5f;
+	case 5: return  0.2f;
+	case 6: return  0.1f;
+	case 7: return  0.05f;
+	case 8: return  0.02f;
+	case 9: return  0.01f;
+	case 10: return 0.005f;
+	default: return 0.5f;
 	}
 }
 
@@ -111,11 +121,10 @@ struct Scope : Module {
 		configParam(POS_D_PARAM, -8.0, 8.0, 0.0, "Channel D Pos", " Div");
 
 		// scale
-		std:std::vector<std::string> scales = {"10 V/Div","5 V/Div","1 V/Div","0.5 V/Div","0.1 V/Div","50 mV/Div","10 mV/Div","5 V/Div","1 V/Div"};
-		configSwitch(SCALE_A_PARAM, 0.0f, 8.0f, 2.0f, "Channel A Scale", scales);
-		configSwitch(SCALE_B_PARAM, 0.0f, 8.0f, 2.0f, "Channel B Scale", scales);
-		configSwitch(SCALE_C_PARAM, 0.0f, 8.0f, 2.0f, "Channel C Scale", scales);
-		configSwitch(SCALE_D_PARAM, 0.0f, 8.0f, 2.0f, "Channel D Scale", scales);
+		configSwitch(SCALE_A_PARAM, 0.0f, 10.0f, 4.0f, "Channel A Scale", scales);
+		configSwitch(SCALE_B_PARAM, 0.0f, 10.0f, 4.0f, "Channel B Scale", scales);
+		configSwitch(SCALE_C_PARAM, 0.0f, 10.0f, 4.0f, "Channel C Scale", scales);
+		configSwitch(SCALE_D_PARAM, 0.0f, 10.0f, 4.0f, "Channel D Scale", scales);
 
 		// Time
 		configParam(TIME_PARAM, -5.0f, 1.0f, -3.0f, "Time / Div", " s", 10.0f);
@@ -242,6 +251,33 @@ struct Scope : Module {
 			holdoffTime_s -= args.sampleTime;
 		}
 
+		// Schmitt-trigger processing
+		// Invert input for falling edge
+		float signal = trigEdge == TRIG_EDGE_FALL ? -trigSig : trigSig;
+		float thr = trigEdge == TRIG_EDGE_FALL ? -threshold : threshold;
+
+		// Hysteresis window 0.1V: Lower = Thr - 0.1, High = Thr.
+		bool schmittState = trigSchmitt.process(signal, thr - hysteresis, thr);
+		bool edgeFound = trigPulse.process(schmittState);
+
+		if (edgeFound) {
+			if (autoTimeMode && period_s < AUTO_TIME_PERIOD_MAX) {
+				// Time since last trigger
+				double period = period_s;
+
+				// Calculate ideal time/div to show 3 periods
+				// 3.0 periods fill 1 screen
+				double targetTimePerDiv_s = (period * 3.0) / numDivsHoriz;
+
+				// clamp to prevent log(0)
+				if (targetTimePerDiv_s < 1e-5) targetTimePerDiv_s = 1e-5;
+				float newParamVal = std::log10((float)targetTimePerDiv_s);
+
+				params[TIME_PARAM].setValue(newParamVal);
+			}
+			period_s = 0.0;
+		}
+
 		if (triggered) {
 			// Recording
 			// We have already triggered, now we fill the buffer for the rest of the screen
@@ -262,47 +298,18 @@ struct Scope : Module {
 			}
 		} else {
 			// Waiting
-			if (holdoffTime_s <= 0.0f) {
-				// Schmitt-trigger processing
-				// Invert input for falling edge
-				float signal = trigEdge == TRIG_EDGE_FALL ? -trigSig : trigSig;
-				float thr = trigEdge == TRIG_EDGE_FALL ? -threshold : threshold;
-
-				// Hysteresis window 0.1V: Lower = Thr - 0.1, High = Thr.
-				bool schmittState = trigSchmitt.process(signal, thr - hysteresis, thr);
-
-				// Use trigPulse to detect the rising edge of the Schmitt state
-				if (trigPulse.process(schmittState)) {
-
-					if (autoTimeMode && period_s < 2.0) {
-						// Time since last trigger
-						double period = period_s;
-
-						// Calculate ideal time/div to show 3 periods
-						// 3.0 periods fill 1 screen
-						double targetTimePerDiv = (period * 3.0) / numDivsHoriz;
-
-						// clamp to prevent log(0)
-						if (targetTimePerDiv < 1e-5) targetTimePerDiv = 1e-5;
-						float newParamVal = std::log10((float)targetTimePerDiv);
-
-						params[TIME_PARAM].setValue(newParamVal);
-					}
-
-					period_s = 0.0;
-
-					triggered = true;
-					//triggerCandidate = headIndex;
-					triggerIndex = headIndex;
-					samplesSinceTrigger = 0;
-					autoTrigTimer = 0.0f;
-				}
+			if (holdoffTime_s <= 0.0f && edgeFound) {
+				triggered = true;
+				//triggerCandidate = headIndex;
+				triggerIndex = headIndex;
+				samplesSinceTrigger = 0;
+				autoTrigTimer = 0.0f;
 			}
 
 			if (trigMode == TRIG_MODE_AUTO) {
 				autoTrigTimer += args.sampleTime;
 				// If no trigger for 0.5s (or > screen time), force update
-				float timeout = 0.5f;
+				float timeout = TRIG_AUTO_TIMEOUT;
 				if (timeout < totalScreenTime * 1.5f) timeout = totalScreenTime * 1.5f;
 
 				if (autoTrigTimer > timeout) {
@@ -324,7 +331,7 @@ struct Scope : Module {
 	static float getRed(int ch) {
 		switch (ch) {
 			case 0: return 1.0f;
-			case 1: return 1.0f;
+			case 1: return 0.9f;
 			case 2: return 0.0f;//0.2f;
 			case 3: return 0.0f;//0.2f;
 			default: return 1.0f;
@@ -334,9 +341,9 @@ struct Scope : Module {
 	static float getGreen(int ch) {
 		switch (ch) {
 			case 0: return 0.0f;//0.2f;
-			case 1: return 0.9f;
+			case 1: return 0.8f;
 			case 2: return 1.0f;
-			case 3: return 0.3f;//0.6f;
+			case 3: return 0.0f;//0.6f;
 			default: return 1.0f;
 		}
 	}
