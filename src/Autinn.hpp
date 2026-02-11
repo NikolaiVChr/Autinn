@@ -39,6 +39,14 @@ static const float HALF_LIGHT_SMALL  = mm2px(2.0f)*0.5f;// Was 6.4252f in Rack 1
 static const float HALF_LIGHT_MEDIUM = mm2px(3.0f)*0.5f;
 static const float HALF_LIGHT_LARGE  = mm2px(5.0f)*0.5f;
 
+inline float px2mm(float px) {
+	return px / (SVG_DPI / MM_PER_IN);
+}
+
+inline Vec px2mm(math::Vec px) {
+	return px.div(SVG_DPI / MM_PER_IN);
+}
+
 struct AutinnSlider : app::SvgSlider {
 	AutinnSlider() {
 		if (!pluginInstance) return;

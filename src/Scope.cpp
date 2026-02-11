@@ -274,27 +274,27 @@ struct Scope : Module {
 		switch (ch) {
 			case 0: return 1.0f;
 			case 1: return 1.0f;
-			case 2: return 0.2f;
-			case 3: return 0.2f;
+			case 2: return 0.0f;//0.2f;
+			case 3: return 0.0f;//0.2f;
 			default: return 1.0f;
 		}
 	}
 
 	static float getGreen(int ch) {
 		switch (ch) {
-			case 0: return 0.2f;
+			case 0: return 0.0f;//0.2f;
 			case 1: return 0.9f;
 			case 2: return 1.0f;
-			case 3: return 0.6f;
+			case 3: return 0.3f;//0.6f;
 			default: return 1.0f;
 		}
 	}
 
 	static float getBlue(int ch) {
 		switch (ch) {
-			case 0: return 0.2f;
-			case 1: return 0.2f;
-			case 2: return 0.2f;
+			case 0: return 0.0f;//0.2f;
+			case 1: return 0.0f;//0.2f;
+			case 2: return 0.0f;//0.2f;
 			case 3: return 1.0f;
 			default: return 1.0f;
 		}
@@ -559,11 +559,6 @@ struct ScopeWidget : ModuleWidget {
 		// holdoff
 		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xHoldoff, yRow1), module, Scope::HOLDOFF_PARAM));
 		
-		// Freeze
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xHoldoff, yRow2), module, Scope::FREEZE_PARAM));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xHoldoff + 12, yRow2 + 12), module, Scope::FREEZE_LIGHT_RGB));
-
-
 		// Trigger
 		float xTrigLevel = 28.0f * hp;
 		float xTrigBtns  = 33.0f * hp - mm2px(7.0f);
@@ -572,6 +567,10 @@ struct ScopeWidget : ModuleWidget {
 		// Trig level
 		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xTrigLevel, yRow1), module, Scope::TRIG_LEVEL_PARAM));
 
+		// Freeze
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigLevel, yRow2), module, Scope::FREEZE_PARAM));
+		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigLevel + 12, yRow2 + 12), module, Scope::FREEZE_LIGHT_RGB));
+
 		// Trig buttons (grid layout)
 		// source, mode
 		// edge, light
@@ -579,17 +578,27 @@ struct ScopeWidget : ModuleWidget {
 		float btnLightOffsetX = mm2px(7.0f); // xTrigBtns to light center
 		float lightSpacingY = btnLightOffsetX*0.5f;
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow1 - btnSpacingY), module, Scope::TRIG_SOURCE_PARAM));
-		addChild(createLightCentered<MediumLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 - btnSpacingY), module, Scope::TRIG_SOURCE_LIGHT_RGB));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow1), module, Scope::TRIG_SOURCE_PARAM));
+		addChild(createLightCentered<LargeLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1), module, Scope::TRIG_SOURCE_LIGHT_RGB));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow1 + btnSpacingY), module, Scope::TRIG_MODE_PARAM));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY - lightSpacingY), module, Scope::TRIG_MODE_AUTO_LIGHT));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY), module, Scope::TRIG_MODE_NORM_LIGHT));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY + lightSpacingY), module, Scope::TRIG_MODE_SOLO_LIGHT));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow1 + btnSpacingY*2.0f), module, Scope::TRIG_MODE_PARAM));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f - lightSpacingY), module, Scope::TRIG_MODE_AUTO_LIGHT));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f), module, Scope::TRIG_MODE_NORM_LIGHT));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f + lightSpacingY), module, Scope::TRIG_MODE_SOLO_LIGHT));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow2), module, Scope::TRIG_EDGE_PARAM));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2), module, Scope::TRIG_EDGE_RISE_LIGHT));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + lightSpacingY), module, Scope::TRIG_EDGE_FALL_LIGHT));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_PARAM));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_RISE_LIGHT));
+		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + lightSpacingY + btnSpacingY), module, Scope::TRIG_EDGE_FALL_LIGHT));
+
+		INFO("Freeze %.0f, %.0f", px2mm(xTrigLevel), px2mm(yRow2));
+		INFO("Time %.0f, %.0f", px2mm(xTime), px2mm(yRow1));
+		INFO("Holdoff %.0f, %.0f", px2mm(xHoldoff), px2mm(yRow1));
+		INFO("Threshold %.0f, %.0f", px2mm(xTrigLevel), px2mm(yRow1));
+		INFO("Auto %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow1 + btnSpacingY*2.0f - lightSpacingY));
+		INFO("Norm %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow1 + btnSpacingY*2.0f));
+		INFO("Single %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow1 + btnSpacingY*2.0f + lightSpacingY));
+		INFO("Rise %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow2 + btnSpacingY));
+		INFO("Fall %.0f, %.0f", px2mm(xTrigBtns + btnLightOffsetX), px2mm(yRow2 + lightSpacingY + btnSpacingY));
 
 		// Ext trigger
 		addInput(createInputCentered<InPortAutinn>(Vec(xExtTrig, yRow2), module, Scope::CV_TRIG_EXT_INPUT));
