@@ -712,10 +712,6 @@ struct ScopeDisplay : TransparentWidget {
 		const float* signalX2 = module->buffer[2]; // Channel C
 		const float* signalY2 = module->buffer[3]; // Channel D
 
-		nvgBeginPath(args.vg);
-		nvgStrokeColor(args.vg, nvgRGBA(100, 255, 200, 200));
-		nvgStrokeWidth(args.vg, 1.5f);
-
 		const float timePerDiv = module->getTimeDiv();
 
 		const float totalTime = numDivsHoriz * timePerDiv;// arbitrarily selected width
@@ -736,6 +732,9 @@ struct ScopeDisplay : TransparentWidget {
 		bool first = true;
 
 		if (AB) {
+			nvgBeginPath(args.vg);
+			nvgStrokeWidth(args.vg, 1.5f);
+			nvgStrokeColor(args.vg, nvgRGBA(100, 255, 200, 200));//cyan
 			for (int i = 0; i < samplesToDraw; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
 
@@ -753,8 +752,12 @@ struct ScopeDisplay : TransparentWidget {
 					nvgLineTo(args.vg, pxX, pxY);
 				}
 			}
+			nvgStroke(args.vg);
 		}
 		if (CD) {
+			nvgBeginPath(args.vg);
+			nvgStrokeWidth(args.vg, 1.5f);
+			nvgStrokeColor(args.vg, nvgRGBA(255, 100, 255, 200));//magenta
 			first = true;
 
 			for (int i = 0; i < samplesToDraw; i += step) {
@@ -774,8 +777,8 @@ struct ScopeDisplay : TransparentWidget {
 					nvgLineTo(args.vg, pxX2, pxY2);
 				}
 			}
+			nvgStroke(args.vg);
 		}
-		nvgStroke(args.vg);
 	}
 
 	float volt2PxVert(float voltage, float offset_divs, float vPerDiv) const {
