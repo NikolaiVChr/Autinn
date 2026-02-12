@@ -645,9 +645,11 @@ struct ScopeDisplay : TransparentWidget {
 		nvgStrokeWidth(args.vg, 1.25f); // Slightly thicker line
 		nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
+		float sppx = WAVEFORM_SAMPLES_PER_PX + 8.0f * float(ch);
+
 		int iteratorStep = 1;
-		if (samplesPerPixel > WAVEFORM_SAMPLES_PER_PX) {
-			iteratorStep = (int)(samplesPerPixel * WAVEFORM_PX_PER_SAMPLE);
+		if (samplesPerPixel > sppx) {
+			iteratorStep = (int)(samplesPerPixel / sppx);
 			if (iteratorStep < 1) iteratorStep = 1;
 		}
 
@@ -714,11 +716,17 @@ struct ScopeDisplay : TransparentWidget {
 				yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
 				yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
+				if (std::abs(yTop - yBottom) < 1.0f) {
+					float mid = (yTop + yBottom) * 0.5f;
+					yTop = mid - 0.5f;
+					yBottom = mid + 0.5f;
+				}
+
 				if (first) {
 					nvgMoveTo(args.vg, float(curr_px), yTop);
 					first = false;
 				} else {
-					nvgLineTo(args.vg, float(curr_px), yTop);
+					nvgMoveTo(args.vg, float(curr_px), yTop);
 				}
 				nvgLineTo(args.vg, float(curr_px), yBottom);
 
@@ -975,7 +983,7 @@ struct ScopeDisplay : TransparentWidget {
 			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			char text[128];
 			if (module->lastFrequency_hz > 0.0f && ch == module->trigSource) {
-				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: % 5.2f V  AVG: %+.2f  RMS: %.2f  Freq: %.1f Hz",
+				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %5.2f V  AVG: %+.2f  RMS: %.2f  Freq: %.1f Hz",
 					'A' + ch,
 					minV,
 					maxV,
@@ -984,7 +992,7 @@ struct ScopeDisplay : TransparentWidget {
 					rms,
 					module->lastFrequency_hz);
 			} else {
-				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: % 5.2f V  AVG: %+.2f  RMS: %.2f",
+				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %5.2f V  AVG: %+.2f  RMS: %.2f",
 					'A' + ch,
 					minV,
 					maxV,
