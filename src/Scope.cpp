@@ -345,7 +345,7 @@ struct Scope : Module {
 			}
 		} else {
 			// Waiting
-			if (holdoffTime_s <= 0.0f && edgeFound && trigMode != TRIG_MODE_XY) {
+			if (holdoffTime_s <= 0.0f && edgeFound) {
 				// switch to recording
 				//triggerCandidate = writeIndex;
 				lastTriggerIndex = triggerIndex;
@@ -357,7 +357,7 @@ struct Scope : Module {
 				autoTrigTimer = 0.0f;
 			}
 
-			if (trigMode == TRIG_MODE_AUTO) {
+			if (trigMode == TRIG_MODE_AUTO || trigMode == TRIG_MODE_XY) {
 				autoTrigTimer += args.sampleTime;
 				// If no trigger for TRIG_AUTO_TIMEOUT (or > screen time), force update
 				float timeout = TRIG_AUTO_TIMEOUT;
@@ -442,6 +442,7 @@ struct Scope : Module {
 			autoTimeMode = !autoTimeMode;
 		}
 		if (trigMode == TRIG_MODE_XY) {
+			/*
 			autoTimeMode = false;
 			lastTriggerIndex = 0;
 			triggerIndex = 0;
@@ -449,6 +450,7 @@ struct Scope : Module {
 			recording = false;
 			triggerValid = false;
 			prev_triggerValid = false;
+			*/
 			freezePending = false;
 		}
 		if (freezeBtnTrig.process(freezeBtn)) {
@@ -509,23 +511,17 @@ struct Scope : Module {
 
 		bool lissajous = trigMode==TRIG_MODE_XY;
 
-		if (!lissajous) {
-			lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(getRed(trigSource)*blinkBrightness);
-			lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(getGreen(trigSource)*blinkBrightness);
-			lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(getBlue(trigSource)*blinkBrightness);
-		} else {
-			lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(0.5f);
-			lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(0.5f);
-			lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(0.5f);
-		}
+		lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(getRed(trigSource)*blinkBrightness);
+		lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(getGreen(trigSource)*blinkBrightness);
+		lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(getBlue(trigSource)*blinkBrightness);
 
 		lights[TRIG_MODE_AUTO_LIGHT].setBrightness(trigMode==TRIG_MODE_AUTO ? 1.0f : 0.0f);
 		lights[TRIG_MODE_NORM_LIGHT].setBrightness(trigMode==TRIG_MODE_NORM ? 1.0f : 0.0f);
 		lights[TRIG_MODE_SOLO_LIGHT].setBrightness(trigMode==TRIG_MODE_SOLO ? 1.0f : 0.0f);
 		lights[TRIG_MODE_XY_LIGHT].setBrightness(lissajous ? 1.0f : 0.0f);
 
-		lights[TRIG_EDGE_RISE_LIGHT].setBrightness(trigEdge == TRIG_EDGE_RISE && !lissajous? 1.0f : 0.0f);
-		lights[TRIG_EDGE_FALL_LIGHT].setBrightness(trigEdge == TRIG_EDGE_FALL && !lissajous? 1.0f : 0.0f);
+		lights[TRIG_EDGE_RISE_LIGHT].setBrightness(trigEdge == TRIG_EDGE_RISE? 1.0f : 0.0f);
+		lights[TRIG_EDGE_FALL_LIGHT].setBrightness(trigEdge == TRIG_EDGE_FALL? 1.0f : 0.0f);
 
 		lights[AUTO_TIME_LIGHT].setBrightness(autoTimeMode ? 1.0f : 0.0f);
 
@@ -732,17 +728,26 @@ struct ScopeDisplay : TransparentWidget {
 			if (step < 1) step = 1;
 		}
 
-		int startIdx = (module->writeIndex - samplesToDraw) & BUFFER_MASK;
-		if (startIdx < 0) startIdx += BUFFER_SIZE;
+		// start index
+		// Calc how many samples exist between trigger and write index
+		int samplesRecorded = (module->writeIndex - module->triggerIndex) & BUFFER_MASK;
+		bool enough = (samplesRecorded >= samplesToDraw);
+		const int startIdx = module->triggerValid && enough?module->triggerIndex
+									:(module->prev_triggerValid?module->lastTriggerIndex
+									:((module->writeIndex - samplesToDraw) & BUFFER_MASK));
 
 		bool first = true;
 
 		if (AB) {
 			nvgBeginPath(args.vg);
 			nvgStrokeWidth(args.vg, 1.5f);
-			nvgStrokeColor(args.vg, colorXY1);//cyan
 			for (int i = 0; i < samplesToDraw; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
+
+				float age = (float)i / (float)samplesToDraw; // 0.0 = Old, 1.0 = New
+				float alpha = 0.1f + (0.9f * age); // Fade from 10% to 100%
+				NVGcolor _colorXY1 = nvgRGBA(colorXY1.r, colorXY1.g, colorXY1.b, alpha);
+				nvgStrokeColor(args.vg, _colorXY1);
 
 				// voltages to screen px
 				float volX = signalX[idx];
@@ -763,11 +768,15 @@ struct ScopeDisplay : TransparentWidget {
 		if (CD) {
 			nvgBeginPath(args.vg);
 			nvgStrokeWidth(args.vg, 1.5f);
-			nvgStrokeColor(args.vg, colorXY2);
 			first = true;
 
 			for (int i = 0; i < samplesToDraw; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
+
+				float age = (float)i / (float)samplesToDraw; // 0.0 = Old, 1.0 = New
+				float alpha = 0.1f + (0.9f * age); // Fade from 10% to 100%
+				NVGcolor _colorXY2 = nvgRGBA(colorXY2.r, colorXY2.g, colorXY2.b, alpha);
+				nvgStrokeColor(args.vg, _colorXY2);
 
 				// voltages to screen px
 				float volX2 = signalX2[idx];
