@@ -14,6 +14,9 @@ constexpr float numDivsHoriz_inv = 1.0f/numDivsHoriz;
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
 #define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
 #define TRIG_SOURCE_EXT 4
+#define STATS_OFF 0
+#define STATS_ONE 1
+#define STATS_ALL 2
 
 static std::vector<std::string> scales = {
 	"10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
@@ -126,7 +129,7 @@ struct Scope : Module {
 	bool showBaselines = false;
 	bool showCenterline = false;
 	bool showGrid = true;
-	bool showStats = true;
+	int showStats = STATS_ONE;
 
 	// controls
 	bool sourceBtn;
@@ -196,7 +199,7 @@ struct Scope : Module {
 		json_object_set_new(rootJ, "trigMode", json_integer(trigMode));
 		json_object_set_new(rootJ, "trigEdge", json_boolean(trigEdge));
 		json_object_set_new(rootJ, "autoTimeMode", json_boolean(autoTimeMode));
-		json_object_set_new(rootJ, "showStats", json_boolean(showStats));
+		json_object_set_new(rootJ, "showStats", json_integer(showStats));
 		json_object_set_new(rootJ, "showGrid", json_boolean(showGrid));
 		json_object_set_new(rootJ, "showCenterline", json_boolean(showCenterline));
 		json_object_set_new(rootJ, "showBaselines", json_boolean(showBaselines));
@@ -217,7 +220,12 @@ struct Scope : Module {
 		if (aJ) autoTimeMode = json_is_true(aJ);
 
 		json_t* stJ = json_object_get(rootJ, "showStats");
-		if (stJ) showStats = json_is_true(stJ);
+		if (stJ) {
+			bool b = json_is_true(stJ);
+			int i = int(json_integer_value(stJ));
+			if (i == 0 && b) showStats = STATS_ONE;
+			else showStats = i;
+		}
 
 		json_t* gJ = json_object_get(rootJ, "showGrid");
 		if (gJ) showGrid = json_is_true(gJ);
@@ -446,7 +454,8 @@ struct Scope : Module {
 			}
 		}
 		if (statsBtnTrig.process(statsBtn)) {
-			showStats = !showStats;
+			showStats++;
+			if (showStats > STATS_ALL) showStats = STATS_OFF;
 		}
 	}
 
@@ -778,63 +787,82 @@ struct ScopeDisplay : TransparentWidget {
 	}
 
 	void drawStats(const DrawArgs& args) const {
-		if (!module || !module->showStats) return;
+		if (!module || module->showStats == STATS_OFF) return;
 
 		//if (!font) font = APP->window->loadFont(asset::plugin(pluginInstance, "res/fonts/autinn.ttf"));
 		//if (!font) return;
 		//nvgFontFaceId(args.vg, font->handle);
 		nvgFontSize(args.vg, 13.0f);
 
-		const int ch = module->trigSource;
-		if (ch >= 4) return; // no stats for ext trigger
-		if (!module->inputs[Scope::A_INPUT + ch].isConnected()) return;
+		const int chTrig = module->trigSource;
+		if (chTrig >= 4 && module->showStats == STATS_ONE) return; // no stats for ext trigger
 
-		// limit
-		const int startIndex = module->triggerIndex;
-		const float timePerDiv_s = module->getTimeDiv();
-		const float totalTime = numDivsHoriz * timePerDiv_s;
-		int samplesToScan = (int)(totalTime * module->sampleRate);
-		if (samplesToScan > BUFFER_SIZE) samplesToScan = BUFFER_SIZE;
+		int done = 0;
 
-		float minV = 100.0f;
-		float maxV = -100.0f;
+		for (int ch = 0; ch < TRIG_SOURCE_EXT; ch++) {
+			if (!module->inputs[Scope::A_INPUT + ch].isConnected()) continue;
+			if (module->showStats == STATS_ONE && ch != module->trigSource) continue;
+			// limit
+			const int startIndex = module->triggerIndex;
+			const float timePerDiv_s = module->getTimeDiv();
+			const float totalTime = numDivsHoriz * timePerDiv_s;
+			int samplesToScan = (int)(totalTime * module->sampleRate);
+			if (samplesToScan > BUFFER_SIZE) samplesToScan = BUFFER_SIZE;
 
-		int step = 1;
-		if (samplesToScan > 4000) step = samplesToScan / 2000;
+			float minV = 100.0f;
+			float maxV = -100.0f;
 
-		for (int i = 0; i < samplesToScan; i += step) {
-			const int idx = (startIndex + i) & BUFFER_MASK;
-			const float v = module->buffer[ch][idx];
-			if (v < minV) minV = v;
-			if (v > maxV) maxV = v;
+			int step = 1;
+			if (samplesToScan > 4000) step = samplesToScan / 2000;
+
+			for (int i = 0; i < samplesToScan; i += step) {
+				const int idx = (startIndex + i) & BUFFER_MASK;
+				const float v = module->buffer[ch][idx];
+				if (v < minV) minV = v;
+				if (v > maxV) maxV = v;
+			}
+
+			// Text box
+			float textBoxHeight = 20.0f;
+			nvgBeginPath(args.vg);
+			nvgRoundedRect(args.vg, 0, 0, box.size.x, textBoxHeight, 0.0f);
+			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 128));
+			nvgFill(args.vg);
+
+			// Text
+			nvgFillColor(args.vg, getColor(ch));
+			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+			char text[128];
+			if (module->lastFrequency_hz > 0.0f && ch == module->trigSource) {
+				snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   PP: %.2f V   Freq: %.1f Hz",
+					'A' + ch,
+					minV,
+					maxV,
+					(maxV - minV),
+					module->lastFrequency_hz);
+			} else {
+				snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   PP: %.2f V",
+					'A' + ch,
+					minV,
+					maxV,
+					(maxV - minV));
+			}
+
+			nvgText(args.vg, 10, getTextY(done, textBoxHeight), text, nullptr);
+			done++;
 		}
+	}
 
-		// Text box
-		nvgBeginPath(args.vg);
-		nvgRoundedRect(args.vg, 0, 0, box.size.x, 20.0f, 0.0f);
-		nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 128));
-		nvgFill(args.vg);
-
-		// Text
-		nvgFillColor(args.vg, getColor(ch));
-		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-		char text[128];
-		if (module->lastFrequency_hz > 0.0f) {
-			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   PP: %.2f V   Freq: %.1f Hz",
-				'A' + ch,
-				minV,
-				maxV,
-				(maxV - minV),
-				module->lastFrequency_hz);
-		} else {
-			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   PP: %.2f V",
-				'A' + ch,
-				minV,
-				maxV,
-				(maxV - minV));
+	float getTextY(const int done, const float textBoxHeight) const {
+		const float height = box.size.y;
+		constexpr float margin = 5.0f;
+		switch (done) {
+			case 0: return margin;
+			case 1: return height - margin - textBoxHeight;
+			case 2: return margin + textBoxHeight + margin;
+			case 3: return height - margin - textBoxHeight - margin - textBoxHeight;
+			default: return height * 0.5f;
 		}
-
-		nvgText(args.vg, 10, 10, text, nullptr);
 	}
 
 	void drawTrigger(const DrawArgs& args) {
