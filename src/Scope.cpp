@@ -417,9 +417,21 @@ struct Scope : Module {
 		}
 		if (modeBtnTrig.process(trigModeKnob)) {
 			trigMode = (trigMode + 1) % 4;
+			if (trigMode == TRIG_MODE_XY) frozen = false;
 		}
 		if (edgeBtnTrig.process(trigEdgeBtn)) {
 			trigEdge = !trigEdge;
+		}
+		if (autoTimeBtnTrig.process(autotimeBtn)) {
+			autoTimeMode = !autoTimeMode;
+		}
+		if (trigMode == TRIG_MODE_XY) {
+			autoTimeMode = false;
+			lastTriggerIndex = 0;
+			triggerIndex = 0;
+			lastFrequency_hz = 0.0f;
+			triggered = false;
+			freezePending = false;
 		}
 		if (freezeBtnTrig.process(freezeBtn)) {
 			if (freezePending || frozen) {
@@ -432,18 +444,6 @@ struct Scope : Module {
 			} else {
 				freezePending = true;
 			}
-		}
-		if (autoTimeBtnTrig.process(autotimeBtn)) {
-			autoTimeMode = !autoTimeMode;
-		}
-		if (trigMode == TRIG_MODE_XY) {
-			autoTimeMode = false;
-			lastTriggerIndex = 0;
-			triggerIndex = 0;
-			lastFrequency_hz = 0.0f;
-			triggered = false;
-			frozen = false;
-			freezePending = false;
 		}
 		if (statsBtnTrig.process(statsBtn)) {
 			showStats = !showStats;
@@ -490,7 +490,7 @@ struct Scope : Module {
 
 		bool lissajous = trigMode==TRIG_MODE_XY;
 
-		if (lissajous) {
+		if (!lissajous) {
 			lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(getRed(trigSource)*blinkBrightness);
 			lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(getGreen(trigSource)*blinkBrightness);
 			lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(getBlue(trigSource)*blinkBrightness);
