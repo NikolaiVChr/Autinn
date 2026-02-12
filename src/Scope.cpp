@@ -13,6 +13,7 @@ constexpr float numDivsHoriz_inv = 1.0f/numDivsHoriz;
 #define TRIG_AUTO_TIMEOUT 1.0f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
 #define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
+#define TRIG_SOURCE_EXT 4
 
 static std::vector<std::string> scales = {
 	"10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
@@ -99,6 +100,7 @@ struct Scope : Module {
 #define TRIG_MODE_SOLO 2 // freeze when finding trigger
 #define TRIG_EDGE_RISE true
 #define TRIG_EDGE_FALL false
+#define AUTO_TIME_KNOB_OFF 50.0f
 
 	// transient
 	bool frozen = false;
@@ -112,6 +114,7 @@ struct Scope : Module {
 	int dspFrame = 1001;
 	float lastFrequency_hz = 0.0f;
 	float blinkPhase = 0.0f;
+	float autoTimeKnob = AUTO_TIME_KNOB_OFF;
 
 	// persisted
 	bool autoTimeMode = false;
@@ -255,7 +258,7 @@ struct Scope : Module {
 		// Get trigger signal
 		float trigSig = 0.0f;
 		float hysteresis = 0.1f; // Default for Ext (100mV)
-		if (trigSource < 4) {
+		if (trigSource < TRIG_SOURCE_EXT) {
 			trigSig = inputs[A_INPUT + trigSource].getVoltage();
 			float vPerDiv = scale[trigSource];
 			hysteresis *= vPerDiv;
@@ -264,8 +267,7 @@ struct Scope : Module {
 		}
 
 		float threshold = thresholdKnob;
-		float timePerDiv = std::pow(10.f, params[TIME_PARAM].getValue());
-
+		float timePerDiv = getTimeDiv();
 		// We want to record numDivsHoriz divisions after the trigger to fill the screen
 		float totalScreenTime = numDivsHoriz * timePerDiv;
 		int samplesToRecord = int(totalScreenTime * sampleRate);
@@ -363,10 +365,23 @@ struct Scope : Module {
 
 			// clamp to prevent log(0)
 			if (targetTimePerDiv_s < 1e-5) targetTimePerDiv_s = 1e-5;
-			float newParamVal = std::log10((float)targetTimePerDiv_s);
+			autoTimeKnob = std::log10((float)targetTimePerDiv_s);
 
-			params[TIME_PARAM].setValue(newParamVal);
+			//params[TIME_PARAM].setValue(autoTimeKnob);//TODO:
+		} else {
+			autoTimeKnob = AUTO_TIME_KNOB_OFF;
 		}
+	}
+
+	float getTimeDiv() {
+		float timePerDiv;
+		if (autoTimeKnob > AUTO_TIME_KNOB_OFF - 1.0f) {
+			// auto time have not set a time/div, so we read knob
+			timePerDiv = std::pow(10.f, params[TIME_PARAM].getValue());
+		} else {
+			timePerDiv = std::pow(10.f, autoTimeKnob);
+		}
+		return timePerDiv;
 	}
 
 	void readControls() {
@@ -502,7 +517,7 @@ struct ScopeDisplay : TransparentWidget {
 
 		float scale = module->scale[ch];
 		float offset = module->offset[ch];
-		float timePerDiv_s = std::pow(10.f, module->params[Scope::TIME_PARAM].getValue());
+		float timePerDiv_s = module->getTimeDiv();
 
 		const NVGcolor color = getColor(ch);
 
@@ -674,7 +689,7 @@ struct ScopeDisplay : TransparentWidget {
 
 		// limit
 		const int startIndex = module->triggerIndex;
-		const float timePerDiv_s = std::pow(10.f, module->params[Scope::TIME_PARAM].getValue());
+		const float timePerDiv_s = module->getTimeDiv();
 		const float totalTime = numDivsHoriz * timePerDiv_s;
 		int samplesToScan = (int)(totalTime * module->sampleRate);
 		if (samplesToScan > BUFFER_SIZE) samplesToScan = BUFFER_SIZE;
@@ -743,7 +758,7 @@ struct ScopeDisplay : TransparentWidget {
 		float scale = 2.0f; // Default 2V/Div
 		float offset = 0.0f;
 
-		if (ch < 4) {
+		if (ch < TRIG_SOURCE_EXT) {
 			scale = module->scale[ch];
 			offset = module->offset[ch];
 		} else {
@@ -776,7 +791,7 @@ struct ScopeDisplay : TransparentWidget {
 		nvgText(args.vg, box.size.x - 5, y - 2, text, nullptr);
 	}
 
-	void drawDashedLine(NVGcontext* vg, float x1, float y1, float x2, float y2, float stroke, NVGcolor color) const {
+	static void drawDashedLine(NVGcontext* vg, float x1, float y1, float x2, float y2, float stroke, NVGcolor color) {
 		float dashLen = 5.0f; // Length of the solid part
 		float gapLen = 5.0f;  // Length of the empty part
 
@@ -975,7 +990,12 @@ struct ScopeWidget : ModuleWidget {
 		float xHoldoff = 24.0f * hp;
 		
 		// Time
-		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xTime, yRow1), module, Scope::TIME_PARAM));
+		//addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xTime, yRow1), module, Scope::TIME_PARAM));
+		auto qKnob = createParam<AutinnArcMidKnob>(Vec(xTime, yRow1), module, Scope::TIME_PARAM);
+		qKnob->setModulation(-2, [module](float cv, float val, float att) {
+							return module->autoTimeKnob;
+						});
+		addParam(qKnob);
 		
 		// holdoff
 		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xHoldoff, yRow1), module, Scope::HOLDOFF_PARAM));

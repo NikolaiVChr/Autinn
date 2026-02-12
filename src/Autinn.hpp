@@ -175,11 +175,15 @@ struct AutinnArcKnob : TBase {
     	if (this->getParamQuantity() == nullptr) {
     		return;
     	}
+		bool CV = true;
+    	if (inputId >= -1) {
+    		if (!this->module || inputId < 0) return;
 
-    	if (!this->module || inputId < 0) return;
-
-    	if (!this->module->inputs[inputId].isConnected()) {
-    		return; // Don't draw the arc if there's no CV
+    		if (!this->module->inputs[inputId].isConnected()) {
+    			return; // Don't draw the arc if there's no CV
+    		}
+    	} else {
+    		CV = false;
     	}
 
         if (layer == 1) {
@@ -187,11 +191,15 @@ struct AutinnArcKnob : TBase {
             float maxVal = this->getParamQuantity()->getMaxValue();
             float currentVal = this->getParamQuantity()->getValue();
 
-            float cv = this->module->inputs[inputId].getVoltage();
+            float cv = CV?this->module->inputs[inputId].getVoltage():0.0f;
         	float attenVal = (attenId != -1) ? this->module->params[attenId].getValue() : 1.0f;
 
         	// Calculate raw value first (Unclamped)
         	float rawModVal = calcModulation(cv, currentVal, attenVal);
+
+        	if (!CV && rawModVal > maxVal+1.0f) {
+        		return;
+        	}
 
         	// Clamp it for the visual arc (so it stays on the knob)
         	float modVal = clamp(rawModVal, minVal, maxVal);
