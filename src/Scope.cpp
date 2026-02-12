@@ -3,17 +3,26 @@
 
 static constexpr int BUFFER_SIZE = 1 << 22;// 2^20 (5.4 seconds at 192khz) - 2^22 (22 seconds at 192khz)
 static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
-
-// 8 divisions (audio scope std)
-constexpr float numDivsVert = 8.0f;// total vert divs
-constexpr float numDivsHoriz = 20.0f;// total horiz divs
+constexpr float numDivsVert = 8.0f;// total vert divs (audio scope std)
+constexpr float numDivsHoriz = 20.0f;// total horiz divs (approx effective 1:1)
 constexpr float numDivsVert_inv = 1.0f/numDivsVert;
 constexpr float numDivsHoriz_inv = 1.0f/numDivsHoriz;
+constexpr float maxSamplesPerPx = 16.0f;
+constexpr float maxPxPerSamples = 1.0f/maxSamplesPerPx;
 
 #define TRIG_AUTO_TIMEOUT 1.0f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
 #define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
 #define TRIG_SOURCE_EXT 4
+#define TRIG_HYSTERESIS 0.1f // will be multiplied by V/Div except for ext. trigger
+#define BLINK_HZ 2.0f
+#define AUTO_TIME_KNOB_OFF 50.0f
+#define TRIG_MODE_AUTO 0 // wait TRIG_AUTO_TIMEOUT then trigger even if no trigger found
+#define TRIG_MODE_NORM 1 // wait forever for trigger to be found
+#define TRIG_MODE_SOLO 2 // freeze when finding trigger
+#define TRIG_MODE_XY   3 // Lissajous
+#define TRIG_EDGE_RISE true
+#define TRIG_EDGE_FALL false
 #define STATS_OFF 0
 #define STATS_ONE 1
 #define STATS_ALL 2
@@ -93,14 +102,6 @@ struct Scope : Module {
 	dsp::BooleanTrigger freezeBtnTrig;
 	dsp::BooleanTrigger autoTimeBtnTrig;
 	dsp::BooleanTrigger statsBtnTrig;
-
-#define TRIG_MODE_AUTO 0 // wait TRIG_AUTO_TIMEOUT then trigger even if no trigger found
-#define TRIG_MODE_NORM 1 // wait forever for trigger to be found
-#define TRIG_MODE_SOLO 2 // freeze when finding trigger
-#define TRIG_MODE_XY   3 // Lissajous
-#define TRIG_EDGE_RISE true
-#define TRIG_EDGE_FALL false
-#define AUTO_TIME_KNOB_OFF 50.0f
 
 	// transient
 	float buffer[4][BUFFER_SIZE] = {};
@@ -254,7 +255,7 @@ struct Scope : Module {
 			writeIndex = (writeIndex + 1) & BUFFER_MASK;
 		}
 
-		blinkPhase += args.sampleTime * 2.0f;
+		blinkPhase += args.sampleTime * BLINK_HZ;
 		if (blinkPhase >= 1.0f) blinkPhase -= 1.0f;
 
 		dspFrame++;
@@ -278,7 +279,7 @@ struct Scope : Module {
 	void triggerDetect(const ProcessArgs& args) {
 		// Get trigger signal
 		float trigSig = 0.0f;
-		float hysteresis = 0.1f; // Default for Ext (100mV)
+		float hysteresis = TRIG_HYSTERESIS; // Default for Ext (100mV)
 		if (trigSource < TRIG_SOURCE_EXT) {
 			trigSig = inputs[A_INPUT + trigSource].getVoltage();
 			float vPerDiv = scale[trigSource];
@@ -536,9 +537,6 @@ struct ScopeDisplay : TransparentWidget {
 	Scope* module{};
 	int frame = 0;
 
-	const float maxSamplesPerPx = 16.0f;
-	const float maxPxPerSamples = 1.0f/maxSamplesPerPx;
-
 	//std::shared_ptr<Font> font;
 	float lastTrigLevel = -999.0f;
 	float trigVisibilityTimer = 0.0f;
@@ -547,7 +545,12 @@ struct ScopeDisplay : TransparentWidget {
 	NVGcolor color1 = nvgRGBA(255, 230, 50, 230);  // Yellow
 	NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
 	NVGcolor color3 = nvgRGBA(50, 150, 255, 230);  // Blue
-	NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);
+	NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
+	NVGcolor colorScanLine = nvgRGBA(255, 255, 255, 90);// faint white
+	NVGcolor colorXY1 = nvgRGBA(100, 255, 200, 200);//cyan
+	NVGcolor colorXY2 = nvgRGBA(255, 100, 255, 200);//magenta
+	NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
+	NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
 
 
 
@@ -688,7 +691,7 @@ struct ScopeDisplay : TransparentWidget {
 		if (module->recording && float(drawLimitPixel) <= width_px) {
 			// scanline
 			nvgBeginPath(args.vg);
-			nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 90)); // Faint white
+			nvgStrokeColor(args.vg, colorScanLine); // Faint white
 			nvgStrokeWidth(args.vg, 1.0f);
 			nvgMoveTo(args.vg, (float)drawLimitPixel, 0);
 			nvgLineTo(args.vg, (float)drawLimitPixel, box.size.y);
@@ -734,7 +737,7 @@ struct ScopeDisplay : TransparentWidget {
 		if (AB) {
 			nvgBeginPath(args.vg);
 			nvgStrokeWidth(args.vg, 1.5f);
-			nvgStrokeColor(args.vg, nvgRGBA(100, 255, 200, 200));//cyan
+			nvgStrokeColor(args.vg, colorXY1);//cyan
 			for (int i = 0; i < samplesToDraw; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
 
@@ -757,7 +760,7 @@ struct ScopeDisplay : TransparentWidget {
 		if (CD) {
 			nvgBeginPath(args.vg);
 			nvgStrokeWidth(args.vg, 1.5f);
-			nvgStrokeColor(args.vg, nvgRGBA(255, 100, 255, 200));//magenta
+			nvgStrokeColor(args.vg, colorXY2);
 			first = true;
 
 			for (int i = 0; i < samplesToDraw; i += step) {
@@ -1043,7 +1046,7 @@ struct ScopeDisplay : TransparentWidget {
 		float yCenter = box.size.y / 2.0f;
 		if (module->showBaselines) {
 			nvgBeginPath(args.vg);
-			nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 100));
+			nvgStrokeColor(args.vg, colorBaseline);
 			nvgStrokeWidth(args.vg, 1.0);
 			const float x1 = 0;
 			const float x2 = box.size.x;
@@ -1062,7 +1065,7 @@ struct ScopeDisplay : TransparentWidget {
 		}
 		if (module->showCenterline) {
 			nvgBeginPath(args.vg);
-			nvgStrokeColor(args.vg, nvgRGBA(200, 200, 200, 100));
+			nvgStrokeColor(args.vg, colorCenterline);
 			nvgStrokeWidth(args.vg, 1.0);
 			float x1 = 0;
 			float x2 = box.size.x;
