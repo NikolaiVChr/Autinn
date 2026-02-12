@@ -29,9 +29,9 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      labelstyle="default"
-     inkscape:zoom="0.71891835"
-     inkscape:cx="148.8347"
-     inkscape:cy="47.29327"
+     inkscape:zoom="8.1336326"
+     inkscape:cx="645.71394"
+     inkscape:cy="445.06559"
      inkscape:window-width="1528"
      inkscape:window-height="1000"
      inkscape:window-x="-8"
@@ -299,6 +299,11 @@
        id="text22"
        style="font-weight:500;font-size:3.52777px;font-family:OldSansBlack;-inkscape-font-specification:'OldSansBlack Medium';fill:#ffffff;stroke-width:0.1"
        aria-label="SCOPE" />
+    <path
+       d="m 173.30909,115.1492 h 0.43215 l -0.49636,-0.94086 0.46673,-0.89641 h -0.43216 l -0.24941,0.51612 -0.24941,-0.51612 h -0.43215 l 0.46672,0.89641 -0.49636,0.94086 h 0.43215 l 0.27905,-0.57044 z m 0.48895,-0.50871 h 0.65934 v -0.32103 h -0.65934 z m 1.62489,-0.22719 0.50623,-1.10137 h -0.41486 l -0.28893,0.66428 -0.28892,-0.66428 h -0.41487 l 0.50871,1.10878 v 0.72849 h 0.39264 z"
+       id="text23"
+       style="font-weight:500;font-size:2.46944px;font-family:OldSansBlack;-inkscape-font-specification:'OldSansBlack Medium';fill:#ffffff;stroke-width:0.1"
+       aria-label="X-Y" />
   </g>
   <g
      inkscape:groupmode="layer"

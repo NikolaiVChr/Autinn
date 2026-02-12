@@ -73,6 +73,7 @@ struct Scope : Module {
 		TRIG_MODE_AUTO_LIGHT,
 		TRIG_MODE_NORM_LIGHT,
 		TRIG_MODE_SOLO_LIGHT,
+		TRIG_MODE_XY_LIGHT,
 		TRIG_EDGE_FALL_LIGHT,
 		TRIG_EDGE_RISE_LIGHT,
 		ENUMS(FREEZE_LIGHT_RGB, 3),
@@ -98,6 +99,7 @@ struct Scope : Module {
 #define TRIG_MODE_AUTO 0 // wait TRIG_AUTO_TIMEOUT then trigger even if no trigger found
 #define TRIG_MODE_NORM 1 // wait forever for trigger to be found
 #define TRIG_MODE_SOLO 2 // freeze when finding trigger
+#define TRIG_MODE_XY   3 // Lissajous
 #define TRIG_EDGE_RISE true
 #define TRIG_EDGE_FALL false
 #define AUTO_TIME_KNOB_OFF 50.0f
@@ -156,7 +158,7 @@ struct Scope : Module {
 
 		// Time
 		configParam(TIME_PARAM, -5.0f, 0.0f, -3.0f, "Time / Div", " s", 10.0f);
-		configParam(HOLDOFF_PARAM, -3.0f, 0.0f, -3.0f, "Trigger holdoff", " s", 10.0f);
+		configParam(HOLDOFF_PARAM, -4.0f, 1.0f, -3.0f, "Trigger holdoff", " s", 10.0f);
 
 		// Trigger
 		configParam(TRIG_LEVEL_PARAM, -10.0f, 10.0f, 0.0f, "Trigger threshold", " V");
@@ -165,7 +167,7 @@ struct Scope : Module {
 		configButton(TRIG_EDGE_PARAM, "Trigger edge");
 		configButton(FREEZE_PARAM, "Freeze");
 		configButton(AUTO_TIME_PARAM, "Auto time");
-		configButton(STATS_PARAM, "Stats");
+		configButton(STATS_PARAM, "Stats for selected channel");
 
 		// inputs
 		configInput(A_INPUT, "Channel A");
@@ -179,6 +181,7 @@ struct Scope : Module {
 		configLight(TRIG_MODE_AUTO_LIGHT, "Auto trigger");
 		configLight(TRIG_MODE_NORM_LIGHT, "Norm trigger");
 		configLight(TRIG_MODE_SOLO_LIGHT, "Single trigger");
+		configLight(TRIG_MODE_XY_LIGHT, "X-Y (A & B)");
 		configLight(TRIG_EDGE_RISE_LIGHT, "Trigger on rising edge");
 		configLight(TRIG_EDGE_FALL_LIGHT, "Trigger on falling edge");
 		configLight(FREEZE_LIGHT_RGB, "Freeze");
@@ -254,6 +257,16 @@ struct Scope : Module {
 		}
 	}
 
+	/*
+	 * TODO:
+	 *		Consider zeroing a channel.
+	 *		Update manual.
+	 *		X-Y Mode (Lissajous)
+	 *		AC/DC switch to remove DC
+	 *		Stats for all channels (cycle options)
+	 *
+	 */
+
 	void triggerDetect(const ProcessArgs& args) {
 		// Get trigger signal
 		float trigSig = 0.0f;
@@ -311,7 +324,7 @@ struct Scope : Module {
 				triggered = false;
 
 				// Set holdoff (max 1 sec)
-				holdoffTime_s = holdoffKnob;
+				holdoffTime_s = holdoffKnob > 0.00011f?holdoffKnob:0.0f;
 
 				if (trigMode == TRIG_MODE_SOLO || freezePending) {
 					frozen = true;
@@ -403,7 +416,7 @@ struct Scope : Module {
 			trigSource = (trigSource + 1) % 5;
 		}
 		if (modeBtnTrig.process(trigModeKnob)) {
-			trigMode = (trigMode + 1) % 3;
+			trigMode = (trigMode + 1) % 4;
 		}
 		if (edgeBtnTrig.process(trigEdgeBtn)) {
 			trigEdge = !trigEdge;
@@ -469,6 +482,7 @@ struct Scope : Module {
 		lights[TRIG_MODE_AUTO_LIGHT].setBrightness(trigMode==TRIG_MODE_AUTO ? 1.0f : 0.0f);
 		lights[TRIG_MODE_NORM_LIGHT].setBrightness(trigMode==TRIG_MODE_NORM ? 1.0f : 0.0f);
 		lights[TRIG_MODE_SOLO_LIGHT].setBrightness(trigMode==TRIG_MODE_SOLO ? 1.0f : 0.0f);
+		lights[TRIG_MODE_XY_LIGHT].setBrightness(trigMode==TRIG_MODE_XY ? 1.0f : 0.0f);
 
 		lights[TRIG_EDGE_RISE_LIGHT].setBrightness(trigEdge == TRIG_EDGE_RISE ? 1.0f : 0.0f);
 		lights[TRIG_EDGE_FALL_LIGHT].setBrightness(trigEdge == TRIG_EDGE_FALL ? 1.0f : 0.0f);
@@ -599,8 +613,8 @@ struct ScopeDisplay : TransparentWidget {
 					if (v > maxV) maxV = v;
 				}
 
-				float yTop = volt2Px(maxV, offset, scale);
-				float yBottom = volt2Px(minV, offset, scale);
+				float yTop = volt2PxVert(maxV, offset, scale);
+				float yBottom = volt2PxVert(minV, offset, scale);
 
 				yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
 				yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
@@ -616,7 +630,7 @@ struct ScopeDisplay : TransparentWidget {
 			} else {
 				// zoom in
 				const float v = module->buffer[ch][readIndex];
-				float y = volt2Px(v, offset, scale);
+				float y = volt2PxVert(v, offset, scale);
 
 				// clamp unseen.
 				y = clamp(y, -10000.0f, box.size.y+10000.0f);
@@ -646,7 +660,47 @@ struct ScopeDisplay : TransparentWidget {
 		}
 	}
 
-	float volt2Px(float voltage, float offset_divs, float vPerDiv) const {
+	void drawXY(const DrawArgs& args) const {
+		if (!module) return;
+
+		const float* signalX = module->buffer[0]; // Channel A
+		const float* signalY = module->buffer[1]; // Channel B
+
+		// Check connections
+		if (!module->inputs[Scope::A_INPUT].isConnected() ||
+		!module->inputs[Scope::B_INPUT].isConnected()) return;
+
+		nvgBeginPath(args.vg);
+		nvgStrokeColor(args.vg, nvgRGBA(100, 255, 200, 200));
+		nvgStrokeWidth(args.vg, 1.5f);
+
+		int scanSize = 4000; // points to draw
+		int startIdx = (module->writeIndex - scanSize) & BUFFER_MASK;
+		if (startIdx < 0) startIdx += BUFFER_SIZE;
+
+		bool first = true;
+
+		for (int i = 0; i < scanSize; i++) {
+			int idx = (startIdx + i) & BUFFER_MASK;
+
+			// voltages to screen px
+			float volX = signalX[idx];
+			float volY = signalY[idx];
+
+			float pxX = volt2PxHoriz(volX, module->scale[0]);// Ch A settings for X
+			float pxY = volt2PxVert(volY, module->offset[1], module->scale[1]); // Ch B settings for Y
+
+			if (first) {
+				nvgMoveTo(args.vg, pxX, pxY);
+				first = false;
+			} else {
+				nvgLineTo(args.vg, pxX, pxY);
+			}
+		}
+		nvgStroke(args.vg);
+	}
+
+	float volt2PxVert(float voltage, float offset_divs, float vPerDiv) const {
 
 		const float totalVolts = numDivsVert * vPerDiv;
 
@@ -654,6 +708,16 @@ struct ScopeDisplay : TransparentWidget {
 		const float centerY = box.size.y * 0.5f;
 
 		return centerY - voltage * pxPerVolt - box.size.y*numDivsVert_inv*offset_divs;
+	}
+
+	float volt2PxHoriz(float voltage, float vPerDiv) const {
+
+		const float totalVolts = numDivsHoriz * vPerDiv;
+
+		const float pxPerVolt = box.size.x / totalVolts;
+		const float centerX = box.size.x * 0.5f;
+
+		return centerX + voltage * pxPerVolt;
 	}
 
 	void draw(const DrawArgs& args) override {
@@ -666,8 +730,12 @@ struct ScopeDisplay : TransparentWidget {
 		if (module && layer == 1) {// check if in plugin-browser or in rack.
 			nvgSave(args.vg);
 			nvgScissor(args.vg, 0, 0, box.size.x, box.size.y);
-			for (int c = 0; c < 4; c++) {
-				drawWaveform(args, c);
+			if (module->trigMode == TRIG_MODE_XY) {
+				drawXY(args);
+			} else {
+				for (int c = 0; c < 4; c++) {
+					drawWaveform(args, c);
+				}
 			}
 			nvgRestore(args.vg);
 		}
@@ -766,7 +834,7 @@ struct ScopeDisplay : TransparentWidget {
 			return;
 		}
 
-		float y = volt2Px(currentLevel, offset, scale);
+		float y = volt2PxVert(currentLevel, offset, scale);
 		if (y < 0) y = 0;
 		if (y > box.size.y) y = box.size.y;
 
@@ -861,7 +929,7 @@ struct ScopeDisplay : TransparentWidget {
 				if (module->inputs[Scope::A_INPUT+ch].isConnected()) {
 					const float offset = module->offset[ch];
 					const float scale = module->scale[ch];
-					const float y = volt2Px(0.0f, offset, scale);
+					const float y = volt2PxVert(0.0f, offset, scale);
 					if (y >= 0.0f && y <= box.size.y) {
 						nvgMoveTo(args.vg, x1, y);
 						nvgLineTo(args.vg, x2, y);
@@ -991,11 +1059,11 @@ struct ScopeWidget : ModuleWidget {
 		
 		// Time
 		//addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xTime, yRow1), module, Scope::TIME_PARAM));
-		auto qKnob = createParam<AutinnArcMidKnob>(Vec(xTime, yRow1), module, Scope::TIME_PARAM);
-		qKnob->setModulation(-2, [module](float cv, float val, float att) {
+		auto timeKnob = createParamCentered<AutinnArcMidKnob>(Vec(xTime, yRow1), module, Scope::TIME_PARAM);
+		timeKnob->setModulation(-2, [module](float cv, float val, float att) {
 							return module->autoTimeKnob;
 						});
-		addParam(qKnob);
+		addParam(timeKnob);
 		
 		// holdoff
 		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xHoldoff, yRow1), module, Scope::HOLDOFF_PARAM));
@@ -1033,6 +1101,7 @@ struct ScopeWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f - lightSpacingY), module, Scope::TRIG_MODE_AUTO_LIGHT));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f), module, Scope::TRIG_MODE_NORM_LIGHT));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f + lightSpacingY), module, Scope::TRIG_MODE_SOLO_LIGHT));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f + lightSpacingY*2.0f), module, Scope::TRIG_MODE_XY_LIGHT));
 
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_PARAM));
 		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_RISE_LIGHT));
