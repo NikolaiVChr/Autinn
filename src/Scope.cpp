@@ -18,8 +18,8 @@ static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 1600
 #define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
 #define TRIG_SOURCE_EXT 4
 #define TRIG_HYSTERESIS 0.1f // will be multiplied by V/Div except for ext. trigger
-#define BLINK_HZ 2.0f
 #define AUTO_TIME_KNOB_OFF 50.0f
+#define BLINK_HZ 2.0f
 #define TRIG_MODE_AUTO 0 // wait TRIG_AUTO_TIMEOUT then trigger even if no trigger found
 #define TRIG_MODE_NORM 1 // wait forever for trigger to be found
 #define TRIG_MODE_SOLO 2 // freeze when finding trigger
@@ -29,6 +29,14 @@ static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 1600
 #define STATS_OFF 0
 #define STATS_ONE 1
 #define STATS_ALL 2
+#define SCALE_DEFAULT 2.0f
+#define SCALE_DEFAULT_KNOB 3
+#define SCALE_KNOB_MIN -1 // OFF
+#define SCALE_KNOB_MAX 11 // 5 mV/Div
+#define TIME_KNOB_MIN -5.0f //   from  10µs
+#define TIME_KNOB_MAX 0.0f //      to   1s
+#define HOLDOFF_KNOB_MIN -4.0f// from 100µs
+#define HOLDOFF_KNOB_MAX 1.0f //   to  10s
 
 static std::vector<std::string> scales = {
 	"OFF","20 V/Div","10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
@@ -49,7 +57,7 @@ static float getScale(int knob) {
 	case 9: return  0.02f;
 	case 10: return  0.01f;
 	case 11: return 0.005f;
-	default: return 0.5f;
+	default: return SCALE_DEFAULT;
 	}
 }
 
@@ -139,32 +147,32 @@ struct Scope : Module {
 	int showStats = STATS_ONE;
 
 	// controls
-	bool sourceBtn;
-	bool trigModeKnob;
-	bool trigEdgeBtn;
-	bool autotimeBtn;
-	bool freezeBtn;
-	bool statsBtn;
-	float offset[4];
-	float scale[4];
-	float thresholdKnob;
-	float holdoffKnob;
+	bool sourceBtn = false;
+	bool trigModeKnob = false;
+	bool trigEdgeBtn = false;
+	bool autotimeBtn = false;
+	bool freezeBtn = false;
+	bool statsBtn = false;
+	float offset[4]{};
+	float scale[4]{};
+	float thresholdKnob = 0.0f;
+	float holdoffKnob = -3.0f;
 
 
 	Scope() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
-		// pos
-		configParam(POS_A_PARAM, -8.0, 8.0, 0.0, "Channel A Pos", " Div");
-		configParam(POS_B_PARAM, -8.0, 8.0, 0.0, "Channel B Pos", " Div");
-		configParam(POS_C_PARAM, -8.0, 8.0, 0.0, "Channel C Pos", " Div");
-		configParam(POS_D_PARAM, -8.0, 8.0, 0.0, "Channel D Pos", " Div");
+		// pos (we use DIVS_HORIZ, due to X-Y sideways offset)
+		configParam(POS_A_PARAM, -DIVS_HORIZ*0.25f, DIVS_HORIZ*0.25f, 0.0, "Channel A Pos", " Div");
+		configParam(POS_B_PARAM, -DIVS_HORIZ*0.25f, DIVS_HORIZ*0.25f, 0.0, "Channel B Pos", " Div");
+		configParam(POS_C_PARAM, -DIVS_HORIZ*0.25f, DIVS_HORIZ*0.25f, 0.0, "Channel C Pos", " Div");
+		configParam(POS_D_PARAM, -DIVS_HORIZ*0.25f, DIVS_HORIZ*0.25f, 0.0, "Channel D Pos", " Div");
 
 		// scale
-		configSwitch(SCALE_A_PARAM, -1.0f, 11.0f, 5.0f, "Channel A Scale", scales);
-		configSwitch(SCALE_B_PARAM, -1.0f, 11.0f, 5.0f, "Channel B Scale", scales);
-		configSwitch(SCALE_C_PARAM, -1.0f, 11.0f, 5.0f, "Channel C Scale", scales);
-		configSwitch(SCALE_D_PARAM, -1.0f, 11.0f, 5.0f, "Channel D Scale", scales);
+		configSwitch(SCALE_A_PARAM, (float)SCALE_KNOB_MIN, (float)SCALE_KNOB_MAX, (float)SCALE_DEFAULT_KNOB, "Channel A Scale", scales);
+		configSwitch(SCALE_B_PARAM, (float)SCALE_KNOB_MIN, (float)SCALE_KNOB_MAX, (float)SCALE_DEFAULT_KNOB, "Channel B Scale", scales);
+		configSwitch(SCALE_C_PARAM, (float)SCALE_KNOB_MIN, (float)SCALE_KNOB_MAX, (float)SCALE_DEFAULT_KNOB, "Channel C Scale", scales);
+		configSwitch(SCALE_D_PARAM, (float)SCALE_KNOB_MIN, (float)SCALE_KNOB_MAX, (float)SCALE_DEFAULT_KNOB, "Channel D Scale", scales);
 
 		// Time
 		configParam(TIME_PARAM, -5.0f, 0.0f, -3.0f, "Time / Div", " s", 10.0f);
@@ -274,7 +282,6 @@ struct Scope : Module {
 
 	/*
 	 * TODO:
-	 *		Consider zeroing a channel.
 	 *		Update manual.
 	 *		AC/DC switch to remove DC
 	 *		Stats: Duty cycle %, period, pulse width, crest factor, rise time, fall time, overshoot, compare phase
@@ -961,7 +968,7 @@ struct ScopeDisplay : TransparentWidget {
 
 		const int ch = module->trigSource;
 
-		float scale = 2.0f; // Default 2V/Div
+		float scale = SCALE_DEFAULT;
 		float offset = 0.0f;
 
 		if (ch < TRIG_SOURCE_EXT) {
