@@ -185,7 +185,7 @@ struct Scope : Module {
 		configLight(TRIG_MODE_AUTO_LIGHT, "Auto trigger");
 		configLight(TRIG_MODE_NORM_LIGHT, "Norm trigger");
 		configLight(TRIG_MODE_SOLO_LIGHT, "Single trigger");
-		configLight(TRIG_MODE_XY_LIGHT, "X-Y (A & B)");
+		configLight(TRIG_MODE_XY_LIGHT, "X-Y (A-B and/or C-D)");
 		configLight(TRIG_EDGE_RISE_LIGHT, "Trigger on rising edge");
 		configLight(TRIG_EDGE_FALL_LIGHT, "Trigger on falling edge");
 		configLight(FREEZE_LIGHT_RGB, "Freeze");
@@ -694,12 +694,18 @@ struct ScopeDisplay : TransparentWidget {
 	void drawXY(const DrawArgs& args) const {
 		if (!module) return;
 
-		const float* signalX = module->buffer[0]; // Channel A
-		const float* signalY = module->buffer[1]; // Channel B
+		bool AB = module->inputs[Scope::A_INPUT].isConnected() &&
+		module->inputs[Scope::B_INPUT].isConnected();
+		bool CD = module->inputs[Scope::C_INPUT].isConnected() &&
+		module->inputs[Scope::D_INPUT].isConnected();
 
 		// Check connections
-		if (!module->inputs[Scope::A_INPUT].isConnected() ||
-		!module->inputs[Scope::B_INPUT].isConnected()) return;
+		if (!AB && !CD) return;
+
+		const float* signalX = module->buffer[0]; // Channel A
+		const float* signalY = module->buffer[1]; // Channel B
+		const float* signalX2 = module->buffer[2]; // Channel C
+		const float* signalY2 = module->buffer[3]; // Channel D
 
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, nvgRGBA(100, 255, 200, 200));
@@ -724,8 +730,9 @@ struct ScopeDisplay : TransparentWidget {
 
 		bool first = true;
 
-		for (int i = 0; i < samplesToDraw; i += step) {
-			int idx = (startIdx + i) & BUFFER_MASK;
+		if (AB) {
+			for (int i = 0; i < samplesToDraw; i += step) {
+				int idx = (startIdx + i) & BUFFER_MASK;
 
 			// voltages to screen px
 			float volX = signalX[idx];
@@ -734,11 +741,33 @@ struct ScopeDisplay : TransparentWidget {
 			float pxX = volt2PxHoriz(volX, module->scale[0]);// Ch A settings for X
 			float pxY = volt2PxVert(volY, module->offset[1], module->scale[1]); // Ch B settings for Y
 
-			if (first) {
-				nvgMoveTo(args.vg, pxX, pxY);
-				first = false;
-			} else {
-				nvgLineTo(args.vg, pxX, pxY);
+				if (first) {
+					nvgMoveTo(args.vg, pxX, pxY);
+					first = false;
+				} else {
+					nvgLineTo(args.vg, pxX, pxY);
+				}
+			}
+		}
+		if (CD) {
+			first = true;
+
+			for (int i = 0; i < samplesToDraw; i += step) {
+				int idx = (startIdx + i) & BUFFER_MASK;
+
+				// voltages to screen px
+				float volX2 = signalX2[idx];
+				float volY2 = signalY2[idx];
+
+				float pxX2 = volt2PxHoriz(volX2, module->scale[2]);// Ch C settings for X
+				float pxY2 = volt2PxVert(volY2, module->offset[3], module->scale[3]); // Ch D settings for Y
+
+				if (first) {
+					nvgMoveTo(args.vg, pxX2, pxY2);
+					first = false;
+				} else {
+					nvgLineTo(args.vg, pxX2, pxY2);
+				}
 			}
 		}
 		nvgStroke(args.vg);
