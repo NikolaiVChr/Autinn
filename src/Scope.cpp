@@ -645,11 +645,9 @@ struct ScopeDisplay : TransparentWidget {
 		nvgStrokeWidth(args.vg, 1.25f); // Slightly thicker line
 		nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
-		float sppx = WAVEFORM_SAMPLES_PER_PX + 8.0f * float(ch);
-
 		int iteratorStep = 1;
-		if (samplesPerPixel > sppx) {
-			iteratorStep = (int)(samplesPerPixel / sppx);
+		if (samplesPerPixel > WAVEFORM_SAMPLES_PER_PX) {
+			iteratorStep = (int)(samplesPerPixel * WAVEFORM_PX_PER_SAMPLE);
 			if (iteratorStep < 1) iteratorStep = 1;
 		}
 
@@ -665,8 +663,11 @@ struct ScopeDisplay : TransparentWidget {
 		}
 
 		bool first = true;
+		/*
 		float prevTop = 0.0f;
 		float prevBottom = 0.0f;
+		*/
+		float lastY = 0.0f;
 
 		for (int curr_px = 0; curr_px < int(width_px); curr_px += 1.0f) {
 			// left: new
@@ -723,6 +724,7 @@ struct ScopeDisplay : TransparentWidget {
 				float nextPrevTop = yTop;
 				float nextPrevBottom = yBottom;
 
+				/*
 				if (!first) {
 					// If we jumped below the previous bottom, extend top to meet it.
 					if (yTop > prevBottom) yTop = prevBottom;
@@ -730,29 +732,44 @@ struct ScopeDisplay : TransparentWidget {
 					// If we jumped above the previous top, extend bottom to meet it.
 					if (yBottom < prevTop) yBottom = prevTop;
 				}
+				*/
 
-				if (std::abs(yTop - yBottom) < 1.0f) {
+				if (ch == 0 && std::abs(yTop - yBottom) < 1.0f) {
 					// demand minimum size of 1 pixel
 					float mid = (yTop + yBottom) * 0.5f;
 					yTop = mid - 0.5f;
 					yBottom = mid + 0.5f;
 				}
 
-				const float sharpX = floorf(float(curr_px)) + 0.5f;
-
+				//const float sharpX = floorf(float(curr_px)) + 0.5f;// only works when user is at 100% zoom
+				auto px = float(curr_px);
 				if (first) {
-					nvgMoveTo(args.vg, sharpX, yTop);
+					nvgMoveTo(args.vg, px, yTop);
+					nvgLineTo(args.vg, px, yBottom);
+					lastY = yBottom;
 					first = false;
 				} else {
-					nvgMoveTo(args.vg, sharpX, yTop);
-				}
-				nvgLineTo(args.vg, sharpX, yBottom);
+					float distToTop = std::abs(lastY - yTop);
+					float distToBottom = std::abs(lastY - yBottom);
 
+					if (distToTop < distToBottom) {
+						// closer to the top
+						nvgLineTo(args.vg, px, yTop);
+						nvgLineTo(args.vg, px, yBottom);
+						lastY = yBottom;
+					} else {
+						// closer to the bottom.
+						nvgLineTo(args.vg, px, yBottom);
+						nvgLineTo(args.vg, px, yTop);
+						lastY = yTop;
+					}
+				}
+				/*
 				prevTop = nextPrevTop;
 				prevBottom = nextPrevBottom;
+				*/
 			} else {
 				// zoom in
-				nvgLineCap(args.vg, NVG_ROUND);
 				const float v = module->buffer[ch][readIndex];
 				float y = volt2PxVert(v, offset, scale);
 
