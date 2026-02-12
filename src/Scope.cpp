@@ -824,8 +824,9 @@ struct ScopeDisplay : TransparentWidget {
 
 			// Text box
 			float textBoxHeight = 20.0f;
+			float textY = getTextY(done, textBoxHeight, 0.0f);
 			nvgBeginPath(args.vg);
-			nvgRoundedRect(args.vg, 0, 0, box.size.x, textBoxHeight, 0.0f);
+			nvgRoundedRect(args.vg, 0, textY, box.size.x, textBoxHeight, 0.0f);
 			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 128));
 			nvgFill(args.vg);
 
@@ -848,19 +849,18 @@ struct ScopeDisplay : TransparentWidget {
 					(maxV - minV));
 			}
 
-			nvgText(args.vg, 10, getTextY(done, textBoxHeight), text, nullptr);
+			nvgText(args.vg, 10, getTextY(done, textBoxHeight, 10.0f), text, nullptr);
 			done++;
 		}
 	}
 
-	float getTextY(const int done, const float textBoxHeight) const {
+	float getTextY(const int done, const float textBoxHeight, const float margin) const {
 		const float height = box.size.y;
-		constexpr float margin = 5.0f;
 		switch (done) {
 			case 0: return margin;
-			case 1: return height - margin - textBoxHeight;
-			case 2: return margin + textBoxHeight + margin;
-			case 3: return height - margin - textBoxHeight - margin - textBoxHeight;
+			case 1: return height - textBoxHeight + margin;
+			case 2: return textBoxHeight + margin;
+			case 3: return height - textBoxHeight * 2.0f + margin;
 			default: return height * 0.5f;
 		}
 	}
