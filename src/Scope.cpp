@@ -703,12 +703,18 @@ struct ScopeDisplay : TransparentWidget {
 		if (samplesToDraw > BUFFER_SIZE) samplesToDraw = BUFFER_SIZE;
 		if (samplesToDraw < 2) samplesToDraw = 2;
 
+		int step = 1;
+		if (samplesToDraw > 6000) {
+			step = samplesToDraw / 6000;
+			if (step < 1) step = 1;
+		}
+
 		int startIdx = (module->writeIndex - samplesToDraw) & BUFFER_MASK;
 		if (startIdx < 0) startIdx += BUFFER_SIZE;
 
 		bool first = true;
 
-		for (int i = 0; i < samplesToDraw; i++) {
+		for (int i = 0; i < samplesToDraw; i += step) {
 			int idx = (startIdx + i) & BUFFER_MASK;
 
 			// voltages to screen px
