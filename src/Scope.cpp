@@ -3,12 +3,15 @@
 
 static constexpr int BUFFER_SIZE = 1 << 22;// 2^20 (5.4 seconds at 192khz) - 2^22 (22 seconds at 192khz)
 static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
-constexpr float numDivsVert = 8.0f;// total vert divs (audio scope std)
-constexpr float numDivsHoriz = 20.0f;// total horiz divs (approx effective 1:1)
-constexpr float numDivsVert_inv = 1.0f/numDivsVert;
-constexpr float numDivsHoriz_inv = 1.0f/numDivsHoriz;
-constexpr float maxSamplesPerPx = 16.0f;
-constexpr float maxPxPerSamples = 1.0f/maxSamplesPerPx;
+static constexpr float DIVS_VERT = 8.0f;// total vert divs (audio scope std)
+static constexpr float DIVS_HORIZ = 20.0f;// total horiz divs (approx effective 1:1)
+static constexpr float DIVS_VERT_INV = 1.0f/DIVS_VERT;
+static constexpr float DIVS_HORIZ_INV = 1.0f/DIVS_HORIZ;
+static constexpr float WAVEFORM_SAMPLES_PER_PX = 16.0f;
+static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
+static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
+static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable Average/RMS, but we allow
+static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
 
 #define TRIG_AUTO_TIMEOUT 1.0f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
@@ -290,8 +293,8 @@ struct Scope : Module {
 
 		float threshold = thresholdKnob;
 		float timePerDiv = getTimeDiv();
-		// We want to record numDivsHoriz divisions after the trigger to fill the screen
-		float totalScreenTime = numDivsHoriz * timePerDiv;
+		// We want to record DIVS_HORIZ divisions after the trigger to fill the screen
+		float totalScreenTime = DIVS_HORIZ * timePerDiv;
 		int samplesToRecord = int(totalScreenTime * sampleRate);
 
 		if (samplesToRecord > BUFFER_SIZE) samplesToRecord = BUFFER_SIZE;
@@ -387,7 +390,7 @@ struct Scope : Module {
 
 			// Calculate ideal time/div to show 3 periods
 			// 3 periods fill 1 screen
-			double targetTimePerDiv_s = (period * 3.0) / numDivsHoriz;
+			double targetTimePerDiv_s = (period * 3.0) / DIVS_HORIZ;
 
 			// clamp to prevent log(0)
 			if (targetTimePerDiv_s < 1e-5) targetTimePerDiv_s = 1e-5;
@@ -576,7 +579,7 @@ struct ScopeDisplay : TransparentWidget {
 
 
 		const float width_px = box.size.x;
-		const float totalTime_s = numDivsHoriz * timePerDiv_s;
+		const float totalTime_s = DIVS_HORIZ * timePerDiv_s;
 		const float samplesToDraw = totalTime_s * module->sampleRate;
 
 		if (samplesToDraw < 2.0f) return;
@@ -591,8 +594,8 @@ struct ScopeDisplay : TransparentWidget {
 		nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
 		int iteratorStep = 1;
-		if (samplesPerPixel > maxSamplesPerPx) {
-			iteratorStep = (int)(samplesPerPixel * maxPxPerSamples);
+		if (samplesPerPixel > WAVEFORM_SAMPLES_PER_PX) {
+			iteratorStep = (int)(samplesPerPixel * WAVEFORM_PX_PER_SAMPLE);
 			if (iteratorStep < 1) iteratorStep = 1;
 		}
 
@@ -717,15 +720,15 @@ struct ScopeDisplay : TransparentWidget {
 
 		const float timePerDiv = module->getTimeDiv();
 
-		const float totalTime = numDivsHoriz * timePerDiv;// arbitrarily selected width
+		const float totalTime = DIVS_HORIZ * timePerDiv;// arbitrarily selected width
 
 		int samplesToDraw = (int)(totalTime * module->sampleRate);
 		if (samplesToDraw > BUFFER_SIZE) samplesToDraw = BUFFER_SIZE;
 		if (samplesToDraw < 2) samplesToDraw = 2;
 
 		int step = 1;
-		if (samplesToDraw > 6000) {
-			step = samplesToDraw / 6000;
+		if (samplesToDraw > XY_SAMPLE_DECIMATION) {
+			step = samplesToDraw / XY_SAMPLE_DECIMATION;
 			if (step < 1) step = 1;
 		}
 
@@ -786,22 +789,22 @@ struct ScopeDisplay : TransparentWidget {
 
 	float volt2PxVert(float voltage, float offset_divs, float vPerDiv) const {
 
-		const float totalVolts = numDivsVert * vPerDiv;
+		const float totalVolts = DIVS_VERT * vPerDiv;
 
 		const float pxPerVolt = box.size.y / totalVolts;
 		const float centerY = box.size.y * 0.5f;
 
-		return centerY - voltage * pxPerVolt - box.size.y*numDivsVert_inv*offset_divs;
+		return centerY - voltage * pxPerVolt - box.size.y*DIVS_VERT_INV*offset_divs;
 	}
 
 	float volt2PxHoriz(float voltage, float offset_divs, float vPerDiv) const {
 
-		const float totalVolts = numDivsHoriz * vPerDiv;
+		const float totalVolts = DIVS_HORIZ * vPerDiv;
 
 		const float pxPerVolt = box.size.x / totalVolts;
 		const float centerX = box.size.x * 0.5f;
 
-		return centerX + voltage * pxPerVolt + box.size.x*numDivsHoriz_inv*offset_divs;
+		return centerX + voltage * pxPerVolt + box.size.x*DIVS_HORIZ_INV*offset_divs;
 	}
 
 	void draw(const DrawArgs& args) override {
@@ -846,7 +849,7 @@ struct ScopeDisplay : TransparentWidget {
 
 			// limit
 			const float timePerDiv_s = module->getTimeDiv();
-			const float totalTime = numDivsHoriz * timePerDiv_s;
+			const float totalTime = DIVS_HORIZ * timePerDiv_s;
 			int samplesToScan = (int)(totalTime * module->sampleRate);
 			if (samplesToScan > BUFFER_SIZE) samplesToScan = BUFFER_SIZE;
 
@@ -866,7 +869,7 @@ struct ScopeDisplay : TransparentWidget {
 			int count = 0;
 
 			int step = 1;
-			if (samplesToScan > 16000) step = samplesToScan / 4000;
+			if (samplesToScan > STATS_DECIMATION_THRESHOLD) step = samplesToScan / STATS_SAMPLE_DECIMATION_COUNT;
 
 			for (int i = 0; i < samplesToScan; i += step) {
 				const int idx = (startIndex + i) & BUFFER_MASK;
@@ -1030,14 +1033,14 @@ struct ScopeDisplay : TransparentWidget {
 			nvgStrokeColor(args.vg, nvgRGBA(60, 60, 60, 150));
 			nvgStrokeWidth(args.vg, 1.0);
 			// vert lines:
-			for (int i = 1; i < int(numDivsHoriz); i++) {
-				float x = (box.size.x * numDivsHoriz_inv) * float(i);
+			for (int i = 1; i < int(DIVS_HORIZ); i++) {
+				float x = (box.size.x * DIVS_HORIZ_INV) * float(i);
 				nvgMoveTo(args.vg, x, 0);
 				nvgLineTo(args.vg, x, box.size.y);
 			}
 			// horiz lines:
-			for (int i = 1; i < int(numDivsVert); i++) {
-				float y = (box.size.y * numDivsVert_inv) * float(i);
+			for (int i = 1; i < int(DIVS_VERT); i++) {
+				float y = (box.size.y * DIVS_VERT_INV) * float(i);
 				nvgMoveTo(args.vg, 0, y);
 				nvgLineTo(args.vg, box.size.x, y);
 			}
