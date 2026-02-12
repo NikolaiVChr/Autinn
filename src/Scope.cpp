@@ -1405,7 +1405,7 @@ struct ScopeWidget : ModuleWidget {
 		auto* a = dynamic_cast<Scope*>(module);
 		assert(a);
 
-		menu->addChild(new MenuLabel());
+		menu->addChild(new MenuSeparator());
 		menu->addChild(new ShowGridItem(a, "Show grid"));
 		menu->addChild(new ShowBaseItem(a, "Show baselines"));
 		menu->addChild(new ShowCenterItem(a, "Show centerline"));
@@ -1413,7 +1413,8 @@ struct ScopeWidget : ModuleWidget {
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods  1", 1));
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods  3", 3));
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 10", 10));
-		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 10", 20));
+		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 25", 25));
+		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 50", 50));
 	}
 };
 
