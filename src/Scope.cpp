@@ -5,12 +5,12 @@ static constexpr int BUFFER_SIZE = 1 << 22;// 2^20 (5.4 seconds at 192khz) - 2^2
 static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
 
 // 8 divisions (audio scope std)
-constexpr float numDivsVert = 8.0f;// total
-constexpr float numDivsHoriz = 20.0f;
+constexpr float numDivsVert = 8.0f;// total vert divs
+constexpr float numDivsHoriz = 20.0f;// total horiz divs
 constexpr float numDivsVert_inv = 1.0f/numDivsVert;
 constexpr float numDivsHoriz_inv = 1.0f/numDivsHoriz;
 
-#define TRIG_AUTO_TIMEOUT 2.0f    // seconds
+#define TRIG_AUTO_TIMEOUT 1.0f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
 #define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
 
@@ -80,7 +80,7 @@ struct Scope : Module {
 	};
 
 	float buffer[4][BUFFER_SIZE] = {};
-	int headIndex = 0;
+	int writeIndex = 0;
 	int triggerIndex = 0; // last valid trigger
 	int lastTriggerIndex = 0;
 	float sampleRate = 44100.0f;
@@ -110,7 +110,7 @@ struct Scope : Module {
 	float holdoffTime_s = 0.0f;     // Remaining holdoff in seconds
 	float autoTrigTimer = 0.0f;   // Auto mode timeout
 	int dspFrame = 1001;
-	float lastFrequency = 0.0f;
+	float lastFrequency_hz = 0.0f;
 	float blinkPhase = 0.0f;
 
 	// persisted
@@ -230,12 +230,12 @@ struct Scope : Module {
 
 		if (!frozen) {
 			for (int c = 0; c < 4; c++) {
-				buffer[c][headIndex] = inputs[A_INPUT + c].getVoltage();
+				buffer[c][writeIndex] = inputs[A_INPUT + c].getVoltage();
 			}
 
 			triggerDetect(args);
 
-			headIndex = (headIndex + 1) & BUFFER_MASK;
+			writeIndex = (writeIndex + 1) & BUFFER_MASK;
 		}
 
 		blinkPhase += args.sampleTime * 2.0f;
@@ -251,10 +251,111 @@ struct Scope : Module {
 		}
 	}
 
+	void triggerDetect(const ProcessArgs& args) {
+		// Get trigger signal
+		float trigSig = 0.0f;
+		float hysteresis = 0.1f; // Default for Ext (100mV)
+		if (trigSource < 4) {
+			trigSig = inputs[A_INPUT + trigSource].getVoltage();
+			float vPerDiv = scale[trigSource];
+			hysteresis *= vPerDiv;
+		} else {
+			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
+		}
+
+		float threshold = thresholdKnob;
+		float timePerDiv = std::pow(10.f, params[TIME_PARAM].getValue());
+
+		// We want to record numDivsHoriz divisions after the trigger to fill the screen
+		float totalScreenTime = numDivsHoriz * timePerDiv;
+		int samplesToRecord = int(totalScreenTime * sampleRate);
+
+		if (samplesToRecord > BUFFER_SIZE) samplesToRecord = BUFFER_SIZE;
+		if (samplesToRecord < 32) samplesToRecord = 32;
+
+		// Holdoff
+		if (holdoffTime_s > 0.0f) {
+			holdoffTime_s -= args.sampleTime;
+		}
+
+		// Schmitt-trigger processing
+		// Invert input for falling edge
+		// Hysteresis window 0.1V
+		float signal = trigSig;
+		if (trigEdge == TRIG_EDGE_FALL) {
+			signal = -signal;
+			hysteresis = -hysteresis;
+			threshold = -threshold;
+		}
+		bool schmittState = trigSchmitt.process(signal, threshold, threshold+hysteresis);
+		bool edgeFound = trigPulse.process(schmittState);
+
+		if (edgeFound) {
+			if (period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
+				lastFrequency_hz = (float)(1.0 / period_s);
+			} else {
+				lastFrequency_hz = 0.0f;
+			}
+			period_s = 0.0;
+		}
+
+		if (triggered) {
+			// Recording
+			// We have already triggered, now we fill the buffer for the rest of the screen
+			samplesSinceTrigger++;
+
+			if (samplesSinceTrigger >= samplesToRecord) {
+				// buffer full
+				triggered = false;
+
+				// Set holdoff (max 1 sec)
+				holdoffTime_s = holdoffKnob;
+
+				if (trigMode == TRIG_MODE_SOLO || freezePending) {
+					frozen = true;
+					freezePending = false;
+				}
+			}
+		} else {
+			// Waiting
+			if (holdoffTime_s <= 0.0f && edgeFound) {
+				// switch to recording
+				triggered = true;
+				//triggerCandidate = writeIndex;
+				lastTriggerIndex = triggerIndex;
+				triggerIndex = writeIndex;
+				samplesSinceTrigger = 0;
+				autoTrigTimer = 0.0f;
+			}
+
+			if (trigMode == TRIG_MODE_AUTO) {
+				autoTrigTimer += args.sampleTime;
+				// If no trigger for TRIG_AUTO_TIMEOUT (or > screen time), force update
+				float timeout = TRIG_AUTO_TIMEOUT;
+				if (timeout < totalScreenTime * 1.25f) timeout = totalScreenTime * 1.25f;
+
+				if (autoTrigTimer > timeout) {
+					// Force rolling trigger
+					//lastTriggerIndex = triggerIndex;//TODO: not sure
+					triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;
+					triggered = false;
+					samplesSinceTrigger = 0;
+					autoTrigTimer = 0.0f;
+					lastFrequency_hz = 0.0f;
+
+					if (freezePending) {
+						frozen = true;
+						freezePending = false;
+					}
+				}
+			}
+		}
+	}
+
 	void autoTime () {
-		if (autoTimeMode && lastFrequency > 0.01f) {
+		if (autoTimeMode && lastFrequency_hz > 0.01f) {
 			// Time since last trigger
-			double period = 1.0/lastFrequency;
+			double period = 1.0/lastFrequency_hz;
 
 			// Calculate ideal time/div to show 3 periods
 			// 3 periods fill 1 screen
@@ -305,105 +406,6 @@ struct Scope : Module {
 		}
 		if (statsBtnTrig.process(statsBtn)) {
 			showStats = !showStats;
-		}
-	}
-
-	void triggerDetect(const ProcessArgs& args) {
-		// Get trigger signal
-		float trigSig = 0.0f;
-		float hysteresis = 0.1f; // Default for Ext (100mV)
-		if (trigSource < 4) {
-			trigSig = inputs[A_INPUT + trigSource].getVoltage();
-			float vPerDiv = scale[trigSource];
-			hysteresis = 0.1f * vPerDiv;
-		} else {
-			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
-		}
-
-		float threshold = thresholdKnob;
-		float timePerDiv = std::pow(10.f, params[TIME_PARAM].getValue());
-
-		// We want to record numDivsHoriz divisions after the trigger to fill the screen
-		float totalScreenTime = numDivsHoriz * timePerDiv;
-		int samplesToRecord = int(totalScreenTime * sampleRate);
-
-		if (samplesToRecord > BUFFER_SIZE) samplesToRecord = BUFFER_SIZE;
-		if (samplesToRecord < 32) samplesToRecord = 32;
-
-		// Holdoff
-		if (holdoffTime_s > 0.0f) {
-			holdoffTime_s -= args.sampleTime;
-		}
-
-		// Schmitt-trigger processing
-		// Invert input for falling edge
-		float signal = trigEdge == TRIG_EDGE_FALL ? -trigSig : trigSig;
-		float thr = trigEdge == TRIG_EDGE_FALL ? -threshold : threshold;
-
-		// Hysteresis window 0.1V: Lower = Thr - 0.1, High = Thr.
-		bool schmittState = trigSchmitt.process(signal, thr - hysteresis, thr);
-		bool edgeFound = trigPulse.process(schmittState);
-
-		if (edgeFound) {
-			if (period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
-				lastFrequency = (float)(1.0 / period_s);
-			} else {
-				lastFrequency = 0.0f;
-			}
-			period_s = 0.0;
-		}
-
-		if (triggered) {
-			// Recording
-			// We have already triggered, now we fill the buffer for the rest of the screen
-			samplesSinceTrigger++;
-
-			if (samplesSinceTrigger >= samplesToRecord) {
-				// buffer full, send to be drawn
-				//triggerIndex = triggerCandidate;
-				triggered = false;
-
-				// Set holdoff (max 1 sec)
-				holdoffTime_s = std::pow(10.f,holdoffKnob);
-
-				if (trigMode == TRIG_MODE_SOLO || freezePending) {
-					frozen = true;
-					freezePending = false;
-				}
-			}
-		} else {
-			// Waiting
-			if (holdoffTime_s <= 0.0f && edgeFound) {
-				// switch to recording
-				triggered = true;
-				//triggerCandidate = headIndex;
-				lastTriggerIndex = triggerIndex;
-				triggerIndex = headIndex;
-				samplesSinceTrigger = 0;
-				autoTrigTimer = 0.0f;
-			}
-
-			if (trigMode == TRIG_MODE_AUTO) {
-				autoTrigTimer += args.sampleTime;
-				// If no trigger for TRIG_AUTO_TIMEOUT (or > screen time), force update
-				float timeout = TRIG_AUTO_TIMEOUT;
-				if (timeout < totalScreenTime * 1.25f) timeout = totalScreenTime * 1.25f;
-
-				if (autoTrigTimer > timeout) {
-					// Force rolling trigger
-					//lastTriggerIndex = triggerIndex;//TODO: not sure if thsi line is smart or not.
-					triggerIndex = (headIndex - samplesToRecord) & BUFFER_MASK;
-					triggered = false;
-					samplesSinceTrigger = 0;
-					autoTrigTimer = 0.0f;
-					lastFrequency = 0.0f;
-
-					if (freezePending) {
-						frozen = true;
-						freezePending = false;
-					}
-				}
-			}
 		}
 	}
 
@@ -505,49 +507,54 @@ struct ScopeDisplay : TransparentWidget {
 		const NVGcolor color = getColor(ch);
 
 
-		const float width = box.size.x;
-		const float totalTime = numDivsHoriz * timePerDiv_s;
-		const float samplesToDraw = totalTime * module->sampleRate;
+		const float width_px = box.size.x;
+		const float totalTime_s = numDivsHoriz * timePerDiv_s;
+		const float samplesToDraw = totalTime_s * module->sampleRate;
 
 		if (samplesToDraw < 2.0f) return;
 
 		// < 1.0: Zoomed in
 		// > 1.0: Zoomed out
-		const double samplesPerPixel = samplesToDraw / width;
+		const double samplesPerPixel = samplesToDraw / width_px;
 
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, color);
 		nvgStrokeWidth(args.vg, 1.25f); // Slightly thicker line
 		nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
-		bool first = true;
-
-		int step = 1;
+		int iteratorStep = 1;
 		if (samplesPerPixel > maxSamplesPerPx) {
-			step = (int)(samplesPerPixel * maxPxPerSamples);
-			if (step < 1) step = 1;
+			iteratorStep = (int)(samplesPerPixel * maxPxPerSamples);
+			if (iteratorStep < 1) iteratorStep = 1;
 		}
 
-		int drawLimitPixel = int(width)+1;
+		int drawLimitPixel = int(width_px)+1;
 
 		if (module->triggered) {
-			// We are in the middle of a scan
+			// we only draw enough pixels to reach writeIndex from trigger
 			double validPixels = (double)module->samplesSinceTrigger / samplesPerPixel;
 			drawLimitPixel = (int)validPixels;
 
-			if (drawLimitPixel > int(width)+1) drawLimitPixel = int(width)+1;
+			if (drawLimitPixel > int(width_px)+1) drawLimitPixel = int(width_px)+1;
 			if (drawLimitPixel < 0) drawLimitPixel = 0;
 		}
 
-		for (int x = 0; x < int(width); x += 1.0f) {
+		bool first = true;
+
+		for (int curr_px = 0; curr_px < int(width_px); curr_px += 1.0f) {
 			// left: new
 			// right: old
 			// extreme right: ahead of bufferhead
-			bool isNewData = (x < drawLimitPixel);
+			bool isNewData = curr_px < drawLimitPixel;
+
+			// If we drawing past writeIndex, then we draw old data from previous trigger.
+			// else we draw from current trigger.
 			const int startIdx = isNewData ? module->triggerIndex : module->lastTriggerIndex;
 
-			int sampleOffset = (int)(x * samplesPerPixel);
+			int sampleOffset = (int)(curr_px * samplesPerPixel);
 			if (sampleOffset >= BUFFER_SIZE) {
+				// whole buffer does not fit on screen
+				// we stop drawing.
 				break;
 			}
 			int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
@@ -556,22 +563,22 @@ struct ScopeDisplay : TransparentWidget {
 				// Distance from New Trigger to this Read Point
 				int distFromNew = (readIndex - module->triggerIndex) & BUFFER_MASK;
 
-				// If this distance is small and positive, it means this old pixel
-				// is wrapped in the buffer.
 				if (distFromNew >= 0 && distFromNew < module->samplesSinceTrigger) {
-					break;
+					// distFromNew is small and positive, it means this old pixel
+					// is wrapped in the buffer.
+					break;//TODO:
 				}
 			}
 
 			if (samplesPerPixel > 1.0) {
 				// zoom out: Peaks
-				const int iStart = (int)(x * samplesPerPixel);
-				int iEnd = (int)((x + 1) * samplesPerPixel);
-				if (iEnd <= iStart) iEnd = iStart + 1;
+				const int iterStart = (int)(curr_px * samplesPerPixel);
+				int iterEnd = (int)((curr_px + 1) * samplesPerPixel);
+				if (iterEnd <= iterStart) iterEnd = iterStart + 1;
 
 				float minV = 100.0f;
 				float maxV = -100.0f;
-				for (int i = iStart; i < iEnd; i += step) {
+				for (int i = iterStart; i < iterEnd; i += iteratorStep) {
 					const float v = module->buffer[ch][readIndex];
 					if (v < minV) minV = v;
 					if (v > maxV) maxV = v;
@@ -584,11 +591,12 @@ struct ScopeDisplay : TransparentWidget {
 				yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
 				if (first) {
-					nvgMoveTo(args.vg, float(x), yTop);
+					nvgMoveTo(args.vg, float(curr_px), yTop);
 					first = false;
+				} else {
+					nvgLineTo(args.vg, float(curr_px), yTop);
 				}
-				nvgLineTo(args.vg, float(x), yTop);
-				nvgLineTo(args.vg, float(x), yBottom);
+				nvgLineTo(args.vg, float(curr_px), yBottom);
 
 			} else {
 				// zoom in
@@ -599,19 +607,20 @@ struct ScopeDisplay : TransparentWidget {
 				y = clamp(y, -10000.0f, box.size.y+10000.0f);
 
 				if (first) {
-					nvgMoveTo(args.vg, float(x), y);
+					nvgMoveTo(args.vg, float(curr_px), y);
 					first = false;
 				} else {
-					if (x == drawLimitPixel) {
-						nvgMoveTo(args.vg, float(x), y);
+					if (curr_px == drawLimitPixel) {
+						// transition from new to old data
+						nvgMoveTo(args.vg, float(curr_px), y);
 					} else {
-						nvgLineTo(args.vg, float(x), y);
+						nvgLineTo(args.vg, float(curr_px), y);
 					}
 				}
 			}
 		}
 		nvgStroke(args.vg);
-		if (module->triggered && float(drawLimitPixel) <= width) {
+		if (module->triggered && float(drawLimitPixel) <= width_px) {
 			// scanline
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 90)); // Faint white
@@ -693,13 +702,13 @@ struct ScopeDisplay : TransparentWidget {
 		nvgFillColor(args.vg, getColor(ch));
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 		char text[128];
-		if (module->lastFrequency > 0.0f) {
+		if (module->lastFrequency_hz > 0.0f) {
 			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   Vpp: %.2f V   Freq: %.1f Hz",
 				'A' + ch,
 				minV,
 				maxV,
 				(maxV - minV),
-				module->lastFrequency);
+				module->lastFrequency_hz);
 		} else {
 			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   Vpp: %.2f V",
 				'A' + ch,
@@ -1027,7 +1036,7 @@ struct ScopeWidget : ModuleWidget {
 	}
 
 	void appendContextMenu(Menu* menu) override {
-		Scope* a = dynamic_cast<Scope*>(module);
+		auto* a = dynamic_cast<Scope*>(module);
 		assert(a);
 
 		menu->addChild(new MenuLabel());
