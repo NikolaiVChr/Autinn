@@ -520,8 +520,8 @@ struct Scope : Module {
 		lights[TRIG_MODE_SOLO_LIGHT].setBrightness(trigMode==TRIG_MODE_SOLO ? 1.0f : 0.0f);
 		lights[TRIG_MODE_XY_LIGHT].setBrightness(lissajous ? 1.0f : 0.0f);
 
-		lights[TRIG_EDGE_RISE_LIGHT].setBrightness(trigEdge == TRIG_EDGE_RISE ? 1.0f : 0.0f);
-		lights[TRIG_EDGE_FALL_LIGHT].setBrightness(trigEdge == TRIG_EDGE_FALL ? 1.0f : 0.0f);
+		lights[TRIG_EDGE_RISE_LIGHT].setBrightness(trigEdge == TRIG_EDGE_RISE && !lissajous? 1.0f : 0.0f);
+		lights[TRIG_EDGE_FALL_LIGHT].setBrightness(trigEdge == TRIG_EDGE_FALL && !lissajous? 1.0f : 0.0f);
 
 		lights[AUTO_TIME_LIGHT].setBrightness(autoTimeMode ? 1.0f : 0.0f);
 
