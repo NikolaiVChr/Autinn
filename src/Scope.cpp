@@ -975,16 +975,16 @@ struct ScopeDisplay : TransparentWidget {
 			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			char text[128];
 			if (module->lastFrequency_hz > 0.0f && ch == module->trigSource) {
-				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %.2f V  Freq: %.1f Hz  AVG: %+.2f  RMS: %.2f",
+				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: % 5.2f V  AVG: %+.2f  RMS: %.2f  Freq: %.1f Hz",
 					'A' + ch,
 					minV,
 					maxV,
 					(maxV - minV),
-					module->lastFrequency_hz,
 					avg,
-					rms);
+					rms,
+					module->lastFrequency_hz);
 			} else {
-				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %.2f V  AVG: %+.2f  RMS: %.2f",
+				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: % 5.2f V  AVG: %+.2f  RMS: %.2f",
 					'A' + ch,
 					minV,
 					maxV,
@@ -1136,7 +1136,7 @@ struct ScopeDisplay : TransparentWidget {
 			for (int ch = 0; ch < 4; ch++) {
 				if (module->inputs[Scope::A_INPUT+ch].isConnected()) {
 					const float offset = module->offset[ch];
-					const float y = volt2PxVert(0.0f, offset, 0.0f);
+					const float y = volt2PxVert(0.0f, offset, 1.0f);//VPerDiv must not be zero as it's denominator in division.
 					if (y >= 0.0f && y <= box.size.y) {
 						nvgMoveTo(args.vg, x1, y);
 						nvgLineTo(args.vg, x2, y);
