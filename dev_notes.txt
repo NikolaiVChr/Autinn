@@ -57,6 +57,7 @@ Mixer6       No
 Vxy          No
 Fluencerator No
 Conv         No
+Scope        No
 
 
 
@@ -69,7 +70,7 @@ Flora, Non, Zod
 
 Mono
 ----
-Bass, Mera, Flopper, Sjip
+Bass, Mera, Flopper, Sjip, Scope
 
 Polyphony
 ----

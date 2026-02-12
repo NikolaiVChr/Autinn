@@ -10,7 +10,7 @@ static constexpr float DIVS_HORIZ_INV = 1.0f/DIVS_HORIZ;
 static constexpr float WAVEFORM_SAMPLES_PER_PX = 16.0f;
 static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
-static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable Average/RMS, but we allow
+static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable average/RMS, but we allow
 static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
 
 #define TRIG_AUTO_TIMEOUT 1.0f    // seconds
@@ -62,6 +62,7 @@ static float getScale(int knob) {
 }
 
 struct Scope : Module {
+
 	enum ParamIds {
 		POS_A_PARAM,
 		POS_B_PARAM,
@@ -238,7 +239,7 @@ struct Scope : Module {
 		if (stJ) {
 			bool b = json_is_true(stJ);
 			int i = int(json_integer_value(stJ));
-			if (i == 0 && b) showStats = STATS_ONE;
+			if (i == 0 && b) showStats = STATS_ONE;//backwards compat
 			else showStats = i;
 		}
 
@@ -486,8 +487,8 @@ struct Scope : Module {
 
 	static float getRed(int ch) {
 		switch (ch) {
-			case 0: return 1.0f;
-			case 1: return 0.9f;
+			case 0: return 0.9f;
+			case 1: return 1.0f;
 			case 2: return 0.0f;//0.2f;
 			case 3: return 0.0f;//0.2f;
 			default: return 0.0f;
@@ -496,8 +497,8 @@ struct Scope : Module {
 
 	static float getGreen(int ch) {
 		switch (ch) {
-			case 0: return 0.0f;//0.2f;
-			case 1: return 0.8f;
+			case 0: return 0.8f;
+			case 1: return 0.0f;//0.2f;
 			case 2: return 0.8f;
 			case 3: return 0.0f;//0.6f;
 			default: return 0.0f;
@@ -553,8 +554,8 @@ struct ScopeDisplay : TransparentWidget {
 	float lastTrigLevel = -999.0f;
 	float trigVisibilityTimer = 0.0f;
 
-	NVGcolor color0 = nvgRGBA(255, 50, 50, 230);   // Red
-	NVGcolor color1 = nvgRGBA(255, 230, 50, 230);  // Yellow
+	NVGcolor color0 = nvgRGBA(255, 230, 50, 230);  // Yellow
+	NVGcolor color1 = nvgRGBA(255, 50, 50, 230);   // Red
 	NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
 	NVGcolor color3 = nvgRGBA(50, 150, 255, 230);  // Blue
 	NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
@@ -574,6 +575,41 @@ struct ScopeDisplay : TransparentWidget {
 		case 3: return color3;
 		default: return colorExt;
 		}
+	}
+
+	void drawStaticWaveform(const DrawArgs& args) const {
+
+		// Center line
+		nvgBeginPath(args.vg);
+		nvgStrokeColor(args.vg, colorBaseline);
+		nvgStrokeWidth(args.vg, 1.0f);
+		nvgMoveTo(args.vg, 0, box.size.y * 0.5f);
+		nvgLineTo(args.vg, box.size.x, box.size.y * 0.5f);
+		nvgStroke(args.vg);
+
+		// Damped sine
+		nvgBeginPath(args.vg);
+		nvgStrokeColor(args.vg, color2);
+		nvgStrokeWidth(args.vg, 2.0f); // Bold line
+		nvgLineJoin(args.vg, NVG_ROUND);
+
+		const float cy = box.size.y * 0.5f;
+		const float w = box.size.x;
+		const float amp = box.size.y * 0.4f;
+
+		for (float x = 0; x <= w; x += 3.0f) {
+			// normalize x
+			float t = (x / w - 0.5f) * 2.0f;
+
+			// High freq sin * gaussian
+			float y = std::sin(t * 20.0f) * std::exp(-5.0f * t * t);
+
+			float py = cy - (y * amp);
+
+			if (x == 0) nvgMoveTo(args.vg, x, py);
+			else nvgLineTo(args.vg, x, py);
+		}
+		nvgStroke(args.vg);
 	}
 
 	void drawWaveform(const DrawArgs& args, int ch) const {
@@ -641,13 +677,14 @@ struct ScopeDisplay : TransparentWidget {
 			int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
 
 			if (!isNewData) {
-				// Distance from New Trigger to this Read Point
+				// Distance from new trigger to this readIndex
 				int distFromNew = (readIndex - module->triggerIndex) & BUFFER_MASK;
 
 				if (distFromNew >= 0 && distFromNew < module->samplesSinceTrigger) {
 					// distFromNew is small and positive, it means this old pixel
-					// is wrapped in the buffer.
-					break;//TODO:
+					// is wrapped in the buffer. As in, we have drawn the entire buffer
+					// and if we continue, we will be repeating data.
+					break;
 				}
 			}
 
@@ -831,17 +868,21 @@ struct ScopeDisplay : TransparentWidget {
 	}
 
 	void drawLayer(const DrawArgs& args, const int layer) override {
-		if (module && layer == 1) {// check if in plugin-browser or in rack.
-			nvgSave(args.vg);
-			nvgScissor(args.vg, 0, 0, box.size.x, box.size.y);
-			if (module->trigMode == TRIG_MODE_XY) {
-				drawXY(args);
-			} else {
-				for (int c = 0; c < 4; c++) {
-					drawWaveform(args, c);
+		if (layer == 1) {
+			if (module) {// check if in plugin-browser or in rack.
+				nvgSave(args.vg);
+				nvgScissor(args.vg, 0, 0, box.size.x, box.size.y);
+				if (module->trigMode == TRIG_MODE_XY) {
+					drawXY(args);
+				} else {
+					for (int c = 0; c < 4; c++) {
+						drawWaveform(args, c);
+					}
 				}
+				nvgRestore(args.vg);
+			} else {
+				drawStaticWaveform(args);
 			}
-			nvgRestore(args.vg);
 		}
 		frame++;
 		if (frame > 60) frame = 0;
@@ -1037,16 +1078,14 @@ struct ScopeDisplay : TransparentWidget {
 	}
 	
 	void drawGrid(const DrawArgs& args) const {
-		if (!module) return;
-
-		// Background
+		// Background (draw even if in module-browser)
 		nvgBeginPath(args.vg);
 		nvgRect(args.vg, 0, 0, box.size.x, box.size.y);
 		nvgFillColor(args.vg, nvgRGB(20, 20, 20));
 		nvgFill(args.vg);
 
-		// grid
-		if (module->showGrid) {
+		// grid (draw even if in module-browser)
+		if (!module || module->showGrid) {
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, nvgRGBA(60, 60, 60, 150));
 			nvgStrokeWidth(args.vg, 1.0);
@@ -1064,6 +1103,9 @@ struct ScopeDisplay : TransparentWidget {
 			}
 			nvgStroke(args.vg);
 		}
+
+		if (!module) return;
+
 		float yCenter = box.size.y / 2.0f;
 		if (module->showBaselines) {
 			nvgBeginPath(args.vg);

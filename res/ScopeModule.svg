@@ -29,12 +29,12 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      labelstyle="default"
-     inkscape:zoom="8.1336326"
-     inkscape:cx="645.71394"
-     inkscape:cy="445.06559"
+     inkscape:zoom="1.0167041"
+     inkscape:cx="312.28359"
+     inkscape:cy="243.92545"
      inkscape:window-width="1528"
      inkscape:window-height="1000"
-     inkscape:window-x="-8"
+     inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="0"
      inkscape:current-layer="layer1"
@@ -123,13 +123,6 @@
        transform="scale(0.26458333)"
        id="text2"
        style="font-weight:500;font-size:8px;font-family:OldSansBlack;-inkscape-font-specification:'OldSansBlack Medium';writing-mode:lr-tb;direction:ltr;white-space:pre;shape-inside:url(#rect2);display:inline;fill:#202020;fill-opacity:1;stroke-width:16" />
-    <rect
-       style="fill:#808080;fill-opacity:1;stroke-width:4.21374"
-       id="rect3"
-       width="193.2"
-       height="80"
-       x="5"
-       y="5" />
     <g
        transform="matrix(0.72038886,0,0,0.72038886,84.60649,-205.66995)"
        style="fill:#ffd700"
@@ -154,7 +147,7 @@
          id="path6" />
     </g>
     <rect
-       style="fill:#ff3232;fill-opacity:0.64102566;stroke:none;stroke-width:4.233;stroke-dasharray:none"
+       style="fill:#ffe632;fill-opacity:0.64313728;stroke:none;stroke-width:4.233;stroke-dasharray:none"
        id="rect5"
        width="17.780001"
        height="35.880001"
@@ -181,7 +174,7 @@
        rx="5.0799999"
        ry="5.0799999" />
     <rect
-       style="fill:#ffe632;fill-opacity:0.64299804;stroke:none;stroke-width:4.233;stroke-dasharray:none"
+       style="fill:#ff3232;fill-opacity:0.63921571;stroke:none;stroke-width:4.233;stroke-dasharray:none"
        id="rect5-2"
        width="17.780001"
        height="35.880001"
@@ -310,6 +303,13 @@
      id="layer2"
      inkscape:label="Outlines"
      style="display:none">
+    <rect
+       style="fill:#808080;fill-opacity:1;stroke-width:4.21374"
+       id="rect3"
+       width="193.2"
+       height="80"
+       x="5"
+       y="5" />
     <rect
        style="fill:none;fill-opacity:0.635108;stroke:#ffffff;stroke-width:1;stroke-dasharray:4, 2;stroke-dashoffset:0;stroke-opacity:1"
        id="rect6"
