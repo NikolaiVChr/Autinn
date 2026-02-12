@@ -270,10 +270,8 @@ struct Scope : Module {
 	 * TODO:
 	 *		Consider zeroing a channel.
 	 *		Update manual.
-	 *		X-Y Mode (Lissajous)
 	 *		AC/DC switch to remove DC
-	 *		Stats for all channels (cycle options)
-	 *
+	 *		Stats: Duty cycle %, period, pulse width, crest factor, rise time, fall time, overshoot, compare phase
 	 */
 
 	void triggerDetect(const ProcessArgs& args) {
@@ -734,12 +732,12 @@ struct ScopeDisplay : TransparentWidget {
 			for (int i = 0; i < samplesToDraw; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
 
-			// voltages to screen px
-			float volX = signalX[idx];
-			float volY = signalY[idx];
+				// voltages to screen px
+				float volX = signalX[idx];
+				float volY = signalY[idx];
 
-			float pxX = volt2PxHoriz(volX, module->scale[0]);// Ch A settings for X
-			float pxY = volt2PxVert(volY, module->offset[1], module->scale[1]); // Ch B settings for Y
+				float pxX = volt2PxHoriz(volX, module->scale[0]);// Ch A settings for X
+				float pxY = volt2PxVert(volY, module->offset[1], module->scale[1]); // Ch B settings for Y
 
 				if (first) {
 					nvgMoveTo(args.vg, pxX, pxY);
@@ -841,16 +839,25 @@ struct ScopeDisplay : TransparentWidget {
 
 			float minV = 100.0f;
 			float maxV = -100.0f;
+			double sum = 0.0;
+			double sumSq = 0.0;
+			int count = 0;
 
 			int step = 1;
-			if (samplesToScan > 4000) step = samplesToScan / 2000;
+			if (samplesToScan > 16000) step = samplesToScan / 4000;
 
 			for (int i = 0; i < samplesToScan; i += step) {
 				const int idx = (startIndex + i) & BUFFER_MASK;
 				const float v = module->buffer[ch][idx];
 				if (v < minV) minV = v;
 				if (v > maxV) maxV = v;
+				sum += v;
+				sumSq += v*v;
+				count++;
 			}
+
+			float avg = (float)(sum / count);
+			float rms = (float)std::sqrt(sumSq / count);
 
 			// Text box
 			float textBoxHeight = 20.0f;
@@ -865,18 +872,22 @@ struct ScopeDisplay : TransparentWidget {
 			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			char text[128];
 			if (module->lastFrequency_hz > 0.0f && ch == module->trigSource) {
-				snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   PP: %.2f V   Freq: %.1f Hz",
+				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %.2f V  Freq: %.1f Hz  AVG: %.2f  RMS: %.2f",
 					'A' + ch,
 					minV,
 					maxV,
 					(maxV - minV),
-					module->lastFrequency_hz);
+					module->lastFrequency_hz,
+					avg,
+					rms);
 			} else {
-				snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   PP: %.2f V",
+				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %.2f V  AVG: %.2f  RMS: %.2f",
 					'A' + ch,
 					minV,
 					maxV,
-					(maxV - minV));
+					(maxV - minV),
+					avg,
+					rms);
 			}
 
 			nvgText(args.vg, 10, getTextY(done, textBoxHeight, 10.0f), text, nullptr);
