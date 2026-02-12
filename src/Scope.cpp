@@ -743,7 +743,7 @@ struct ScopeDisplay : TransparentWidget {
 				float volX = signalX[idx];
 				float volY = signalY[idx];
 
-				float pxX = volt2PxHoriz(volX, module->scale[0]);// Ch A settings for X
+				float pxX = volt2PxHoriz(volX, module->offset[0], module->scale[0]);// Ch A settings for X
 				float pxY = volt2PxVert(volY, module->offset[1], module->scale[1]); // Ch B settings for Y
 
 				if (first) {
@@ -764,7 +764,7 @@ struct ScopeDisplay : TransparentWidget {
 				float volX2 = signalX2[idx];
 				float volY2 = signalY2[idx];
 
-				float pxX2 = volt2PxHoriz(volX2, module->scale[2]);// Ch C settings for X
+				float pxX2 = volt2PxHoriz(volX2, module->offset[2], module->scale[2]);// Ch C settings for X
 				float pxY2 = volt2PxVert(volY2, module->offset[3], module->scale[3]); // Ch D settings for Y
 
 				if (first) {
@@ -788,14 +788,14 @@ struct ScopeDisplay : TransparentWidget {
 		return centerY - voltage * pxPerVolt - box.size.y*numDivsVert_inv*offset_divs;
 	}
 
-	float volt2PxHoriz(float voltage, float vPerDiv) const {
+	float volt2PxHoriz(float voltage, float offset_divs, float vPerDiv) const {
 
 		const float totalVolts = numDivsHoriz * vPerDiv;
 
 		const float pxPerVolt = box.size.x / totalVolts;
 		const float centerX = box.size.x * 0.5f;
 
-		return centerX + voltage * pxPerVolt;
+		return centerX + voltage * pxPerVolt + box.size.x*numDivsVert_inv*offset_divs;
 	}
 
 	void draw(const DrawArgs& args) override {
