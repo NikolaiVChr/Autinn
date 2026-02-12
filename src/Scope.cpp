@@ -665,6 +665,8 @@ struct ScopeDisplay : TransparentWidget {
 		}
 
 		bool first = true;
+		float prevTop = 0.0f;
+		float prevBottom = 0.0f;
 
 		for (int curr_px = 0; curr_px < int(width_px); curr_px += 1.0f) {
 			// left: new
@@ -716,7 +718,20 @@ struct ScopeDisplay : TransparentWidget {
 				yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
 				yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
+				// keep a copy of the raw range for the next iteration
+				float nextPrevTop = yTop;
+				float nextPrevBottom = yBottom;
+
+				if (!first) {
+					// If we jumped below the previous bottom, extend top to meet it.
+					if (yTop > prevBottom) yTop = prevBottom;
+
+					// If we jumped above the previous top, extend bottom to meet it.
+					if (yBottom < prevTop) yBottom = prevTop;
+				}
+
 				if (std::abs(yTop - yBottom) < 1.0f) {
+					// demand minimum size of 1 pixel
 					float mid = (yTop + yBottom) * 0.5f;
 					yTop = mid - 0.5f;
 					yBottom = mid + 0.5f;
@@ -730,6 +745,8 @@ struct ScopeDisplay : TransparentWidget {
 				}
 				nvgLineTo(args.vg, float(curr_px), yBottom);
 
+				prevTop = nextPrevTop;
+				prevBottom = nextPrevBottom;
 			} else {
 				// zoom in
 				const float v = module->buffer[ch][readIndex];
