@@ -85,12 +85,6 @@ struct Scope : Module {
 		NUM_LIGHTS
 	};
 
-	float buffer[4][BUFFER_SIZE] = {};
-	int writeIndex = 0;
-	int triggerIndex = 0; // last valid trigger
-	int lastTriggerIndex = 0;
-	float sampleRate = 44100.0f;
-
 	dsp::SchmittTrigger trigSchmitt;
 	dsp::BooleanTrigger trigPulse;
 	dsp::BooleanTrigger srcBtnTrig;
@@ -109,10 +103,17 @@ struct Scope : Module {
 #define AUTO_TIME_KNOB_OFF 50.0f
 
 	// transient
+	float buffer[4][BUFFER_SIZE] = {};
+	int writeIndex = 0;
+	int triggerIndex = 0; // last valid trigger
+	int lastTriggerIndex = 0;
+	bool recording = false;       // Have we found a trigger edge?
+	bool triggerValid = false;       // triggerIndex is valid
+	bool prev_triggerValid = false;       // lastTriggerIndex is valid
+	float sampleRate = 44100.0f;
 	bool frozen = false;
 	bool freezePending = false;
 	double period_s = 0.0;
-	bool triggered = false;       // Have we found a trigger edge?
 	//int triggerCandidate = 0;     // Where did the trigger happen?
 	int samplesSinceTrigger = 0;  // Counter for div * time/div wait
 	float holdoffTime_s = 0.0f;     // Remaining holdoff in seconds
@@ -302,7 +303,7 @@ struct Scope : Module {
 
 		// Schmitt-trigger processing
 		// Invert input for falling edge
-		// Hysteresis window 0.1V
+		// Hysteresis window: 0.1V x V/div
 		float signal = trigSig;
 		if (trigEdge == TRIG_EDGE_FALL) {
 			signal = -signal;
@@ -321,14 +322,14 @@ struct Scope : Module {
 			period_s = 0.0;
 		}
 
-		if (triggered) {
+		if (recording) {
 			// Recording
 			// We have already triggered, now we fill the buffer for the rest of the screen
 			samplesSinceTrigger++;
 
 			if (samplesSinceTrigger >= samplesToRecord) {
 				// buffer full
-				triggered = false;
+				recording = false;
 
 				// Set holdoff (max 1 sec)
 				holdoffTime_s = holdoffKnob > 0.00011f?holdoffKnob:0.0f;
@@ -342,9 +343,11 @@ struct Scope : Module {
 			// Waiting
 			if (holdoffTime_s <= 0.0f && edgeFound && trigMode != TRIG_MODE_XY) {
 				// switch to recording
-				triggered = true;
 				//triggerCandidate = writeIndex;
 				lastTriggerIndex = triggerIndex;
+				prev_triggerValid = triggerValid;
+				recording = true;
+				triggerValid = true;
 				triggerIndex = writeIndex;
 				samplesSinceTrigger = 0;
 				autoTrigTimer = 0.0f;
@@ -360,7 +363,9 @@ struct Scope : Module {
 					// Force rolling trigger
 					//lastTriggerIndex = triggerIndex;//TODO: not sure
 					triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;
-					triggered = false;
+					recording = false;
+					triggerValid = false;
+					prev_triggerValid = false;
 					samplesSinceTrigger = 0;
 					autoTrigTimer = 0.0f;
 					lastFrequency_hz = 0.0f;
@@ -437,7 +442,9 @@ struct Scope : Module {
 			lastTriggerIndex = 0;
 			triggerIndex = 0;
 			lastFrequency_hz = 0.0f;
-			triggered = false;
+			recording = false;
+			triggerValid = false;
+			prev_triggerValid = false;
 			freezePending = false;
 		}
 		if (freezeBtnTrig.process(freezeBtn)) {
@@ -491,7 +498,7 @@ struct Scope : Module {
 	void updateLights() {
 		float blinkBrightness = 1.0f;
 
-		if (!triggered && !frozen) {
+		if (!recording && !frozen) {
 			// scanning
 			if (blinkPhase > 0.5f) blinkBrightness = 0.1f;
 		}
@@ -588,7 +595,7 @@ struct ScopeDisplay : TransparentWidget {
 
 		int drawLimitPixel = int(width_px)+1;
 
-		if (module->triggered) {
+		if (module->recording) {
 			// we only draw enough pixels to reach writeIndex from trigger
 			double validPixels = (double)module->samplesSinceTrigger / samplesPerPixel;
 			drawLimitPixel = (int)validPixels;
@@ -678,7 +685,7 @@ struct ScopeDisplay : TransparentWidget {
 			}
 		}
 		nvgStroke(args.vg);
-		if (module->triggered && float(drawLimitPixel) <= width_px) {
+		if (module->recording && float(drawLimitPixel) <= width_px) {
 			// scanline
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 90)); // Faint white
@@ -830,12 +837,21 @@ struct ScopeDisplay : TransparentWidget {
 		for (int ch = 0; ch < TRIG_SOURCE_EXT; ch++) {
 			if (!module->inputs[Scope::A_INPUT + ch].isConnected()) continue;
 			if (module->showStats == STATS_ONE && ch != module->trigSource) continue;
+
 			// limit
-			const int startIndex = module->triggerIndex;
 			const float timePerDiv_s = module->getTimeDiv();
 			const float totalTime = numDivsHoriz * timePerDiv_s;
 			int samplesToScan = (int)(totalTime * module->sampleRate);
 			if (samplesToScan > BUFFER_SIZE) samplesToScan = BUFFER_SIZE;
+
+
+			// start index
+			// Calc how many samples exist between trigger and write index
+			int samplesRecorded = (module->writeIndex - module->triggerIndex) & BUFFER_MASK;
+			bool enough = (samplesRecorded >= samplesToScan);
+			const int startIndex = module->triggerValid && enough?module->triggerIndex
+										:(module->prev_triggerValid?module->lastTriggerIndex
+										:((module->writeIndex - samplesToScan) & BUFFER_MASK));
 
 			float minV = 100.0f;
 			float maxV = -100.0f;
@@ -856,8 +872,8 @@ struct ScopeDisplay : TransparentWidget {
 				count++;
 			}
 
-			float avg = (float)(sum / count);
-			float rms = (float)std::sqrt(sumSq / count);
+			float avg = (count > 0) ? (float)(sum / count) : 0.0f;
+			float rms = (count > 0) ? (float)std::sqrt(sumSq / count) : 0.0f;
 
 			// Text box
 			float textBoxHeight = 20.0f;
