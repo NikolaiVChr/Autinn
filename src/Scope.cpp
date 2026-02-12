@@ -19,22 +19,23 @@ constexpr float numDivsHoriz_inv = 1.0f/numDivsHoriz;
 #define STATS_ALL 2
 
 static std::vector<std::string> scales = {
-	"10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
+	"20 V/Div","10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
 	"0.2 V/Div","0.1 V/Div","50 mV/Div","20 mV/Div","10 mV/Div", "5 mV/Div"
 };
 static float getScale(int knob) {
 	switch (knob) {
-	case 0: return 10.0f;
-	case 1: return  5.0f;
-	case 2: return  2.0f;
-	case 3: return  1.0f;
-	case 4: return  0.5f;
-	case 5: return  0.2f;
-	case 6: return  0.1f;
-	case 7: return  0.05f;
-	case 8: return  0.02f;
-	case 9: return  0.01f;
-	case 10: return 0.005f;
+	case 0: return 20.0f;
+	case 1: return 10.0f;
+	case 2: return  5.0f;
+	case 3: return  2.0f;
+	case 4: return  1.0f;
+	case 5: return  0.5f;
+	case 6: return  0.2f;
+	case 7: return  0.1f;
+	case 8: return  0.05f;
+	case 9: return  0.02f;
+	case 10: return  0.01f;
+	case 11: return 0.005f;
 	default: return 0.5f;
 	}
 }
@@ -154,10 +155,10 @@ struct Scope : Module {
 		configParam(POS_D_PARAM, -8.0, 8.0, 0.0, "Channel D Pos", " Div");
 
 		// scale
-		configSwitch(SCALE_A_PARAM, 0.0f, 10.0f, 4.0f, "Channel A Scale", scales);
-		configSwitch(SCALE_B_PARAM, 0.0f, 10.0f, 4.0f, "Channel B Scale", scales);
-		configSwitch(SCALE_C_PARAM, 0.0f, 10.0f, 4.0f, "Channel C Scale", scales);
-		configSwitch(SCALE_D_PARAM, 0.0f, 10.0f, 4.0f, "Channel D Scale", scales);
+		configSwitch(SCALE_A_PARAM, 0.0f, 11.0f, 5.0f, "Channel A Scale", scales);
+		configSwitch(SCALE_B_PARAM, 0.0f, 11.0f, 5.0f, "Channel B Scale", scales);
+		configSwitch(SCALE_C_PARAM, 0.0f, 11.0f, 5.0f, "Channel C Scale", scales);
+		configSwitch(SCALE_D_PARAM, 0.0f, 11.0f, 5.0f, "Channel D Scale", scales);
 
 		// Time
 		configParam(TIME_PARAM, -5.0f, 0.0f, -3.0f, "Time / Div", " s", 10.0f);
