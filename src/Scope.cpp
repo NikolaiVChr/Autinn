@@ -333,7 +333,7 @@ struct Scope : Module {
 			}
 		} else {
 			// Waiting
-			if (holdoffTime_s <= 0.0f && edgeFound) {
+			if (holdoffTime_s <= 0.0f && edgeFound && trigMode != TRIG_MODE_XY) {
 				// switch to recording
 				triggered = true;
 				//triggerCandidate = writeIndex;
@@ -425,12 +425,25 @@ struct Scope : Module {
 			if (freezePending || frozen) {
 				frozen = false;
 				freezePending = false;
+			} else if (trigMode == TRIG_MODE_XY) {
+				// In lissajous we freeze instantly
+				freezePending = false;
+				frozen = true;
 			} else {
 				freezePending = true;
 			}
 		}
 		if (autoTimeBtnTrig.process(autotimeBtn)) {
 			autoTimeMode = !autoTimeMode;
+		}
+		if (trigMode == TRIG_MODE_XY) {
+			autoTimeMode = false;
+			lastTriggerIndex = 0;
+			triggerIndex = 0;
+			lastFrequency_hz = 0.0f;
+			triggered = false;
+			frozen = false;
+			freezePending = false;
 		}
 		if (statsBtnTrig.process(statsBtn)) {
 			showStats = !showStats;
@@ -475,14 +488,22 @@ struct Scope : Module {
 			if (blinkPhase > 0.5f) blinkBrightness = 0.1f;
 		}
 
-		lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(getRed(trigSource)*blinkBrightness);
-		lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(getGreen(trigSource)*blinkBrightness);
-		lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(getBlue(trigSource)*blinkBrightness);
+		bool lissajous = trigMode==TRIG_MODE_XY;
+
+		if (lissajous) {
+			lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(getRed(trigSource)*blinkBrightness);
+			lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(getGreen(trigSource)*blinkBrightness);
+			lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(getBlue(trigSource)*blinkBrightness);
+		} else {
+			lights[TRIG_SOURCE_LIGHT_RGB + 0].setBrightness(0.5f);
+			lights[TRIG_SOURCE_LIGHT_RGB + 1].setBrightness(0.5f);
+			lights[TRIG_SOURCE_LIGHT_RGB + 2].setBrightness(0.5f);
+		}
 
 		lights[TRIG_MODE_AUTO_LIGHT].setBrightness(trigMode==TRIG_MODE_AUTO ? 1.0f : 0.0f);
 		lights[TRIG_MODE_NORM_LIGHT].setBrightness(trigMode==TRIG_MODE_NORM ? 1.0f : 0.0f);
 		lights[TRIG_MODE_SOLO_LIGHT].setBrightness(trigMode==TRIG_MODE_SOLO ? 1.0f : 0.0f);
-		lights[TRIG_MODE_XY_LIGHT].setBrightness(trigMode==TRIG_MODE_XY ? 1.0f : 0.0f);
+		lights[TRIG_MODE_XY_LIGHT].setBrightness(lissajous ? 1.0f : 0.0f);
 
 		lights[TRIG_EDGE_RISE_LIGHT].setBrightness(trigEdge == TRIG_EDGE_RISE ? 1.0f : 0.0f);
 		lights[TRIG_EDGE_FALL_LIGHT].setBrightness(trigEdge == TRIG_EDGE_FALL ? 1.0f : 0.0f);
@@ -674,13 +695,20 @@ struct ScopeDisplay : TransparentWidget {
 		nvgStrokeColor(args.vg, nvgRGBA(100, 255, 200, 200));
 		nvgStrokeWidth(args.vg, 1.5f);
 
-		int scanSize = 4000; // points to draw
-		int startIdx = (module->writeIndex - scanSize) & BUFFER_MASK;
+		const float timePerDiv = module->getTimeDiv();
+
+		const float totalTime = numDivsHoriz * timePerDiv;// arbitrarily selected width
+
+		int samplesToDraw = (int)(totalTime * module->sampleRate);
+		if (samplesToDraw > BUFFER_SIZE) samplesToDraw = BUFFER_SIZE;
+		if (samplesToDraw < 2) samplesToDraw = 2;
+
+		int startIdx = (module->writeIndex - samplesToDraw) & BUFFER_MASK;
 		if (startIdx < 0) startIdx += BUFFER_SIZE;
 
 		bool first = true;
 
-		for (int i = 0; i < scanSize; i++) {
+		for (int i = 0; i < samplesToDraw; i++) {
 			int idx = (startIdx + i) & BUFFER_MASK;
 
 			// voltages to screen px
@@ -786,14 +814,14 @@ struct ScopeDisplay : TransparentWidget {
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 		char text[128];
 		if (module->lastFrequency_hz > 0.0f) {
-			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   Vpp: %.2f V   Freq: %.1f Hz",
+			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   PP: %.2f V   Freq: %.1f Hz",
 				'A' + ch,
 				minV,
 				maxV,
 				(maxV - minV),
 				module->lastFrequency_hz);
 		} else {
-			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   Vpp: %.2f V",
+			snprintf(text, sizeof(text), "Ch %c  Min: %+.2f V   Max: %+.2f V   PP: %.2f V",
 				'A' + ch,
 				minV,
 				maxV,
