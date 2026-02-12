@@ -146,6 +146,7 @@ struct Scope : Module {
 	bool showCenterline = false;
 	bool showGrid = true;
 	int showStats = STATS_ONE;
+	int autoTimePeriods = 3;
 
 	// controls
 	bool sourceBtn = false;
@@ -176,8 +177,8 @@ struct Scope : Module {
 		configSwitch(SCALE_D_PARAM, (float)SCALE_KNOB_MIN, (float)SCALE_KNOB_MAX, (float)SCALE_DEFAULT_KNOB, "Channel D Scale", scales);
 
 		// Time
-		configParam(TIME_PARAM, -5.0f, 0.0f, -3.0f, "Time / Div", " s", 10.0f);
-		configParam(HOLDOFF_PARAM, -4.0f, 1.0f, -3.0f, "Trigger holdoff", " s", 10.0f);
+		configParam(TIME_PARAM, TIME_KNOB_MIN, TIME_KNOB_MAX, -3.0f, "Time / Div", " s", 10.0f);
+		configParam(HOLDOFF_PARAM, HOLDOFF_KNOB_MIN, HOLDOFF_KNOB_MAX, -3.0f, "Trigger holdoff", " s", 10.0f);
 
 		// Trigger
 		configParam(TRIG_LEVEL_PARAM, -10.0f, 10.0f, 0.0f, "Trigger threshold", " V");
@@ -219,6 +220,7 @@ struct Scope : Module {
 		json_object_set_new(rootJ, "showGrid", json_boolean(showGrid));
 		json_object_set_new(rootJ, "showCenterline", json_boolean(showCenterline));
 		json_object_set_new(rootJ, "showBaselines", json_boolean(showBaselines));
+		json_object_set_new(rootJ, "autoTimePeriods", json_integer(autoTimePeriods));
 		return rootJ;
 	}
 
@@ -251,6 +253,9 @@ struct Scope : Module {
 
 		json_t* bJ = json_object_get(rootJ, "showBaselines");
 		if (bJ) showBaselines = json_is_true(bJ);
+
+		json_t* pJ = json_object_get(rootJ, "autoTimePeriods");
+		if (pJ) autoTimePeriods = int(json_integer_value(pJ));
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -404,13 +409,11 @@ struct Scope : Module {
 
 			// Calculate ideal time/div to show 3 periods
 			// 3 periods fill 1 screen
-			double targetTimePerDiv_s = (period * 3.0) / DIVS_HORIZ;
+			double targetTimePerDiv_s = (period * double(autoTimePeriods)) / DIVS_HORIZ;
 
 			// clamp to prevent log(0)
 			if (targetTimePerDiv_s < 1e-5) targetTimePerDiv_s = 1e-5;
 			autoTimeKnob = std::log10((float)targetTimePerDiv_s);
-
-			//params[TIME_PARAM].setValue(autoTimeKnob);//TODO:
 		} else {
 			autoTimeKnob = AUTO_TIME_KNOB_OFF;
 		}
@@ -734,12 +737,14 @@ struct ScopeDisplay : TransparentWidget {
 				}
 				*/
 
+				/*
 				if (ch == 0 && std::abs(yTop - yBottom) < 1.0f) {
 					// demand minimum size of 1 pixel
 					float mid = (yTop + yBottom) * 0.5f;
 					yTop = mid - 0.5f;
 					yBottom = mid + 0.5f;
 				}
+				*/
 
 				//const float sharpX = floorf(float(curr_px)) + 0.5f;// only works when user is at 100% zoom
 				auto px = float(curr_px);
@@ -1258,6 +1263,25 @@ struct ShowGridItem : MenuItem {
 	}
 };
 
+struct PeriodsMenuItem : MenuItem {
+	Scope* _module;
+	int _os;
+
+	PeriodsMenuItem(Scope* module, const char* label, int os)
+	: _module(module), _os(os)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->autoTimePeriods = _os;
+	}
+
+	void step() override {
+		rightText = _module->autoTimePeriods == _os ? "✔" : "";
+	}
+};
+
 
 struct ScopeWidget : ModuleWidget {
 	explicit ScopeWidget(Scope* module) {
@@ -1386,6 +1410,10 @@ struct ScopeWidget : ModuleWidget {
 		menu->addChild(new ShowBaseItem(a, "Show baselines"));
 		menu->addChild(new ShowCenterItem(a, "Show centerline"));
 		menu->addChild(new MenuLabel());
+		menu->addChild(new PeriodsMenuItem(a, "Auto time periods  1", 1));
+		menu->addChild(new PeriodsMenuItem(a, "Auto time periods  3", 3));
+		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 10", 10));
+		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 10", 20));
 	}
 };
 
