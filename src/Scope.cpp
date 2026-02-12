@@ -700,6 +700,7 @@ struct ScopeDisplay : TransparentWidget {
 
 			if (samplesPerPixel > 1.0) {
 				// zoom out: Peaks
+				nvgLineCap(args.vg, NVG_BUTT);
 				const int iterStart = (int)(curr_px * samplesPerPixel);
 				int iterEnd = (int)((curr_px + 1) * samplesPerPixel);
 				if (iterEnd <= iterStart) iterEnd = iterStart + 1;
@@ -737,18 +738,21 @@ struct ScopeDisplay : TransparentWidget {
 					yBottom = mid + 0.5f;
 				}
 
+				const float sharpX = floorf(float(curr_px)) + 0.5f;
+
 				if (first) {
-					nvgMoveTo(args.vg, float(curr_px), yTop);
+					nvgMoveTo(args.vg, sharpX, yTop);
 					first = false;
 				} else {
-					nvgMoveTo(args.vg, float(curr_px), yTop);
+					nvgMoveTo(args.vg, sharpX, yTop);
 				}
-				nvgLineTo(args.vg, float(curr_px), yBottom);
+				nvgLineTo(args.vg, sharpX, yBottom);
 
 				prevTop = nextPrevTop;
 				prevBottom = nextPrevBottom;
 			} else {
 				// zoom in
+				nvgLineCap(args.vg, NVG_ROUND);
 				const float v = module->buffer[ch][readIndex];
 				float y = volt2PxVert(v, offset, scale);
 
