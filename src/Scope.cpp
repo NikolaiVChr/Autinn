@@ -795,7 +795,7 @@ struct ScopeDisplay : TransparentWidget {
 		const float pxPerVolt = box.size.x / totalVolts;
 		const float centerX = box.size.x * 0.5f;
 
-		return centerX + voltage * pxPerVolt + box.size.x*numDivsVert_inv*offset_divs;
+		return centerX + voltage * pxPerVolt + box.size.x*numDivsHoriz_inv*offset_divs;
 	}
 
 	void draw(const DrawArgs& args) override {
