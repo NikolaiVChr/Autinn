@@ -900,7 +900,7 @@ struct ScopeDisplay : TransparentWidget {
 			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			char text[128];
 			if (module->lastFrequency_hz > 0.0f && ch == module->trigSource) {
-				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %.2f V  Freq: %.1f Hz  AVG: %.2f  RMS: %.2f",
+				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %.2f V  Freq: %.1f Hz  AVG: %+.2f  RMS: %.2f",
 					'A' + ch,
 					minV,
 					maxV,
@@ -909,7 +909,7 @@ struct ScopeDisplay : TransparentWidget {
 					avg,
 					rms);
 			} else {
-				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %.2f V  AVG: %.2f  RMS: %.2f",
+				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %.2f V  AVG: %+.2f  RMS: %.2f",
 					'A' + ch,
 					minV,
 					maxV,
