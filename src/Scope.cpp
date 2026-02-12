@@ -31,11 +31,12 @@ static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 1600
 #define STATS_ALL 2
 
 static std::vector<std::string> scales = {
-	"20 V/Div","10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
+	"OFF","20 V/Div","10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
 	"0.2 V/Div","0.1 V/Div","50 mV/Div","20 mV/Div","10 mV/Div", "5 mV/Div"
 };
 static float getScale(int knob) {
 	switch (knob) {
+	case -1: return -1.0f;
 	case 0: return 20.0f;
 	case 1: return 10.0f;
 	case 2: return  5.0f;
@@ -160,10 +161,10 @@ struct Scope : Module {
 		configParam(POS_D_PARAM, -8.0, 8.0, 0.0, "Channel D Pos", " Div");
 
 		// scale
-		configSwitch(SCALE_A_PARAM, 0.0f, 11.0f, 5.0f, "Channel A Scale", scales);
-		configSwitch(SCALE_B_PARAM, 0.0f, 11.0f, 5.0f, "Channel B Scale", scales);
-		configSwitch(SCALE_C_PARAM, 0.0f, 11.0f, 5.0f, "Channel C Scale", scales);
-		configSwitch(SCALE_D_PARAM, 0.0f, 11.0f, 5.0f, "Channel D Scale", scales);
+		configSwitch(SCALE_A_PARAM, -1.0f, 11.0f, 5.0f, "Channel A Scale", scales);
+		configSwitch(SCALE_B_PARAM, -1.0f, 11.0f, 5.0f, "Channel B Scale", scales);
+		configSwitch(SCALE_C_PARAM, -1.0f, 11.0f, 5.0f, "Channel C Scale", scales);
+		configSwitch(SCALE_D_PARAM, -1.0f, 11.0f, 5.0f, "Channel D Scale", scales);
 
 		// Time
 		configParam(TIME_PARAM, -5.0f, 0.0f, -3.0f, "Time / Div", " s", 10.0f);
@@ -286,7 +287,7 @@ struct Scope : Module {
 		if (trigSource < TRIG_SOURCE_EXT) {
 			trigSig = inputs[A_INPUT + trigSource].getVoltage();
 			float vPerDiv = scale[trigSource];
-			hysteresis *= vPerDiv;
+			if (vPerDiv > -0.5f) hysteresis *= vPerDiv;
 		} else {
 			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
 		}
@@ -424,7 +425,12 @@ struct Scope : Module {
 		holdoffKnob = std::pow(10.f,params[HOLDOFF_PARAM].getValue());
 		for (int ch = 0; ch < 4; ch++) {
 			offset[ch] = params[POS_A_PARAM + ch].getValue();
-			scale[ch] = getScale(int(std::round(params[SCALE_A_PARAM + ch].getValue())));
+			float kn = params[SCALE_A_PARAM + ch].getValue();
+			if (kn > -0.5f) {
+				scale[ch] = getScale(int(std::round(kn)));
+			} else {
+				scale[ch] = -1.0f;
+			}
 		}
 		// time knob we skip here
 
@@ -568,6 +574,7 @@ struct ScopeDisplay : TransparentWidget {
 		if (!module->inputs[Scope::A_INPUT + ch].isConnected()) return;
 
 		float scale = module->scale[ch];
+		if (scale < -0.5f) return;
 		float offset = module->offset[ch];
 		float timePerDiv_s = module->getTimeDiv();
 
@@ -702,9 +709,9 @@ struct ScopeDisplay : TransparentWidget {
 		if (!module) return;
 
 		bool AB = module->inputs[Scope::A_INPUT].isConnected() &&
-		module->inputs[Scope::B_INPUT].isConnected();
+		module->inputs[Scope::B_INPUT].isConnected() && module->scale[0] > -0.5f && module->scale[1] > -0.5f;
 		bool CD = module->inputs[Scope::C_INPUT].isConnected() &&
-		module->inputs[Scope::D_INPUT].isConnected();
+		module->inputs[Scope::D_INPUT].isConnected() && module->scale[2] > -0.5f && module->scale[3] > -0.5f;
 
 		// Check connections
 		if (!AB && !CD) return;
@@ -959,6 +966,7 @@ struct ScopeDisplay : TransparentWidget {
 
 		if (ch < TRIG_SOURCE_EXT) {
 			scale = module->scale[ch];
+			if (scale < -0.5f) return;
 			offset = module->offset[ch];
 		} else {
 			// If ext trigger then no visuals
@@ -1059,8 +1067,7 @@ struct ScopeDisplay : TransparentWidget {
 			for (int ch = 0; ch < 4; ch++) {
 				if (module->inputs[Scope::A_INPUT+ch].isConnected()) {
 					const float offset = module->offset[ch];
-					const float scale = module->scale[ch];
-					const float y = volt2PxVert(0.0f, offset, scale);
+					const float y = volt2PxVert(0.0f, offset, 0.0f);
 					if (y >= 0.0f && y <= box.size.y) {
 						nvgMoveTo(args.vg, x1, y);
 						nvgLineTo(args.vg, x2, y);
