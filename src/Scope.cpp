@@ -254,6 +254,11 @@ struct Scope : Module {
 	}
 
 	void process(const ProcessArgs& args) override {
+
+		if (!inputs[A_INPUT].isConnected() && !inputs[B_INPUT].isConnected() && !inputs[C_INPUT].isConnected() && !inputs[D_INPUT].isConnected()) {
+			return;
+		}
+
 		sampleRate = args.sampleRate;
 
 		period_s += args.sampleTime;
@@ -550,7 +555,8 @@ struct ScopeDisplay : TransparentWidget {
 	Scope* module{};
 	int frame = 0;
 
-	//std::shared_ptr<Font> font;
+	std::string fontPath;
+
 	float lastTrigLevel = -999.0f;
 	float trigVisibilityTimer = 0.0f;
 
@@ -888,12 +894,26 @@ struct ScopeDisplay : TransparentWidget {
 		if (frame > 60) frame = 0;
 	}
 
-	void drawStats(const DrawArgs& args) const {
+	void drawStats(const DrawArgs& args) {
 		if (!module || module->showStats == STATS_OFF) return;
 
-		//if (!font) font = APP->window->loadFont(asset::plugin(pluginInstance, "res/fonts/autinn.ttf"));
-		//if (!font) return;
-		//nvgFontFaceId(args.vg, font->handle);
+		if (fontPath.empty()) {
+			fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
+			if (!fontPath.empty()) {
+				std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
+
+				if (font) {
+					nvgFontFaceId(args.vg, font->handle);
+				}
+			}
+		} else {
+			std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
+
+			if (font) {
+				nvgFontFaceId(args.vg, font->handle);
+			}
+		}
+
 		nvgFontSize(args.vg, 13.0f);
 
 		const int chTrig = module->trigSource;
