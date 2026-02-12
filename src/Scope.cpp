@@ -741,13 +741,10 @@ struct ScopeDisplay : TransparentWidget {
 		if (AB) {
 			nvgBeginPath(args.vg);
 			nvgStrokeWidth(args.vg, 1.5f);
+			nvgStrokeColor(args.vg, colorXY1);
 			for (int i = 0; i < samplesToDraw; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
 
-				float age = (float)i / (float)samplesToDraw; // 0.0 = Old, 1.0 = New
-				float alpha = 0.1f + (0.9f * age); // Fade from 10% to 100%
-				NVGcolor _colorXY1 = nvgRGBA(colorXY1.r, colorXY1.g, colorXY1.b, alpha);
-				nvgStrokeColor(args.vg, _colorXY1);
 
 				// voltages to screen px
 				float volX = signalX[idx];
@@ -768,15 +765,12 @@ struct ScopeDisplay : TransparentWidget {
 		if (CD) {
 			nvgBeginPath(args.vg);
 			nvgStrokeWidth(args.vg, 1.5f);
+			nvgStrokeColor(args.vg, colorXY2);
 			first = true;
 
 			for (int i = 0; i < samplesToDraw; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
 
-				float age = (float)i / (float)samplesToDraw; // 0.0 = Old, 1.0 = New
-				float alpha = 0.1f + (0.9f * age); // Fade from 10% to 100%
-				NVGcolor _colorXY2 = nvgRGBA(colorXY2.r, colorXY2.g, colorXY2.b, alpha);
-				nvgStrokeColor(args.vg, _colorXY2);
 
 				// voltages to screen px
 				float volX2 = signalX2[idx];
