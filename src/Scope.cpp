@@ -423,6 +423,14 @@ struct Scope : Module {
 					// TRIG_AUTO_MIN_TIMEOUT prevents the CPU from going hot on extremely fast time
 					float timeout = std::max(TRIG_AUTO_MIN_TIMEOUT, totalScreenTime);
 
+					if (autoTimeFrequency_hz > 0.01f) {
+						float knownPeriod = 1.0f / autoTimeFrequency_hz;
+						// If the known period is longer than the screen time, use the period as the timeout
+						if (knownPeriod > timeout) {
+							timeout = knownPeriod;
+						}
+					}
+
 					// tiny buffer so we don't preempt a valid trigger that is just beyond the screen
 					timeout *= 1.1f;
 
