@@ -698,56 +698,51 @@ struct ScopeDisplay : TransparentWidget {
 			if (iteratorStep < 1) iteratorStep = 1;
 		}
 
-		int drawLimitPixel = int(width_px)+1;
-
+		int drawLimit_px = int(width_px)+1;
 		if (module->recording) {
 			// we only draw enough pixels to reach writeIndex from trigger
 			double validPixels = (double)module->samplesSinceTrigger / samplesPerPixel;
-			drawLimitPixel = (int)validPixels;
+			drawLimit_px = (int)validPixels;
 
-			if (drawLimitPixel > int(width_px)+1) drawLimitPixel = int(width_px)+1;
-			if (drawLimitPixel < 0) drawLimitPixel = 0;
+			if (drawLimit_px > int(width_px)+1) drawLimit_px = int(width_px)+1;
+			if (drawLimit_px < 0) drawLimit_px = 0;
 		}
 
 		bool first = true;
-		/*
-		float prevTop = 0.0f;
-		float prevBottom = 0.0f;
-		*/
 		float lastY = 0.0f;
 
-		for (int curr_px = 0; curr_px < int(width_px); curr_px += 1.0f) {
-			// left: new
-			// right: old
-			// extreme right: ahead of bufferhead
-			bool isNewData = curr_px < drawLimitPixel;
+		if (zoomedOut) {
 
-			// If we drawing past writeIndex, then we draw old data from previous trigger.
-			// else we draw from current trigger.
-			const int startIdx = isNewData ? module->triggerIndex : module->lastTriggerIndex;
+			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
+				// left: new
+				// right: old
+				// extreme right: ahead of bufferhead
+				bool isNewData = curr_px <= drawLimit_px;
 
-			int sampleOffset = (int)(curr_px * samplesPerPixel);
-			if (sampleOffset >= BUFFER_SIZE) {
-				// whole buffer does not fit on screen
-				// we stop drawing.
-				break;
-			}
-			int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
+				// If we drawing past writeIndex, then we draw old data from previous trigger.
+				// else we draw from current trigger.
+				const int startIdx = isNewData ? module->triggerIndex : module->lastTriggerIndex;
 
-			if (!isNewData) {
-				// Distance from new trigger to this readIndex
-				int distFromNew = (readIndex - module->triggerIndex) & BUFFER_MASK;
-
-				if (distFromNew >= 0 && distFromNew < module->samplesSinceTrigger) {
-					// distFromNew is small and positive, it means this old pixel
-					// is wrapped in the buffer. As in, we have drawn the entire buffer
-					// and if we continue, we will be repeating data.
+				int sampleOffset = (int)(curr_px * samplesPerPixel);
+				if (sampleOffset >= BUFFER_SIZE) {
+					// whole buffer does not fit on screen
+					// we stop drawing.
 					break;
 				}
-			}
+				int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
 
-			if (zoomedOut) {
-				// zoom out: Peaks
+				if (!isNewData) {
+					// Distance from new trigger to this readIndex
+					int distFromNew = (readIndex - module->triggerIndex) & BUFFER_MASK;
+
+					if (distFromNew >= 0 && distFromNew < module->samplesSinceTrigger) {
+						// distFromNew is small and positive, it means this old pixel
+						// is wrapped in the buffer. As in, we have drawn the entire buffer
+						// and if we continue, we will be repeating data.
+						break;
+					}
+				}
+
 				nvgLineCap(args.vg, NVG_BUTT);
 				const int iterStart = (int)(curr_px * samplesPerPixel);
 				int iterEnd = (int)((curr_px + 1) * samplesPerPixel);
@@ -755,70 +750,95 @@ struct ScopeDisplay : TransparentWidget {
 
 				float minV = 100.0f;
 				float maxV = -100.0f;
-				for (int i = iterStart; i < iterEnd; i += iteratorStep) {
-					const float v = module->buffer[ch][readIndex];
+				bool found = false;
+				for (int readIndexOffset = iterStart; readIndexOffset < iterEnd; readIndexOffset += iteratorStep) {
+					int readIndexRaw = (startIdx + readIndexOffset) & BUFFER_MASK;
+					const float v = module->buffer[ch][readIndexRaw];
 					if (v < minV) minV = v;
 					if (v > maxV) maxV = v;
+					found = true;
 				}
 
-				float yTop = volt2PxVert(maxV, offset, scale);
-				float yBottom = volt2PxVert(minV, offset, scale);
+				if (found) {
+					float yTop = volt2PxVert(maxV, offset, scale);
+					float yBottom = volt2PxVert(minV, offset, scale);
 
-				yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
-				yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
+					yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
+					yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
-				// keep a copy of the raw range for the next iteration
-				float nextPrevTop = yTop;
-				float nextPrevBottom = yBottom;
-
-				/*
-				if (!first) {
-					// If we jumped below the previous bottom, extend top to meet it.
-					if (yTop > prevBottom) yTop = prevBottom;
-
-					// If we jumped above the previous top, extend bottom to meet it.
-					if (yBottom < prevTop) yBottom = prevTop;
-				}
-				*/
-
-				/*
-				if (ch == 0 && std::abs(yTop - yBottom) < 1.0f) {
-					// demand minimum size of 1 pixel
-					float mid = (yTop + yBottom) * 0.5f;
-					yTop = mid - 0.5f;
-					yBottom = mid + 0.5f;
-				}
-				*/
-
-				//const float sharpX = floorf(float(curr_px)) + 0.5f;// only works when user is at 100% zoom
-				auto px = float(curr_px);
-				if (first) {
-					nvgMoveTo(args.vg, px, yTop);
-					nvgLineTo(args.vg, px, yBottom);
-					lastY = yBottom;
-					first = false;
-				} else {
-					float distToTop = std::abs(lastY - yTop);
-					float distToBottom = std::abs(lastY - yBottom);
-
-					if (distToTop < distToBottom) {
-						// closer to the top
-						nvgLineTo(args.vg, px, yTop);
+					auto px = float(curr_px);
+					if (first) {
+						nvgMoveTo(args.vg, px, yTop);
 						nvgLineTo(args.vg, px, yBottom);
 						lastY = yBottom;
+						first = false;
 					} else {
-						// closer to the bottom.
-						nvgLineTo(args.vg, px, yBottom);
-						nvgLineTo(args.vg, px, yTop);
-						lastY = yTop;
+						float distToTop = std::abs(lastY - yTop);
+						float distToBottom = std::abs(lastY - yBottom);
+
+						if (distToTop < distToBottom) {
+							// closer to the top
+							nvgLineTo(args.vg, px, yTop);
+							nvgLineTo(args.vg, px, yBottom);
+							lastY = yBottom;
+						} else {
+							// closer to the bottom.
+							nvgLineTo(args.vg, px, yBottom);
+							nvgLineTo(args.vg, px, yTop);
+							lastY = yTop;
+						}
 					}
 				}
-				/*
-				prevTop = nextPrevTop;
-				prevBottom = nextPrevBottom;
-				*/
-			} else {
-				// zoom in
+			}
+		} else {
+			// zoomed in
+
+			float stepWidth = 1.0f;
+			if (samplesPerPixel < 1.0f) {
+				// If 1 sample is 10 pixels wide, we step 10 pixels at a time
+				stepWidth = 1.0f / (float)samplesPerPixel;
+			}
+
+			bool wasNewData = true;
+
+			for (float curr_px = 0; curr_px <= width_px; curr_px += stepWidth) {
+
+				int sampleOffset = (int)std::round(curr_px * samplesPerPixel);
+				if (sampleOffset >= BUFFER_SIZE) {
+					// whole buffer does not fit on screen
+					// we stop drawing.
+					break;
+				}
+
+				// This eliminates scanline jitter.
+				// left: new
+				// right: old
+				// extreme right: ahead of bufferhead
+				bool isNewData = true;
+				if (module->recording) {
+					if (sampleOffset >= module->samplesSinceTrigger) {
+						isNewData = false;
+					}
+				}
+
+				// If we drawing past writeIndex, then we draw old data from previous trigger.
+				// else we draw from current trigger.
+				const int startIdx = isNewData ? module->triggerIndex : module->lastTriggerIndex;
+				int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
+
+				if (!isNewData) {
+					// Distance from new trigger to this readIndex
+					int distFromNew = (readIndex - module->triggerIndex) & BUFFER_MASK;
+
+					if (distFromNew >= 0 && distFromNew < module->samplesSinceTrigger) {
+						// We have lapped the buffer. Stop drawing to prevent garbage/repeat data.
+						// distFromNew is small and positive, it means this old pixel
+						// is wrapped in the buffer. As in, we have drawn the entire buffer
+						// and if we continue, we will be repeating data.
+						break;
+					}
+				}
+
 				const float v = module->buffer[ch][readIndex];
 				float y = volt2PxVert(v, offset, scale);
 
@@ -826,26 +846,27 @@ struct ScopeDisplay : TransparentWidget {
 				y = clamp(y, -10000.0f, box.size.y+10000.0f);
 
 				if (first) {
-					nvgMoveTo(args.vg, float(curr_px), y);
+					nvgMoveTo(args.vg, curr_px, y);
 					first = false;
 				} else {
-					if (curr_px == drawLimitPixel) {
+					if (wasNewData && !isNewData) {
 						// transition from new to old data
-						nvgMoveTo(args.vg, float(curr_px), y);
+						nvgMoveTo(args.vg, curr_px, y);
 					} else {
-						nvgLineTo(args.vg, float(curr_px), y);
+						nvgLineTo(args.vg, curr_px, y);
 					}
 				}
+				wasNewData = isNewData;
 			}
 		}
 		nvgStroke(args.vg);
-		if (module->recording && float(drawLimitPixel) <= width_px) {
+		if (module->recording && float(drawLimit_px) <= width_px) {
 			// scanline
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, colorScanLine); // Faint white
 			nvgStrokeWidth(args.vg, 1.0f);
-			nvgMoveTo(args.vg, (float)drawLimitPixel, 0);
-			nvgLineTo(args.vg, (float)drawLimitPixel, box.size.y);
+			nvgMoveTo(args.vg, (float)drawLimit_px, 0);
+			nvgLineTo(args.vg, (float)drawLimit_px, box.size.y);
 			nvgStroke(args.vg);
 		}
 	}
