@@ -918,7 +918,27 @@ struct ScopeDisplay : TransparentWidget {
 		return centerX + voltage * pxPerVolt + box.size.x*DIVS_HORIZ_INV*offset_divs;
 	}
 
+	void snap(const DrawArgs& args) {
+		if (!module) return;
+		float mat[6];
+		nvgCurrentTransform(args.vg, mat);
+		bool isRotated = (std::abs(mat[1]) > 0.001f || std::abs(mat[2]) > 0.001f);
+		if (isRotated) return;
+		// mat[4] is global X, mat[5] is global Y
+
+		// Calculate the nudge needed to hit a perfect integer
+		float x = mat[4];
+		float y = mat[5];
+		float dx = std::round(x) - x;
+		float dy = std::round(y) - y;
+
+		// Apply the nudge
+		nvgSave(args.vg);
+		nvgTranslate(args.vg, dx, dy);
+	}
+
 	void draw(const DrawArgs& args) override {
+		snap(args);
 		drawGrid(args);
 		drawStats(args);
 		drawTrigger(args);
@@ -927,6 +947,7 @@ struct ScopeDisplay : TransparentWidget {
 	void drawLayer(const DrawArgs& args, const int layer) override {
 		if (layer == 1) {
 			if (module) {// check if in plugin-browser or in rack.
+				snap(args);
 				nvgSave(args.vg);
 				nvgScissor(args.vg, 0, 0, box.size.x, box.size.y);
 				if (module->trigMode == TRIG_MODE_XY) {
