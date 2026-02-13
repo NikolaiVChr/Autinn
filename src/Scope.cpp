@@ -141,6 +141,7 @@ struct Scope : Module {
 	float blinkPhase = 0.0f;
 	float autoTimeKnob = AUTO_TIME_KNOB_OFF;
 	float trigFoundTimer = 0.0f;
+	bool bufferFilled = false;
 
 	// persisted
 	bool autoTimeMode = false;
@@ -283,6 +284,7 @@ struct Scope : Module {
 			}
 
 			writeIndex = (writeIndex + 1) & BUFFER_MASK;
+			if (writeIndex == 0) bufferFilled = true;
 		}
 
 		const bool edgeFound = triggerDetect(args);
@@ -944,27 +946,60 @@ struct ScopeDisplay : TransparentWidget {
 		// start index
 		// Calc how many samples exist between trigger and write index
 		int samplesRecorded = (module->writeIndex - module->triggerIndex) & BUFFER_MASK;
-		bool enough = (samplesRecorded >= samplesToDraw);
+		bool enoughNew = (samplesRecorded >= samplesToDraw);
+		int samplesRecorded2 = (module->writeIndex - module->lastTriggerIndex) & BUFFER_MASK;
+		bool enoughOld = (samplesRecorded2 >= samplesToDraw);
+		/*
 		const int startIdx = module->triggerValid && enough?module->triggerIndex
 									:(module->prev_triggerValid?module->lastTriggerIndex
 									:((module->writeIndex - samplesToDraw) & BUFFER_MASK));
+		*/
+		int startIdx;
+		int endIdx;
+		int countMax = samplesToDraw;
+		if (module->triggerValid && enoughNew) {
+			// Draw newest data from trigger forward
+			startIdx = module->triggerIndex;
+			//endIdx = (startIdx + samplesToDraw) & BUFFER_MASK;
+		} else if (module->prev_triggerValid && module->triggerValid && enoughOld) {
+			// Draw old data from prev trigger till new trigger
+			startIdx = module->lastTriggerIndex;
+			//endIdx = (startIdx + samplesToDraw) & BUFFER_MASK;
+		} else {
+			// Just draw latest data, ignoring triggers
 
-		bool first = true;
+			//startIdx = (module->writeIndex - samplesToDraw) & BUFFER_MASK;
+			//endIdx = module->writeIndex;
 
-		if (AB) {
+			// If buffer hasn't wrapped yet, we only have 'writeIndex' amount of data.
+			// Don't draw past what we have recorded.
+			int available = module->bufferFilled ? BUFFER_SIZE : module->writeIndex;
+
+			if (countMax > available) countMax = available;
+
+			startIdx = (module->writeIndex - countMax) & BUFFER_MASK;
+		}
+		/*
+		 Is okay, but countMax is always samplesToDraw so I simplified it
+		if (endIdx < startIdx) {
+			countMax = endIdx + (BUFFER_MASK - startIdx);
+		} else {
+			countMax = endIdx - startIdx;
+		}
+		*/
+		auto drawPair = [&](const float* sigX, const float* sigY, const int scaleIdxX, const int scaleIdxY, const NVGcolor color) {
+			bool first = true;
 			nvgBeginPath(args.vg);
 			nvgStrokeWidth(args.vg, 1.5f);
-			nvgStrokeColor(args.vg, colorXY1);
-			for (int i = 0; i < samplesToDraw; i += step) {
+			nvgStrokeColor(args.vg, color);
+			for (int i = 0; i < countMax; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
 
-
 				// voltages to screen px
-				float volX = signalX[idx];
-				float volY = signalY[idx];
-
-				float pxX = volt2PxHoriz(volX, module->offset[0], module->scale[0]);// Ch A settings for X
-				float pxY = volt2PxVert(volY, module->offset[1], module->scale[1]); // Ch B settings for Y
+				float volX = sigX[idx];
+				float volY = sigY[idx];
+				float pxX = volt2PxHoriz(volX, module->offset[scaleIdxX], module->scale[scaleIdxX]);
+				float pxY = volt2PxVert(volY, module->offset[scaleIdxY], module->scale[scaleIdxY]);
 
 				if (first) {
 					nvgMoveTo(args.vg, pxX, pxY);
@@ -974,33 +1009,9 @@ struct ScopeDisplay : TransparentWidget {
 				}
 			}
 			nvgStroke(args.vg);
-		}
-		if (CD) {
-			nvgBeginPath(args.vg);
-			nvgStrokeWidth(args.vg, 1.5f);
-			nvgStrokeColor(args.vg, colorXY2);
-			first = true;
-
-			for (int i = 0; i < samplesToDraw; i += step) {
-				int idx = (startIdx + i) & BUFFER_MASK;
-
-
-				// voltages to screen px
-				float volX2 = signalX2[idx];
-				float volY2 = signalY2[idx];
-
-				float pxX2 = volt2PxHoriz(volX2, module->offset[2], module->scale[2]);// Ch C settings for X
-				float pxY2 = volt2PxVert(volY2, module->offset[3], module->scale[3]); // Ch D settings for Y
-
-				if (first) {
-					nvgMoveTo(args.vg, pxX2, pxY2);
-					first = false;
-				} else {
-					nvgLineTo(args.vg, pxX2, pxY2);
-				}
-			}
-			nvgStroke(args.vg);
-		}
+		};
+		if (AB) drawPair(signalX, signalY, 0, 1, colorXY1);
+		if (CD) drawPair(signalX2, signalY2, 2, 3, colorXY2);
 	}
 
 	float volt2PxVert(float voltage, float offset_divs, float vPerDiv) const {
@@ -1519,7 +1530,7 @@ struct ScopeWidget : ModuleWidget {
 		addInput(createInputCentered<InPortAutinn>(Vec(xExtTrig, yRow2), module, Scope::CV_TRIG_EXT_INPUT));
 
 		// Trigger out
-		addOutput(createOutputCentered<InPortAutinn>(Vec(xExtTrig, yRow1), module, Scope::CV_TRIG_OUTPUT));
+		addOutput(createOutputCentered<OutPortAutinn>(Vec(xExtTrig, yRow1), module, Scope::CV_TRIG_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {
