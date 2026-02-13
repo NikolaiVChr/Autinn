@@ -326,6 +326,7 @@ struct Scope : Module {
 		if (holdoffTime_s > 0.0f) {
 			holdoffTime_s -= args.sampleTime;
 		}
+		bool holdoff_active = holdoffTime_s > 0.0f;
 
 		// Schmitt-trigger processing
 		// Invert input for falling edge
@@ -339,7 +340,7 @@ struct Scope : Module {
 		bool schmittState = trigSchmitt.process(signal, threshold, threshold+hysteresis);
 		bool edgeFound = trigPulse.process(schmittState);
 
-		if (edgeFound) {
+		if (edgeFound && !holdoff_active) {
 			if (period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
 				lastFrequency_hz = (float)(1.0 / period_s);
 			} else {
@@ -367,7 +368,7 @@ struct Scope : Module {
 			}
 		} else {
 			// Waiting
-			if (holdoffTime_s <= 0.0f && edgeFound) {
+			if (!holdoff_active && edgeFound) {
 				// switch to recording
 				//triggerCandidate = writeIndex;
 				lastTriggerIndex = triggerIndex;
@@ -459,6 +460,7 @@ struct Scope : Module {
 		if (modeBtnTrig.process(trigModeKnob)) {
 			trigMode = (trigMode + 1) % 4;
 			if (trigMode == TRIG_MODE_XY) frozen = false;
+			holdoffTime_s = 0.0f;// stop holdoff when switching mode.
 		}
 		if (edgeBtnTrig.process(trigEdgeBtn)) {
 			trigEdge = !trigEdge;
@@ -530,8 +532,13 @@ struct Scope : Module {
 		float blinkBrightness = 1.0f;
 
 		if (!recording && !frozen) {
-			// scanning
-			if (blinkPhase > 0.5f) blinkBrightness = 0.1f;
+			if (holdoffTime_s > 0) {
+				// holdoff timeout
+				blinkBrightness = 0.4f + 0.6f * std::pow((std::sin(blinkPhase * 2.0f * float(M_PI)) + 1.0f) / 2.0f, 2.0f);
+			} else {
+				// scanning for trigger
+				if (blinkPhase > 0.5f) blinkBrightness = 0.1f;
+			}
 		}
 
 		bool lissajous = trigMode==TRIG_MODE_XY;
@@ -642,9 +649,8 @@ struct ScopeDisplay : TransparentWidget {
 
 		if (samplesToDraw < 2.0f) return;
 
-		// < 1.0: Zoomed in
-		// > 1.0: Zoomed out
 		const double samplesPerPixel = samplesToDraw / width_px;
+		bool zoomedOut = samplesPerPixel > 1.0;
 
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, color);
@@ -705,7 +711,7 @@ struct ScopeDisplay : TransparentWidget {
 				}
 			}
 
-			if (samplesPerPixel > 1.0) {
+			if (zoomedOut) {
 				// zoom out: Peaks
 				nvgLineCap(args.vg, NVG_BUTT);
 				const int iterStart = (int)(curr_px * samplesPerPixel);
