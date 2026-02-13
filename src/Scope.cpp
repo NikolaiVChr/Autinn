@@ -14,6 +14,7 @@ static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enou
 static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
 
 #define TRIG_AUTO_MIN_TIMEOUT 0.04f    // seconds
+#define TRIG_AUTO_MAX_TIMEOUT 0.1f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
 #define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
 #define TRIG_SOURCE_EXT 4
@@ -425,6 +426,8 @@ struct Scope : Module {
 					// tiny buffer so we don't preempt a valid trigger that is just beyond the screen
 					timeout *= 1.1f;
 
+					//timeout = std::min(TRIG_AUTO_MAX_TIMEOUT, timeout);
+
 					if (autoTrigTimer > timeout) {
 						// Force rolling trigger
 						lastTriggerIndex = triggerIndex;
@@ -739,7 +742,10 @@ struct ScopeDisplay : TransparentWidget {
 				// left: new
 				// right: old
 				// extreme right: ahead of bufferhead
-				bool isNewData = curr_px <= drawLimit_px;
+				bool isNewData = true;
+				if (module->recording) {// TODO: test1
+					isNewData = curr_px <= drawLimit_px;
+				}
 
 				// If we drawing past writeIndex, then we draw old data from previous trigger.
 				// else we draw from current trigger.
