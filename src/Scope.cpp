@@ -13,14 +13,14 @@ static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to loo
 static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable average/RMS, but we allow
 static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
 
-#define TRIG_AUTO_TIMEOUT 1.0f    // seconds
+#define TRIG_AUTO_MIN_TIMEOUT 0.04f    // seconds
 #define AUTO_TIME_PERIOD_MAX 10.0 // seconds
 #define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
 #define TRIG_SOURCE_EXT 4
 #define TRIG_HYSTERESIS 0.1f // will be multiplied by V/Div except for ext. trigger
 #define AUTO_TIME_KNOB_OFF 50.0f
 #define BLINK_HZ 2.0f
-#define TRIG_MODE_AUTO 0 // wait TRIG_AUTO_TIMEOUT then trigger even if no trigger found
+#define TRIG_MODE_AUTO 0 // wait TRIG_AUTO_MIN_TIMEOUT then trigger even if no trigger found
 #define TRIG_MODE_NORM 1 // wait forever for trigger to be found
 #define TRIG_MODE_SOLO 2 // freeze when finding trigger
 #define TRIG_MODE_XY   3 // Lissajous
@@ -385,13 +385,18 @@ struct Scope : Module {
 
 				if (trigMode == TRIG_MODE_AUTO || trigMode == TRIG_MODE_XY) {
 					autoTrigTimer += args.sampleTime;
-					// If no trigger for TRIG_AUTO_TIMEOUT (or > screen time), force update
-					float timeout = TRIG_AUTO_TIMEOUT;
-					if (timeout < totalScreenTime * 1.25f) timeout = totalScreenTime * 1.25f;
+					// If no trigger for screen time, force update
+
+					// 25Hz = 0.04s
+					// TRIG_AUTO_MIN_TIMEOUT prevents the CPU from going hot on extremely fast time
+					float timeout = std::max(TRIG_AUTO_MIN_TIMEOUT, totalScreenTime);
+
+					// tiny buffer so we don't preempt a valid trigger that is just beyond the screen
+					timeout *= 1.1f;
 
 					if (autoTrigTimer > timeout) {
 						// Force rolling trigger
-						//lastTriggerIndex = triggerIndex;//TODO: not sure
+						lastTriggerIndex = triggerIndex;
 						triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;
 						recording = false;
 						triggerValid = false;
@@ -399,6 +404,12 @@ struct Scope : Module {
 						samplesSinceTrigger = 0;
 						autoTrigTimer = 0.0f;
 						lastFrequency_hz = 0.0f;
+
+						// so that auto time don't adjust due to fake triggers.
+						// And first real valid trigger don't write to last_frequency_hz
+						period_s = 1000.0;
+
+						holdoffTime_s = holdoffKnob > 0.00011f ? holdoffKnob : 0.0f;
 
 						if (freezePending) {
 							frozen = true;
@@ -486,6 +497,7 @@ struct Scope : Module {
 		}
 		if (freezeBtnTrig.process(freezeBtn)) {
 			if (freezePending || frozen) {
+				if (frozen) holdoffTime_s = 0.0f;
 				frozen = false;
 				freezePending = false;
 			} else if (trigMode == TRIG_MODE_XY) {
@@ -541,7 +553,7 @@ struct Scope : Module {
 				blinkBrightness = 0.4f + 0.6f * std::pow((std::sin(blinkPhase * 2.0f * float(M_PI)) + 1.0f) / 2.0f, 2.0f);
 			} else {
 				// scanning for trigger
-				if (int(blinkPhase * 5.0f) % 2 == 0) blinkBrightness = 0.1f;
+				if (int(blinkPhase * 6.0f) % 2 == 0) blinkBrightness = 0.1f;
 			}
 		}
 
@@ -1039,7 +1051,7 @@ struct ScopeDisplay : TransparentWidget {
 			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			char text[128];
 			if (module->lastFrequency_hz > 0.0f && ch == module->trigSource) {
-				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %5.2f V  AVG: %+.2f  RMS: %.2f  Freq: %.1f Hz",
+				snprintf(text, sizeof(text), "%c:  Min: %+5.2f V  Max: %+5.2f V  PP: %5.2f V  AVG: %+.2f  RMS: %.2f  Freq: %.1f Hz",
 					'A' + ch,
 					minV,
 					maxV,
@@ -1048,7 +1060,7 @@ struct ScopeDisplay : TransparentWidget {
 					rms,
 					module->lastFrequency_hz);
 			} else {
-				snprintf(text, sizeof(text), "%c:  Min: %+.2f V  Max: %+.2f V  PP: %5.2f V  AVG: %+.2f  RMS: %.2f",
+				snprintf(text, sizeof(text), "%c:  Min: %+5.2f V  Max: %+5.2f V  PP: %5.2f V  AVG: %+.2f  RMS: %.2f",
 					'A' + ch,
 					minV,
 					maxV,
