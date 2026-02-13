@@ -305,7 +305,10 @@ struct Scope : Module {
 		if (trigSource < TRIG_SOURCE_EXT) {
 			trigSig = inputs[A_INPUT + trigSource].getVoltage();
 			float vPerDiv = scale[trigSource];
-			if (vPerDiv > -0.5f) hysteresis *= vPerDiv;
+			if (vPerDiv > -0.5f && vPerDiv < 1.0f) {
+				// We only scale it down. No reason it should ever get larger than 0.1V.
+				hysteresis *= vPerDiv;
+			}
 		} else {
 			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
 		}
