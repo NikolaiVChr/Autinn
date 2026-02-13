@@ -133,7 +133,7 @@ struct Scope : Module {
 	float holdoffTime_s = 0.0f;     // Remaining holdoff in seconds
 	float autoTrigTimer = 0.0f;   // Auto mode timeout
 	int dspFrame = 1001;
-	float lastFrequency_hz = 0.0f;
+	float autoTimeFrequency_hz = 0.0f;
 	float blinkPhase = 0.0f;
 	float autoTimeKnob = AUTO_TIME_KNOB_OFF;
 
@@ -342,10 +342,11 @@ struct Scope : Module {
 
 		if (edgeFound) {
 			if (!holdoff_active) {
-				if (period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
-					lastFrequency_hz = (float)(1.0 / period_s);
+				bool periodValid = period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN;
+				if (periodValid) {
+					autoTimeFrequency_hz = (float)(1.0 / period_s);
 				} else {
-					lastFrequency_hz = 0.0f;
+					//autoTimeFrequency_hz = 0.0f;
 				}
 			}
 			period_s = 0.0;
@@ -403,11 +404,6 @@ struct Scope : Module {
 						prev_triggerValid = false;
 						samplesSinceTrigger = 0;
 						autoTrigTimer = 0.0f;
-						lastFrequency_hz = 0.0f;
-
-						// so that auto time don't adjust due to fake triggers.
-						// And first real valid trigger don't write to last_frequency_hz
-						period_s = 1000.0;
 
 						holdoffTime_s = holdoffKnob > 0.00011f ? holdoffKnob : 0.0f;
 
@@ -422,9 +418,9 @@ struct Scope : Module {
 	}
 
 	void autoTime() {
-		if (autoTimeMode && lastFrequency_hz > 0.01f) {
+		if (autoTimeMode && autoTimeFrequency_hz > 0.01f) {
 			// Time since last trigger
-			double period = 1.0/lastFrequency_hz;
+			double period = 1.0/autoTimeFrequency_hz;
 
 			// Calculate ideal time/div to show 3 periods
 			// 3 periods fill 1 screen
@@ -488,7 +484,7 @@ struct Scope : Module {
 			autoTimeMode = false;
 			lastTriggerIndex = 0;
 			triggerIndex = 0;
-			lastFrequency_hz = 0.0f;
+			autoTimeFrequency_hz = 0.0f;
 			recording = false;
 			triggerValid = false;
 			prev_triggerValid = false;
@@ -1050,17 +1046,17 @@ struct ScopeDisplay : TransparentWidget {
 			nvgFillColor(args.vg, getColor(ch));
 			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			char text[128];
-			if (module->lastFrequency_hz > 0.0f && ch == module->trigSource) {
-				snprintf(text, sizeof(text), "%c:  Min: %+5.2f V  Max: %+5.2f V  PP: %5.2f V  AVG: %+.2f  RMS: %.2f  Freq: %.1f Hz",
+			if (module->autoTimeFrequency_hz > 0.0f && ch == module->trigSource) {
+				snprintf(text, sizeof(text), "%c:  Min: %+6.2f V  Max: %+6.2f V  PP: %5.2f V  AVG: %+6.2f  RMS: %5.2f  Freq: %.1f Hz",
 					'A' + ch,
 					minV,
 					maxV,
 					(maxV - minV),
 					avg,
 					rms,
-					module->lastFrequency_hz);
+					module->autoTimeFrequency_hz);
 			} else {
-				snprintf(text, sizeof(text), "%c:  Min: %+5.2f V  Max: %+5.2f V  PP: %5.2f V  AVG: %+.2f  RMS: %.2f",
+				snprintf(text, sizeof(text), "%c:  Min: %+6.2f V  Max: %+6.2f V  PP: %5.2f V  AVG: %+6.2f  RMS: %5.2f",
 					'A' + ch,
 					minV,
 					maxV,
