@@ -37,6 +37,7 @@ static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 1600
 #define TIME_KNOB_MAX 0.0f //      to   1s
 #define HOLDOFF_KNOB_MIN -4.0f// from 100µs
 #define HOLDOFF_KNOB_MAX 1.0f //   to  10s
+#define TRIG_FOUND_TIMER 0.1f
 
 static std::vector<std::string> scales = {
 	"OFF","20 V/Div","10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
@@ -104,6 +105,7 @@ struct Scope : Module {
 		TRIG_EDGE_RISE_LIGHT,
 		ENUMS(FREEZE_LIGHT_RGB, 3),
 		AUTO_TIME_LIGHT,
+		TRIG_FOUND_LIGHT,
 		NUM_LIGHTS
 	};
 
@@ -128,7 +130,6 @@ struct Scope : Module {
 	bool frozen = false;
 	bool freezePending = false;
 	double period_s = 0.0;
-	//int triggerCandidate = 0;     // Where did the trigger happen?
 	int samplesSinceTrigger = 0;  // Counter for div * time/div wait
 	float holdoffTime_s = 0.0f;     // Remaining holdoff in seconds
 	float autoTrigTimer = 0.0f;   // Auto mode timeout
@@ -136,6 +137,7 @@ struct Scope : Module {
 	float autoTimeFrequency_hz = 0.0f;
 	float blinkPhase = 0.0f;
 	float autoTimeKnob = AUTO_TIME_KNOB_OFF;
+	float trigFoundTimer = 0.0f;
 
 	// persisted
 	bool autoTimeMode = false;
@@ -206,6 +208,7 @@ struct Scope : Module {
 		configLight(TRIG_EDGE_FALL_LIGHT, "Trigger on falling edge");
 		configLight(FREEZE_LIGHT_RGB, "Freeze");
 		configLight(AUTO_TIME_LIGHT, "Auto time");
+		configLight(TRIG_FOUND_LIGHT, "Trigger found");
 
 		readControls();
 	}
@@ -328,6 +331,10 @@ struct Scope : Module {
 		}
 		bool holdoff_active = holdoffTime_s > 0.0f;
 
+		if (trigFoundTimer > 0.0f) {
+			trigFoundTimer -= args.sampleTime;
+		}
+
 		// Schmitt-trigger processing
 		// Invert input for falling edge
 		// Hysteresis window: 0.1V x V/div
@@ -348,6 +355,7 @@ struct Scope : Module {
 				} else {
 					//autoTimeFrequency_hz = 0.0f;
 				}
+				trigFoundTimer = TRIG_FOUND_TIMER;
 			}
 			period_s = 0.0;
 		}
@@ -370,7 +378,7 @@ struct Scope : Module {
 				}
 			}
 		} else {
-			// Waiting
+			// scanning for trigger
 			if (!holdoff_active) {
 				if (edgeFound) {
 					// switch to recording
@@ -541,8 +549,15 @@ struct Scope : Module {
 	}
 
 	void updateLights() {
-		float blinkBrightness = 1.0f;
+		float trigFoundBrightness = 0.0f;
+		if (trigFoundTimer > 0.0f) {
+			trigFoundBrightness = 1.0f;
+		} else {
+			trigFoundBrightness = 0.0f;
+		}
+		lights[TRIG_FOUND_LIGHT].setBrightness(trigFoundBrightness);
 
+		float blinkBrightness = 1.0f;
 		if (!recording && !frozen) {
 			if (holdoffTime_s > 0) {
 				// holdoff timeout
@@ -1046,15 +1061,27 @@ struct ScopeDisplay : TransparentWidget {
 			nvgFillColor(args.vg, getColor(ch));
 			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			char text[128];
-			if (module->autoTimeFrequency_hz > 0.0f && ch == module->trigSource) {
-				snprintf(text, sizeof(text), "%c:  Min: %+6.2f V  Max: %+6.2f V  PP: %5.2f V  AVG: %+6.2f  RMS: %5.2f  Freq: %.1f Hz",
+			if (ch == module->trigSource) {
+				char textF[128];
+				if (module->autoTimeFrequency_hz > 0.0f) {
+					sprintf(textF,"Freq: %.1f Hz", module->autoTimeFrequency_hz);
+				} else {
+					sprintf(textF,"");
+				}
+				std::string triggerStatus = module->frozen?"FROZEN"
+						:(module->trigFoundTimer > 0.0f?"TRIGGER"
+						:(module->holdoffTime_s > 0.0f?"HOLDOFF"
+						:(module->recording?"TRIGGER"
+						:"SCANNING")));
+				snprintf(text, sizeof(text), "%c:  Min: %+6.2f V  Max: %+6.2f V  PP: %5.2f V  AVG: %+6.2f  RMS: %5.2f  %-8s  %s",
 					'A' + ch,
 					minV,
 					maxV,
 					(maxV - minV),
 					avg,
 					rms,
-					module->autoTimeFrequency_hz);
+					triggerStatus.c_str(),
+					textF);
 			} else {
 				snprintf(text, sizeof(text), "%c:  Min: %+6.2f V  Max: %+6.2f V  PP: %5.2f V  AVG: %+6.2f  RMS: %5.2f",
 					'A' + ch,
@@ -1373,6 +1400,7 @@ struct ScopeWidget : ModuleWidget {
 
 		// Trig level
 		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xTrigLevel, yRow1), module, Scope::TRIG_LEVEL_PARAM));
+		addChild(createLightCentered<SmallLight<YellowLight>>(Vec(xTrigLevel + HALF_KNOB_MED * 1.5f, yRow1 + HALF_KNOB_MED), module, Scope::TRIG_FOUND_LIGHT));
 
 		// Freeze
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigLevel, yRow2), module, Scope::FREEZE_PARAM));
