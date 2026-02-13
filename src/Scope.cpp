@@ -340,7 +340,7 @@ struct Scope : Module {
 		bool schmittState = trigSchmitt.process(signal, threshold, threshold+hysteresis);
 		bool edgeFound = trigPulse.process(schmittState);
 
-		if (edgeFound && !holdoff_active) {
+		if (edgeFound) {
 			if (period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
 				lastFrequency_hz = (float)(1.0 / period_s);
 			} else {
@@ -368,38 +368,40 @@ struct Scope : Module {
 			}
 		} else {
 			// Waiting
-			if (!holdoff_active && edgeFound) {
-				// switch to recording
-				//triggerCandidate = writeIndex;
-				lastTriggerIndex = triggerIndex;
-				prev_triggerValid = triggerValid;
-				recording = true;
-				triggerValid = true;
-				triggerIndex = writeIndex;
-				samplesSinceTrigger = 0;
-				autoTrigTimer = 0.0f;
-			}
-
-			if (trigMode == TRIG_MODE_AUTO || trigMode == TRIG_MODE_XY) {
-				autoTrigTimer += args.sampleTime;
-				// If no trigger for TRIG_AUTO_TIMEOUT (or > screen time), force update
-				float timeout = TRIG_AUTO_TIMEOUT;
-				if (timeout < totalScreenTime * 1.25f) timeout = totalScreenTime * 1.25f;
-
-				if (autoTrigTimer > timeout) {
-					// Force rolling trigger
-					//lastTriggerIndex = triggerIndex;//TODO: not sure
-					triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;
-					recording = false;
-					triggerValid = false;
-					prev_triggerValid = false;
+			if (!holdoff_active) {
+				if (edgeFound) {
+					// switch to recording
+					//triggerCandidate = writeIndex;
+					lastTriggerIndex = triggerIndex;
+					prev_triggerValid = triggerValid;
+					recording = true;
+					triggerValid = true;
+					triggerIndex = writeIndex;
 					samplesSinceTrigger = 0;
 					autoTrigTimer = 0.0f;
-					lastFrequency_hz = 0.0f;
+				}
 
-					if (freezePending) {
-						frozen = true;
-						freezePending = false;
+				if (trigMode == TRIG_MODE_AUTO || trigMode == TRIG_MODE_XY) {
+					autoTrigTimer += args.sampleTime;
+					// If no trigger for TRIG_AUTO_TIMEOUT (or > screen time), force update
+					float timeout = TRIG_AUTO_TIMEOUT;
+					if (timeout < totalScreenTime * 1.25f) timeout = totalScreenTime * 1.25f;
+
+					if (autoTrigTimer > timeout) {
+						// Force rolling trigger
+						//lastTriggerIndex = triggerIndex;//TODO: not sure
+						triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;
+						recording = false;
+						triggerValid = false;
+						prev_triggerValid = false;
+						samplesSinceTrigger = 0;
+						autoTrigTimer = 0.0f;
+						lastFrequency_hz = 0.0f;
+
+						if (freezePending) {
+							frozen = true;
+							freezePending = false;
+						}
 					}
 				}
 			}
@@ -407,6 +409,7 @@ struct Scope : Module {
 	}
 
 	void autoTime () {
+		if (holdoffTime_s > 0.0f) return;
 		if (autoTimeMode && lastFrequency_hz > 0.01f) {
 			// Time since last trigger
 			double period = 1.0/lastFrequency_hz;
