@@ -93,6 +93,7 @@ struct Scope : Module {
 		NUM_INPUTS
 	};
 	enum OutputIds {
+		CV_TRIG_OUTPUT,
 		NUM_OUTPUTS
 	};
 	enum LightIds {
@@ -117,6 +118,7 @@ struct Scope : Module {
 	dsp::BooleanTrigger freezeBtnTrig;
 	dsp::BooleanTrigger autoTimeBtnTrig;
 	dsp::BooleanTrigger statsBtnTrig;
+	dsp::PulseGenerator trigOutPulse;
 
 	// transient
 	float buffer[4][BUFFER_SIZE] = {};
@@ -198,6 +200,9 @@ struct Scope : Module {
 		configInput(D_INPUT, "Channel D");
 		configInput(CV_TRIG_EXT_INPUT, "Ext. trigger");
 
+		// outputs
+		configInput(CV_TRIG_OUTPUT, "Trigger");
+
 		// lights
 		configLight(TRIG_SOURCE_LIGHT_RGB, "Trigger source");
 		configLight(TRIG_MODE_AUTO_LIGHT, "Auto trigger");
@@ -276,12 +281,16 @@ struct Scope : Module {
 				buffer[c][writeIndex] = inputs[A_INPUT + c].getVoltage();
 			}
 
-			triggerDetect(args);
-
 			writeIndex = (writeIndex + 1) & BUFFER_MASK;
 		}
 
-		blinkPhase += args.sampleTime * BLINK_HZ * 0.5;
+		const bool edgeFound = triggerDetect(args);
+
+		if (!frozen) {
+			triggerResponse(args, edgeFound);
+		}
+
+		blinkPhase += args.sampleTime * BLINK_HZ * 0.5f;
 		if (blinkPhase >= 1.0f) blinkPhase -= 1.0f;
 
 		dspFrame++;
@@ -292,6 +301,8 @@ struct Scope : Module {
 			readControls();
 			autoTime();
 		}
+
+		outputs[CV_TRIG_OUTPUT].setVoltage(trigOutPulse.process(args.sampleTime) ? 10.0f : 0.0f);
 	}
 
 	/*
@@ -301,7 +312,7 @@ struct Scope : Module {
 	 *		Stats: Duty cycle %, period, pulse width, crest factor, rise time, fall time, overshoot, compare phase
 	 */
 
-	void triggerDetect(const ProcessArgs& args) {
+	bool triggerDetect(const ProcessArgs& args) {
 		// Get trigger signal
 		float trigSig = 0.0f;
 		float hysteresis = TRIG_HYSTERESIS; // Default for Ext (100mV)
@@ -317,16 +328,10 @@ struct Scope : Module {
 		}
 
 		float threshold = thresholdKnob;
-		float timePerDiv = getTimeDiv();
-		// We want to record DIVS_HORIZ divisions after the trigger to fill the screen
-		float totalScreenTime = DIVS_HORIZ * timePerDiv;
-		int samplesToRecord = int(totalScreenTime * sampleRate);
-
-		if (samplesToRecord > BUFFER_SIZE) samplesToRecord = BUFFER_SIZE;
-		if (samplesToRecord < 32) samplesToRecord = 32;
 
 		// Holdoff
 		if (holdoffTime_s > 0.0f) {
+			// its fine that this counts down while being frozen, as unfreezing will reset it anyways.
 			holdoffTime_s -= args.sampleTime;
 		}
 		bool holdoff_active = holdoffTime_s > 0.0f;
@@ -348,17 +353,34 @@ struct Scope : Module {
 		bool edgeFound = trigPulse.process(schmittState);
 
 		if (edgeFound) {
-			if (!holdoff_active) {
-				bool periodValid = period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN;
-				if (periodValid) {
-					autoTimeFrequency_hz = (float)(1.0 / period_s);
-				} else {
-					//autoTimeFrequency_hz = 0.0f;
+			if (!frozen) {
+				if (!holdoff_active) {
+					bool periodValid = period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN;
+					if (periodValid) {
+						autoTimeFrequency_hz = (float)(1.0 / period_s);
+					} else {
+						//autoTimeFrequency_hz = 0.0f;
+					}
+					trigFoundTimer = TRIG_FOUND_TIMER;
 				}
-				trigFoundTimer = TRIG_FOUND_TIMER;
+				period_s = 0.0;
 			}
-			period_s = 0.0;
+			trigOutPulse.trigger();
 		}
+		return edgeFound;
+	}
+
+	void triggerResponse(const ProcessArgs& args, bool edgeFound) {
+
+		float timePerDiv = getTimeDiv();
+		// We want to record DIVS_HORIZ divisions after the trigger to fill the screen
+		float totalScreenTime = DIVS_HORIZ * timePerDiv;
+		int samplesToRecord = int(totalScreenTime * sampleRate);
+
+		if (samplesToRecord > BUFFER_SIZE) samplesToRecord = BUFFER_SIZE;
+		if (samplesToRecord < 32) samplesToRecord = 32;
+
+		bool holdoff_active = holdoffTime_s > 0.0f;
 
 		if (recording) {
 			// Recording
@@ -712,7 +734,7 @@ struct ScopeDisplay : TransparentWidget {
 		float lastY = 0.0f;
 
 		if (zoomedOut) {
-
+			bool wasNewData = true;
 			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
 				// right: old
@@ -752,6 +774,9 @@ struct ScopeDisplay : TransparentWidget {
 				float maxV = -100.0f;
 				bool found = false;
 				for (int readIndexOffset = iterStart; readIndexOffset < iterEnd; readIndexOffset += iteratorStep) {
+					if (isNewData && readIndexOffset >= module->samplesSinceTrigger) {
+						continue;
+					}
 					int readIndexRaw = (startIdx + readIndexOffset) & BUFFER_MASK;
 					const float v = module->buffer[ch][readIndexRaw];
 					if (v < minV) minV = v;
@@ -767,7 +792,7 @@ struct ScopeDisplay : TransparentWidget {
 					yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
 					auto px = float(curr_px);
-					if (first) {
+					if (first|| (wasNewData && !isNewData)) {
 						nvgMoveTo(args.vg, px, yTop);
 						nvgLineTo(args.vg, px, yBottom);
 						lastY = yBottom;
@@ -789,6 +814,7 @@ struct ScopeDisplay : TransparentWidget {
 						}
 					}
 				}
+				wasNewData = isNewData;
 			}
 		} else {
 			// zoomed in
@@ -1437,7 +1463,7 @@ struct ScopeWidget : ModuleWidget {
 
 		// Auto time
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTime, yRow2), module, Scope::AUTO_TIME_PARAM));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(xTime + 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
+		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTime + 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
 
 		// Auto time
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xHoldoff, yRow2), module, Scope::STATS_PARAM));
@@ -1459,8 +1485,8 @@ struct ScopeWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f + lightSpacingY*2.0f), module, Scope::TRIG_MODE_XY_LIGHT));
 
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_PARAM));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_RISE_LIGHT));
-		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + lightSpacingY + btnSpacingY), module, Scope::TRIG_EDGE_FALL_LIGHT));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_RISE_LIGHT));
+		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + lightSpacingY + btnSpacingY), module, Scope::TRIG_EDGE_FALL_LIGHT));
 
 		/*
 		INFO("Freeze %.0f, %.0f", px2mm(xTrigLevel), px2mm(yRow2));
@@ -1477,6 +1503,9 @@ struct ScopeWidget : ModuleWidget {
 
 		// Ext trigger
 		addInput(createInputCentered<InPortAutinn>(Vec(xExtTrig, yRow2), module, Scope::CV_TRIG_EXT_INPUT));
+
+		// Trigger out
+		addOutput(createOutputCentered<InPortAutinn>(Vec(xExtTrig, yRow1), module, Scope::CV_TRIG_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {
