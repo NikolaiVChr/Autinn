@@ -1307,8 +1307,8 @@ struct ScopeWidget : ModuleWidget {
 		float displayHeight_px = mm2px(80.0f);
 		float margin = mm2px(margin_mm);
 
-		auto* display = createWidget<ScopeDisplay>(Vec(margin, margin));
-		display->box.size = Vec(panelWidth_px - 2 * margin, displayHeight_px);
+		auto* display = createWidget<ScopeDisplay>(Vec(std::round(margin), std::round(margin)));
+		display->box.size = Vec(std::round(panelWidth_px - 2 * margin), std::round(displayHeight_px));
 		display->module = module;
 		addChild(display);
 
