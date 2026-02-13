@@ -269,9 +269,9 @@ struct Scope : Module {
 
 		sampleRate = args.sampleRate;
 
-		period_s += args.sampleTime;
-
 		if (!frozen) {
+			period_s += args.sampleTime;
+
 			for (int c = 0; c < 4; c++) {
 				buffer[c][writeIndex] = inputs[A_INPUT + c].getVoltage();
 			}
@@ -362,7 +362,7 @@ struct Scope : Module {
 
 		if (recording) {
 			// Recording
-			// We have already triggered, now we fill the buffer for the rest of the screen
+			// We have triggered, now we fill the buffer for the rest of the screen
 			samplesSinceTrigger++;
 
 			if (samplesSinceTrigger >= samplesToRecord) {
@@ -413,7 +413,6 @@ struct Scope : Module {
 						samplesSinceTrigger = 0;
 						autoTrigTimer = 0.0f;
 
-						holdoffTime_s = holdoffKnob > 0.00011f ? holdoffKnob : 0.0f;
 
 						if (freezePending) {
 							frozen = true;
@@ -471,15 +470,24 @@ struct Scope : Module {
 				scale[ch] = -1.0f;
 			}
 		}
+
 		// time knob we skip here
 
 		if (srcBtnTrig.process(sourceBtn)) {
 			trigSource = (trigSource + 1) % 5;
+			autoTimeFrequency_hz = 0.0f;
+			prev_triggerValid = false;
+			triggerValid = false;
+			holdoffTime_s = 0.0f;// stop holdoff when switching source.
+			recording = false;
 		}
 		if (modeBtnTrig.process(trigModeKnob)) {
 			trigMode = (trigMode + 1) % 4;
 			if (trigMode == TRIG_MODE_XY) frozen = false;
+			prev_triggerValid = false;
+			triggerValid = false;
 			holdoffTime_s = 0.0f;// stop holdoff when switching mode.
+			recording = false;
 		}
 		if (edgeBtnTrig.process(trigEdgeBtn)) {
 			trigEdge = !trigEdge;
@@ -1064,7 +1072,7 @@ struct ScopeDisplay : TransparentWidget {
 			if (ch == module->trigSource) {
 				char textF[128];
 				if (module->autoTimeFrequency_hz > 0.0f) {
-					sprintf(textF,"Freq: %.1f Hz", module->autoTimeFrequency_hz);
+					sprintf(textF,"Freq: %7.1f Hz", module->autoTimeFrequency_hz);
 				} else {
 					sprintf(textF,"");
 				}
@@ -1073,7 +1081,7 @@ struct ScopeDisplay : TransparentWidget {
 						:(module->holdoffTime_s > 0.0f?"HOLDOFF"
 						:(module->recording?"TRIGGER"
 						:"SCANNING")));
-				snprintf(text, sizeof(text), "%c:  Min: %+6.2f V  Max: %+6.2f V  PP: %5.2f V  AVG: %+6.2f  RMS: %5.2f  %-8s  %s",
+				snprintf(text, sizeof(text), "%c Min: %+6.2fV  Max: %+6.2fV  PP: %5.2fV  AVG: %+6.2f  RMS: %5.2f  %-8s  %s",
 					'A' + ch,
 					minV,
 					maxV,
@@ -1083,7 +1091,7 @@ struct ScopeDisplay : TransparentWidget {
 					triggerStatus.c_str(),
 					textF);
 			} else {
-				snprintf(text, sizeof(text), "%c:  Min: %+6.2f V  Max: %+6.2f V  PP: %5.2f V  AVG: %+6.2f  RMS: %5.2f",
+				snprintf(text, sizeof(text), "%c Min: %+6.2fV  Max: %+6.2fV  PP: %5.2fV  AVG: %+6.2f  RMS: %5.2f",
 					'A' + ch,
 					minV,
 					maxV,
@@ -1400,7 +1408,7 @@ struct ScopeWidget : ModuleWidget {
 
 		// Trig level
 		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xTrigLevel, yRow1), module, Scope::TRIG_LEVEL_PARAM));
-		addChild(createLightCentered<SmallLight<YellowLight>>(Vec(xTrigLevel + HALF_KNOB_MED * 1.5f, yRow1 + HALF_KNOB_MED), module, Scope::TRIG_FOUND_LIGHT));
+		addChild(createLightCentered<SmallLight<YellowLight>>(Vec(xTrigLevel - HALF_KNOB_MED * 1.25f, yRow1 + HALF_KNOB_MED), module, Scope::TRIG_FOUND_LIGHT));
 
 		// Freeze
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigLevel, yRow2), module, Scope::FREEZE_PARAM));
