@@ -278,7 +278,7 @@ struct Scope : Module {
 			writeIndex = (writeIndex + 1) & BUFFER_MASK;
 		}
 
-		blinkPhase += args.sampleTime * BLINK_HZ;
+		blinkPhase += args.sampleTime * BLINK_HZ * 0.5;
 		if (blinkPhase >= 1.0f) blinkPhase -= 1.0f;
 
 		dspFrame++;
@@ -341,10 +341,12 @@ struct Scope : Module {
 		bool edgeFound = trigPulse.process(schmittState);
 
 		if (edgeFound) {
-			if (period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
-				lastFrequency_hz = (float)(1.0 / period_s);
-			} else {
-				lastFrequency_hz = 0.0f;
+			if (!holdoff_active) {
+				if (period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN) {
+					lastFrequency_hz = (float)(1.0 / period_s);
+				} else {
+					lastFrequency_hz = 0.0f;
+				}
 			}
 			period_s = 0.0;
 		}
@@ -408,8 +410,7 @@ struct Scope : Module {
 		}
 	}
 
-	void autoTime () {
-		if (holdoffTime_s > 0.0f) return;
+	void autoTime() {
 		if (autoTimeMode && lastFrequency_hz > 0.01f) {
 			// Time since last trigger
 			double period = 1.0/lastFrequency_hz;
@@ -540,7 +541,7 @@ struct Scope : Module {
 				blinkBrightness = 0.4f + 0.6f * std::pow((std::sin(blinkPhase * 2.0f * float(M_PI)) + 1.0f) / 2.0f, 2.0f);
 			} else {
 				// scanning for trigger
-				if (blinkPhase > 0.5f) blinkBrightness = 0.1f;
+				if (int(blinkPhase * 5.0f) % 2 == 0) blinkBrightness = 0.1f;
 			}
 		}
 
