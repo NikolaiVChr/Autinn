@@ -780,7 +780,7 @@ struct ScopeDisplay : TransparentWidget {
 				float maxV = -100.0f;
 				bool found = false;
 				for (int readIndexOffset = iterStart; readIndexOffset < iterEnd; readIndexOffset += iteratorStep) {
-					if (isNewData && readIndexOffset >= module->samplesSinceTrigger) {
+					if (module->recording && isNewData && readIndexOffset >= module->samplesSinceTrigger) {//test2
 						continue;
 					}
 					int readIndexRaw = (startIdx + readIndexOffset) & BUFFER_MASK;
