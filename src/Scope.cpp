@@ -1081,10 +1081,26 @@ struct ScopeDisplay : TransparentWidget {
 			}
 		}
 
-		nvgFontSize(args.vg, 13.0f);
+		// We scale the view DOWN by 4x, and multiply all sizes UP by 4x.
+		// This forces the font engine to render large, smooth glyphs with no grid snapping.
+		const float S = 4.0f;
+
+		nvgSave(args.vg);
+		nvgScale(args.vg, 1.0f/S, 1.0f/S);
+
+		float fontSize = 13.0f * S;
+		float textBoxHeight = 20.0f * S;
+		float widthScaled = box.size.x * S;
+		float heightScaled = box.size.y * S;
+		float marginScaled = 10.0f * S;
+
+		nvgFontSize(args.vg, fontSize);
 
 		const int chTrig = module->trigSource;
-		if (chTrig >= 4 && module->showStats == STATS_ONE) return; // no stats for ext trigger
+		if (chTrig >= 4 && module->showStats == STATS_ONE) {
+			nvgRestore(args.vg);
+			return;  // no stats for ext trigger
+		}
 
 		int done = 0;
 
@@ -1130,10 +1146,9 @@ struct ScopeDisplay : TransparentWidget {
 			float rms = (count > 0) ? (float)std::sqrt(sumSq / count) : 0.0f;
 
 			// Text box
-			float textBoxHeight = 20.0f;
-			float textY = getTextY(done, textBoxHeight, 0.0f);
+			float textY = getTextY(done, textBoxHeight, 0.0f, heightScaled);
 			nvgBeginPath(args.vg);
-			nvgRoundedRect(args.vg, 0, textY, box.size.x, textBoxHeight, 0.0f);
+			nvgRoundedRect(args.vg, 0, textY, widthScaled, textBoxHeight, 0.0f);
 			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 128));
 			nvgFill(args.vg);
 
@@ -1172,13 +1187,13 @@ struct ScopeDisplay : TransparentWidget {
 					rms);
 			}
 
-			nvgText(args.vg, 10, getTextY(done, textBoxHeight, 10.0f), text, nullptr);
+			nvgText(args.vg, marginScaled, getTextY(done, textBoxHeight, marginScaled, heightScaled), text, nullptr);
 			done++;
 		}
+		nvgRestore(args.vg);
 	}
 
-	float getTextY(const int done, const float textBoxHeight, const float margin) const {
-		const float height = box.size.y;
+	float getTextY(const int done, const float textBoxHeight, const float margin, const float height) const {
 		switch (done) {
 			case 0: return margin;
 			case 1: return height - textBoxHeight + margin;
