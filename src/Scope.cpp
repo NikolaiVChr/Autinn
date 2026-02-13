@@ -126,22 +126,22 @@ struct Scope : Module {
 	int writeIndex = 0;
 	int triggerIndex = 0; // last valid trigger
 	int lastTriggerIndex = 0;
-	bool recording = false;       // Have we found a trigger edge?
+	bool recording = false; // We found trigger, we are now filling enough data into buffer to fill display.
 	bool triggerValid = false;       // triggerIndex is valid
 	bool prev_triggerValid = false;       // lastTriggerIndex is valid
 	float sampleRate = 44100.0f;
 	bool frozen = false;
 	bool freezePending = false;
-	double period_s = 0.0;
-	int samplesSinceTrigger = 0;  // Counter for div * time/div wait
+	double period_s = 0.0; // time since last actual trigger event. Does not count up during freeze.
+	int samplesSinceTrigger = 0;  // samples since last trigger. Trigger as in, triggered outside holdoff durations.
 	float holdoffTime_s = 0.0f;     // Remaining holdoff in seconds
-	float autoTrigTimer = 0.0f;   // Auto mode timeout
-	int dspFrame = 1001;
+	float autoTrigTimer_s = 0.0f;   // Time since we in AUTO saw a trigger
+	int dspFrame = 1001; // 1000 of these and we do lights and controls.
 	float autoTimeFrequency_hz = 0.0f;
 	float blinkPhase = 0.0f;
 	float autoTimeKnob = AUTO_TIME_KNOB_OFF;
-	float trigFoundTimer = 0.0f;
-	bool bufferFilled = false;
+	float trigFoundTimer = 0.0f; // Remaining time for trigger light and stats TRIGGER to be shown.
+	bool bufferFilled = false; // We wrapped the buffers at least once, so they has no garbage.
 
 	// persisted
 	bool autoTimeMode = false;
@@ -193,7 +193,7 @@ struct Scope : Module {
 		configButton(TRIG_EDGE_PARAM, "Trigger edge");
 		configButton(FREEZE_PARAM, "Freeze");
 		configButton(AUTO_TIME_PARAM, "Auto time");
-		configButton(STATS_PARAM, "Stats for selected channel");
+		configButton(STATS_PARAM, "Cycle stats");
 
 		// inputs
 		configInput(A_INPUT, "Channel A");
@@ -203,7 +203,7 @@ struct Scope : Module {
 		configInput(CV_TRIG_EXT_INPUT, "Ext. trigger");
 
 		// outputs
-		configInput(CV_TRIG_OUTPUT, "Trigger");
+		configInput(CV_TRIG_OUTPUT, "Trigger (ignore freezes and holdoff)");
 
 		// lights
 		configLight(TRIG_SOURCE_LIGHT_RGB, "Trigger source");
@@ -387,14 +387,14 @@ struct Scope : Module {
 
 		if (recording) {
 			// Recording
-			// We have triggered, now we fill the buffer for the rest of the screen
+			// We have triggered, now we fill the buffer for the rest of the display
 			samplesSinceTrigger++;
 
 			if (samplesSinceTrigger >= samplesToRecord) {
 				// buffer full
 				recording = false;
 
-				// Set holdoff (max 1 sec)
+				// Set holdoff
 				holdoffTime_s = holdoffKnob > 0.00011f?holdoffKnob:0.0f;
 
 				if (trigMode == TRIG_MODE_SOLO || freezePending) {
@@ -414,11 +414,11 @@ struct Scope : Module {
 					triggerValid = true;
 					triggerIndex = writeIndex;
 					samplesSinceTrigger = 0;
-					autoTrigTimer = 0.0f;
+					autoTrigTimer_s = 0.0f;
 				}
 
 				if (trigMode == TRIG_MODE_AUTO || trigMode == TRIG_MODE_XY) {
-					autoTrigTimer += args.sampleTime;
+					autoTrigTimer_s += args.sampleTime;
 					// If no trigger for screen time, force update
 
 					// 25Hz = 0.04s
@@ -438,7 +438,7 @@ struct Scope : Module {
 
 					//timeout = std::min(TRIG_AUTO_MAX_TIMEOUT, timeout);
 
-					if (autoTrigTimer > timeout) {
+					if (autoTrigTimer_s > timeout) {
 						// Force rolling trigger
 						lastTriggerIndex = triggerIndex;
 						triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;
@@ -446,7 +446,7 @@ struct Scope : Module {
 						triggerValid = false;
 						prev_triggerValid = false;
 						samplesSinceTrigger = 0;
-						autoTrigTimer = 0.0f;
+						autoTrigTimer_s = 0.0f;
 
 
 						if (freezePending) {
