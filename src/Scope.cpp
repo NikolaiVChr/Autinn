@@ -1398,7 +1398,7 @@ struct ScopeDisplay : TransparentWidget {
 			const float x1 = 0;
 			const float x2 = box.size.x;
 			for (int ch = 0; ch < 4; ch++) {
-				if (module->inputs[Scope::A_INPUT+ch].isConnected()) {
+				if (module->inputs[Scope::A_INPUT+ch].isConnected() && module->scale[ch] > -0.5f) {
 					const float offset = module->offset[ch];
 					const float y = volt2PxVert(0.0f, offset, 1.0f);//VPerDiv must not be zero as it's denominator in division.
 					if (y >= 0.0f && y <= box.size.y) {
