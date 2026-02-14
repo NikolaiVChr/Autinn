@@ -7,7 +7,7 @@ static constexpr float DIVS_VERT = 8.0f;// total vert divs (audio scope std)
 static constexpr float DIVS_HORIZ = 20.0f;// total horiz divs (approx effective 1:1)
 static constexpr float DIVS_VERT_INV = 1.0f/DIVS_VERT;
 static constexpr float DIVS_HORIZ_INV = 1.0f/DIVS_HORIZ;
-static constexpr float WAVEFORM_SAMPLES_PER_PX = 16.0f;
+static constexpr float WAVEFORM_SAMPLES_PER_PX = 64.0f;
 static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
 static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable average/RMS, but we allow
@@ -765,7 +765,13 @@ struct ScopeDisplay : TransparentWidget {
 		if (samplesToDraw < 2.0f) return;
 
 		const double samplesPerPixel = samplesToDraw / width_px;
-		bool zoomedOut = samplesPerPixel > 1.0;
+
+		// We calculate the number of samples in a single cycle of 20kHz (limit of human hearing).
+		// If a pixel covers less time than this, we draw smooth vector lines (preserves shape).
+		// If a pixel covers more time, we switch to min/max bars.
+		float aliasingThreshold = module->sampleRate / 20000.0f;
+
+		bool zoomedOut = samplesPerPixel > aliasingThreshold;
 
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, color);
@@ -773,8 +779,9 @@ struct ScopeDisplay : TransparentWidget {
 		nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
 		int iteratorStep = 1;
-		if (samplesPerPixel > WAVEFORM_SAMPLES_PER_PX) {
-			iteratorStep = (int)(samplesPerPixel * WAVEFORM_PX_PER_SAMPLE);
+		aliasingThreshold = std::min(aliasingThreshold * 8.0f, WAVEFORM_SAMPLES_PER_PX);
+		if (samplesPerPixel > aliasingThreshold) {
+			iteratorStep = (int)(samplesPerPixel / aliasingThreshold);
 			if (iteratorStep < 1) iteratorStep = 1;
 		}
 
