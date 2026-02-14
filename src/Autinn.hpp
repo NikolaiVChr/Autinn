@@ -161,7 +161,7 @@ struct AutinnArcKnob : TBase {
         calcModulation = [](float cv, float val, float att) { return val + cv; };
     }
 
-    void setModulation(int input, std::function<float(float, float, float)> customMath = nullptr, int attenParam = -1) {
+    void setModulation(const int input, const std::function<float(float, float, float)>& customMath = nullptr, const int attenParam = -1) {
         inputId = input;
     	attenId = attenParam;
         if (customMath) {
