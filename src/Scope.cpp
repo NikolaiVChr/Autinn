@@ -169,6 +169,7 @@ struct Scope : Module {
 	int showStats = STATS_ONE;
 	int autoTimePeriods = 3;
 	bool acCoupled = false;
+	bool cvMode[4] = {false, false, false, false};
 
 	// controls
 	bool sourceBtn = false;
@@ -248,6 +249,11 @@ struct Scope : Module {
 		json_object_set_new(rootJ, "showBaselines", json_boolean(showBaselines));
 		json_object_set_new(rootJ, "autoTimePeriods", json_integer(autoTimePeriods));
 		json_object_set_new(rootJ, "acCoupled", json_boolean(acCoupled));
+		json_t* modesJ = json_array();
+		for (int i = 0; i < 4; i++) {
+			json_array_append_new(modesJ, json_boolean(cvMode[i]));
+		}
+		json_object_set_new(rootJ, "renderModes", modesJ);
 		return rootJ;
 	}
 
@@ -286,6 +292,14 @@ struct Scope : Module {
 
 		json_t* acJ = json_object_get(rootJ, "acCoupled");
 		if (acJ) acCoupled = json_is_true(acJ);
+
+		json_t* modesJ = json_object_get(rootJ, "renderModes");
+		if (modesJ) {
+			for (int i = 0; i < 4; i++) {
+				const json_t* cvJ = json_array_get(modesJ, i);
+				if (cvJ) cvMode[i] = json_is_true(cvJ);
+			}
+		}
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -798,7 +812,7 @@ struct ScopeDisplay : TransparentWidget {
 		// If a pixel covers more time, we switch to min/max bars.
 		float aliasingThreshold = module->sampleRate / 20000.0f;
 
-		bool zoomedOut = samplesPerPixel > aliasingThreshold;
+		bool zoomedOut = samplesPerPixel > aliasingThreshold && !module->cvMode[ch];
 
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, color);
@@ -1488,6 +1502,21 @@ struct ACItem : MenuItem {
 	}
 };
 
+struct RenderModeItem : MenuItem {
+	Scope* module{};
+	int channel{};
+
+	void onAction(const event::Action& e) override {
+		module->cvMode[channel] = !module->cvMode[channel];
+	}
+
+	void step() override {
+		// Label shows current state
+		rightText = module->cvMode[channel] ? "CV" : "Audio";
+		MenuItem::step();
+	}
+};
+
 struct ScopeWidget : ModuleWidget {
 	explicit ScopeWidget(Scope* module) {
 		setModule(module);
@@ -1629,6 +1658,16 @@ struct ScopeWidget : ModuleWidget {
 		acItem->text = "AC Coupled (Block DC)";
 		acItem->module = a;
 		menu->addChild(acItem);
+		menu->addChild(new MenuLabel());
+		for (int i = 0; i < 4; i++) {
+			char label[32];
+			snprintf(label, sizeof(label), "Channel %c Input", 'A' + i);
+			auto* item = new RenderModeItem();
+			item->text = label;
+			item->module = a;
+			item->channel = i;
+			menu->addChild(item);
+		}
 	}
 };
 
