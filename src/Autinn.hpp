@@ -27,13 +27,13 @@ using namespace rack;
 
 extern Plugin *pluginInstance;
 
-static const float HALF_KNOB_MED   = 38*0.5;
-static const float HALF_KNOB_SMALL = 28*0.5;
-static const float HALF_KNOB_TINY  = 18*0.5;
-static const float HALF_PORT       = 31.58*0.5;
-static const float HALF_BUTTON     = 30*0.5;
-static const float HALF_BUTTON_SMALL = 15*0.5;
-static const float HALF_SLIDER     = 15*0.5;
+static constexpr float HALF_KNOB_MED   = 38*0.5;
+static constexpr float HALF_KNOB_SMALL = 28*0.5;
+static constexpr float HALF_KNOB_TINY  = 18*0.5;
+static constexpr float HALF_PORT       = 31.58*0.5;
+static constexpr float HALF_BUTTON     = 30*0.5;
+static constexpr float HALF_BUTTON_SMALL = 15*0.5;
+static constexpr float HALF_SLIDER     = 15*0.5;
 static const float HALF_LIGHT_TINY   = mm2px(1.0f)*0.5f;
 static const float HALF_LIGHT_SMALL  = mm2px(2.0f)*0.5f;// Was 6.4252f in Rack 1
 static const float HALF_LIGHT_MEDIUM = mm2px(3.0f)*0.5f;
@@ -263,10 +263,11 @@ struct ScrewStarAutinn : ThemedSvgScrew {
 	}
 };
 
-struct OutPortAutinn : SVGPort {
+struct OutPortAutinn : ThemedSvgPort {
 	OutPortAutinn() {
 		if (pluginInstance) {
-			setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg")));
+			std::shared_ptr<Svg> svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg"));
+			setSvg(svg,svg);
 			shadow->opacity = 0.0;
 			//background->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/OutPortAutinn.svg"));
 			//background->wrap();
@@ -275,10 +276,11 @@ struct OutPortAutinn : SVGPort {
 	}
 };
 
-struct InPortAutinn : SVGPort {
+struct InPortAutinn : ThemedSvgPort {
 	InPortAutinn() {
 		if (pluginInstance) {
-			setSvg(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg")));
+			std::shared_ptr<Svg> svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg"));
+			setSvg(svg,svg);
 			shadow->opacity = 0.0;
 			//background->svg = Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/InPortAutinn.svg"));
 			//background->wrap();

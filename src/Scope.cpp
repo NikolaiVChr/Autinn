@@ -737,7 +737,7 @@ struct ScopeDisplay : TransparentWidget {
 		}
 	};
 
-	Label* statsLabels[4]{};
+	VectorLabel* statsLabels[4]{};
 	ScopeDisplay() {
 		for (auto & statsLabel : statsLabels) {
 			statsLabel = new VectorLabel();
