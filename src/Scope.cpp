@@ -673,13 +673,20 @@ struct ScopeDisplay : TransparentWidget {
 					nvgFontFaceId(args.vg, font->handle);
 				}
 			}
+			nvgBeginPath(args.vg);
 			nvgFontSize(args.vg, fontSize);
+			nvgTextAlign(args.vg, NVG_ALIGN_TOP | NVG_ALIGN_LEFT );
+			nvgTextLetterSpacing(args.vg, 1);
 			nvgFillColor(args.vg, color);
-			// Force text to be drawn as vector shapes (No Pixel Snapping!)
-			nvgSave(args.vg);
-			nvgRotate(args.vg, 0.00002f);
-			nvgText(args.vg, 0, 0, text.c_str(), nullptr);
-			nvgRestore(args.vg);
+			float bounds[4];
+			nvgTextBounds( args.vg, 0.0, 0.0, text.c_str(), nullptr, bounds );
+			float textX = bounds[0];
+			float textY = bounds[1];
+			float textWidth = bounds[2];
+			float textHeight = bounds[3];
+
+			// center
+			nvgText(args.vg, box.getWidth() / 2.0f - textWidth / 2.0f, box.getHeight() / 2.0f - textHeight / 2.0f, text.c_str(), nullptr);
 		}
 	};
 
