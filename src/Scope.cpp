@@ -1179,6 +1179,7 @@ struct ScopeDisplay : TransparentWidget {
 
 			// Text box
 			float textBoxHeight = 20.0f;
+			float margin = 10.0f;
 			float textY = getTextY(done, textBoxHeight, 0.0f);
 			nvgBeginPath(args.vg);
 			nvgRoundedRect(args.vg, 0, textY, box.size.x, textBoxHeight, 0.0f);
@@ -1224,7 +1225,8 @@ struct ScopeDisplay : TransparentWidget {
 			statsLabels[ch]->text = text;
 			statsLabels[ch]->color = getColor(ch);
 			// +3.0f adjusts for the difference between middle alignment and top alignment
-			statsLabels[ch]->box.pos = Vec(10.0f, getTextY(done, textBoxHeight, 10.0f) + 3.0f);
+			statsLabels[ch]->box.pos = Vec(10.0f, getTextY(done, textBoxHeight, margin));
+			statsLabels[ch]->box.size = Vec(box.getWidth() - margin*2.0f, textBoxHeight);
 			statsLabels[ch]->visible = true;
 			done++;
 		}
