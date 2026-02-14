@@ -1112,27 +1112,6 @@ struct ScopeDisplay : TransparentWidget {
 
 		if (!module || module->showStats == STATS_OFF) return;
 
-		/*
-		if (fontPath.empty()) {
-			fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
-			if (!fontPath.empty()) {
-				std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
-
-				if (font) {
-					nvgFontFaceId(args.vg, font->handle);
-				}
-			}
-		} else {
-			std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
-
-			if (font) {
-				nvgFontFaceId(args.vg, font->handle);
-			}
-		}
-		*/
-
-		//nvgFontSize(args.vg, 13.0f);
-
 		const int chTrig = module->trigSource;
 		if (chTrig >= 4 && module->showStats == STATS_ONE) return; // no stats for ext trigger
 
@@ -1189,13 +1168,11 @@ struct ScopeDisplay : TransparentWidget {
 			nvgFill(args.vg);
 
 			// Text
-			//nvgFillColor(args.vg, getColor(ch));
-			//nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			char text[128];
 			if (ch == module->trigSource) {
 				char textF[128];
 				if (module->autoTimeFrequency_hz > 0.0f) {
-					sprintf(textF,"Freq %7.1f Hz", module->autoTimeFrequency_hz);
+					sprintf(textF,"Freq: %7.1f Hz", module->autoTimeFrequency_hz);
 				} else {
 					sprintf(textF,"");
 				}
@@ -1204,7 +1181,7 @@ struct ScopeDisplay : TransparentWidget {
 						:(module->holdoffTime_s > 0.0f?"HOLDOFF"
 						:(module->recording?"TRIGGER"
 						:"SCANNING")));
-				snprintf(text, sizeof(text), "%c Min %+6.2fV Max %+6.2fV  PP %5.2fV AVG %+6.2f RMS %5.2f %-8s %s",
+				snprintf(text, sizeof(text), "%c Min: %+6.2fV Max: %+6.2fV  PP: %5.2fV AVG: %+6.2f RMS: %5.2f %-8s %s",
 					'A' + ch,
 					minV,
 					maxV,
@@ -1214,7 +1191,7 @@ struct ScopeDisplay : TransparentWidget {
 					triggerStatus.c_str(),
 					textF);
 			} else {
-				snprintf(text, sizeof(text), "%c Min %+6.2fV Max %+6.2fV  PP %5.2fV AVG %+6.2f RMS %5.2f",
+				snprintf(text, sizeof(text), "%c Min: %+6.2fV Max: %+6.2fV  PP: %5.2fV AVG: %+6.2f RMS: %5.2f",
 					'A' + ch,
 					minV,
 					maxV,
@@ -1223,10 +1200,8 @@ struct ScopeDisplay : TransparentWidget {
 					rms);
 			}
 
-			//nvgText(args.vg, 10, getTextY(done, textBoxHeight, 10.0f), text, nullptr);
 			statsLabels[ch]->text = text;
 			statsLabels[ch]->color = getColor(ch);
-			// +3.0f adjusts for the difference between middle alignment and top alignment
 			statsLabels[ch]->box.pos = Vec(0.0f, getTextY(done, textBoxHeight, 0.0f));
 			statsLabels[ch]->box.size = Vec(box.getWidth(), textBoxHeight);
 			statsLabels[ch]->visible = true;
