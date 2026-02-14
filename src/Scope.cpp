@@ -12,33 +12,32 @@ static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
 static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable average/RMS, but we allow
 static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
-
-#define TRIG_AUTO_MIN_TIMEOUT 0.04f    // seconds
-#define TRIG_AUTO_MAX_TIMEOUT 0.1f    // seconds
-#define AUTO_TIME_PERIOD_MAX 10.0 // seconds
-#define AUTO_TIME_PERIOD_MIN 0.000025 // seconds, 40kHz
-#define TRIG_SOURCE_EXT 4
-#define TRIG_HYSTERESIS 0.1f // will be multiplied by V/Div except for ext. trigger
-#define AUTO_TIME_KNOB_OFF 50.0f
-#define BLINK_HZ 2.0f
-#define TRIG_MODE_AUTO 0 // wait TRIG_AUTO_MIN_TIMEOUT then trigger even if no trigger found
-#define TRIG_MODE_NORM 1 // wait forever for trigger to be found
-#define TRIG_MODE_SOLO 2 // freeze when finding trigger
-#define TRIG_MODE_XY   3 // Lissajous
-#define TRIG_EDGE_RISE true
-#define TRIG_EDGE_FALL false
-#define STATS_OFF 0
-#define STATS_ONE 1
-#define STATS_ALL 2
-#define SCALE_DEFAULT 2.0f
-#define SCALE_DEFAULT_KNOB 3
-#define SCALE_KNOB_MIN -1 // OFF
-#define SCALE_KNOB_MAX 11 // 5 mV/Div
-#define TIME_KNOB_MIN -5.0f //   from  10µs
-#define TIME_KNOB_MAX 0.0f //      to   1s
-#define HOLDOFF_KNOB_MIN -4.0f// from 100µs
-#define HOLDOFF_KNOB_MAX 1.0f //   to  10s
-#define TRIG_FOUND_TIMER 0.1f
+static constexpr float TRIG_AUTO_MIN_TIMEOUT = 0.04f;    // seconds
+static constexpr float TRIG_AUTO_MAX_TIMEOUT = 0.1f;    // seconds
+static constexpr double AUTO_TIME_PERIOD_MAX = 10.0; // seconds
+static constexpr double AUTO_TIME_PERIOD_MIN = 0.000025; // seconds, 40kHz
+constexpr int TRIG_SOURCE_EXT = 4;
+static constexpr float TRIG_HYSTERESIS = 0.1f; // will be multiplied by V/Div except for ext. trigger
+static constexpr float AUTO_TIME_KNOB_OFF = 50.0f;
+static constexpr float BLINK_HZ = 2.0f;
+constexpr int TRIG_MODE_AUTO = 0; // wait TRIG_AUTO_MIN_TIMEOUT then trigger even if no trigger found
+constexpr int TRIG_MODE_NORM = 1; // wait forever for trigger to be found
+constexpr int TRIG_MODE_SOLO = 2; // freeze when finding trigger
+constexpr int TRIG_MODE_XY   = 3; // Lissajous
+constexpr bool TRIG_EDGE_RISE = true;
+constexpr bool TRIG_EDGE_FALL = false;
+constexpr int STATS_OFF = 0;
+constexpr int STATS_ONE = 1;
+constexpr int STATS_ALL = 2;
+static constexpr float SCALE_DEFAULT = 2.0f;
+constexpr int SCALE_DEFAULT_KNOB = 3;
+static constexpr float SCALE_KNOB_MIN = -1.0f; // OFF
+static constexpr float SCALE_KNOB_MAX = 11.0f; // 5 mV/Div
+static constexpr float TIME_KNOB_MIN = -5.0f; //   from  10µs
+static constexpr float TIME_KNOB_MAX = 0.0f; //      to   1s
+static constexpr float HOLDOFF_KNOB_MIN = -4.0f;// from 100µs
+static constexpr float HOLDOFF_KNOB_MAX = 1.0f; //   to  10s
+static constexpr float TRIG_FOUND_TIMER = 0.1f;
 
 static std::vector<std::string> scales = {
 	"OFF","20 V/Div","10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
@@ -1626,7 +1625,7 @@ struct ScopeWidget : ModuleWidget {
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 25", 25));
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 50", 50));
 		menu->addChild(new MenuLabel());
-		ACItem* acItem = new ACItem();
+		auto* acItem = new ACItem();
 		acItem->text = "AC Coupled (Block DC)";
 		acItem->module = a;
 		menu->addChild(acItem);
