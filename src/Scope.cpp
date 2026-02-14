@@ -82,6 +82,7 @@ struct Scope : Module {
 		SCALE_B_PARAM,
 		SCALE_C_PARAM,
 		SCALE_D_PARAM,
+		ENUMS(CV_OR_AUDIO_PARAM, 4),
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -107,6 +108,7 @@ struct Scope : Module {
 		ENUMS(FREEZE_LIGHT_RGB, 3),
 		AUTO_TIME_LIGHT,
 		TRIG_FOUND_LIGHT,
+		ENUMS(CV_OR_AUDIO_LIGHT, 4),
 		NUM_LIGHTS
 	};
 
@@ -133,6 +135,7 @@ struct Scope : Module {
 	dsp::BooleanTrigger freezeBtnTrig;
 	dsp::BooleanTrigger autoTimeBtnTrig;
 	dsp::BooleanTrigger statsBtnTrig;
+	dsp::BooleanTrigger cvModeTrig;
 	dsp::PulseGenerator trigOutPulse;
 
 	// transient
@@ -211,6 +214,9 @@ struct Scope : Module {
 		configButton(FREEZE_PARAM, "Freeze");
 		configButton(AUTO_TIME_PARAM, "Auto time");
 		configButton(STATS_PARAM, "Cycle stats");
+		for (int i = 0; i < 4; i++) {
+			configButton(CV_OR_AUDIO_PARAM, "Toggle CV or audio input (light on means CV)");
+		}
 
 		// inputs
 		configInput(A_INPUT, "Channel A");
@@ -233,6 +239,9 @@ struct Scope : Module {
 		configLight(FREEZE_LIGHT_RGB, "Freeze");
 		configLight(AUTO_TIME_LIGHT, "Auto time");
 		configLight(TRIG_FOUND_LIGHT, "Trigger found");
+		for (int i = 0; i < 4; i++) {
+			configLight(CV_OR_AUDIO_LIGHT+i, "Channel input is CV");
+		}
 
 		readControls();
 	}
@@ -374,6 +383,9 @@ struct Scope : Module {
 	 *		Update manual.
 	 *		AC/DC switch to remove DC
 	 *		Stats: Duty cycle %, period, pulse width, crest factor, rise time, fall time, overshoot, compare phase
+	 *		Reset
+	 *		Randomize
+	 *
 	 */
 
 	bool triggerDetect(const ProcessArgs& args) {
@@ -565,6 +577,9 @@ struct Scope : Module {
 			} else {
 				scale[ch] = -1.0f;
 			}
+			if (cvModeTrig.process(params[CV_OR_AUDIO_PARAM + ch].getValue())) {
+				cvMode[ch] = !cvMode[ch];
+			}
 		}
 
 		// time knob we skip here
@@ -670,6 +685,10 @@ struct Scope : Module {
 				// scanning for trigger
 				if (int(blinkPhase * 6.0f) % 2 == 0) blinkBrightness = 0.1f;
 			}
+		}
+
+		for (int ch = 0; ch < 4; ch++) {
+			lights[CV_OR_AUDIO_LIGHT + ch].setBrightness(float(cvMode[ch]));
 		}
 
 		bool lissajous = trigMode==TRIG_MODE_XY;
@@ -1596,6 +1615,8 @@ struct ScopeWidget : ModuleWidget {
 			addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(x, yRow1), module, Scope::POS_A_PARAM + i));
 			addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(x, yRow2-(yRow2-yRow1)/4.0f), module, Scope::SCALE_A_PARAM + i));
 			addInput(createInputCentered<InPortAutinn>(Vec(x+HALF_KNOB_SMALL, yRow2+HALF_KNOB_SMALL), module, Scope::A_INPUT + i));
+			addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(x-HALF_KNOB_SMALL, yRow2+HALF_KNOB_SMALL), module, Scope::CV_OR_AUDIO_PARAM +i));
+			addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(x-HALF_KNOB_SMALL + 12, yRow2+HALF_KNOB_SMALL + 12), module, Scope::CV_OR_AUDIO_LIGHT + i));
 		}
 
 		// Time
@@ -1630,7 +1651,7 @@ struct ScopeWidget : ModuleWidget {
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTime, yRow2), module, Scope::AUTO_TIME_PARAM));
 		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTime + 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
 
-		// Auto time
+		// Stats
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xHoldoff, yRow2), module, Scope::STATS_PARAM));
 
 		// Trig buttons (grid layout)
