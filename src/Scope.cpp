@@ -1682,11 +1682,11 @@ struct ScopeWidget : ModuleWidget {
 		menu->addChild(new ShowBaseItem(a, "Show baselines"));
 		menu->addChild(new ShowCenterItem(a, "Show centerline"));
 		menu->addChild(new MenuLabel());
-		menu->addChild(new PeriodsMenuItem(a, "Auto time periods  1", 1));
-		menu->addChild(new PeriodsMenuItem(a, "Auto time periods  3", 3));
-		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 10", 10));
-		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 25", 25));
-		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 50", 50));
+		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods  1", 1));
+		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods  3", 3));
+		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods 10", 10));
+		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods 25", 25));
+		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods 50", 50));
 		menu->addChild(new MenuLabel());
 		menu->addChild(new ACItem(a, "Ch A - AC Coupled (Block DC)", 0));
 		menu->addChild(new ACItem(a, "Ch B - AC Coupled (Block DC)", 1));
