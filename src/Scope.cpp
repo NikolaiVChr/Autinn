@@ -717,7 +717,7 @@ struct ScopeDisplay : TransparentWidget {
 			nvgBeginPath(args.vg);
 			nvgFontSize(args.vg, fontSize);
 			nvgTextAlign(args.vg, NVG_ALIGN_MIDDLE | NVG_ALIGN_LEFT );
-			//nvgTextLetterSpacing(args.vg, 0);
+			nvgTextLetterSpacing(args.vg, -1);
 			nvgFillColor(args.vg, color);
 
 			/*
