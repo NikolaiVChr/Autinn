@@ -699,7 +699,8 @@ struct ScopeDisplay : TransparentWidget {
 		void draw(const DrawArgs& args) override {
 			if (text.empty()) return;
 			if (fontPath.empty()) {
-				fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
+				//fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
+				fontPath = asset::plugin(pluginInstance, "res/fonts/FragmentMono-Regular.ttf");
 				if (!fontPath.empty()) {
 					std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
 
@@ -717,7 +718,7 @@ struct ScopeDisplay : TransparentWidget {
 			nvgBeginPath(args.vg);
 			nvgFontSize(args.vg, fontSize);
 			nvgTextAlign(args.vg, NVG_ALIGN_MIDDLE | NVG_ALIGN_LEFT );
-			nvgTextLetterSpacing(args.vg, -1);
+			//nvgTextLetterSpacing(args.vg, -1);
 			nvgFillColor(args.vg, color);
 
 			/*
