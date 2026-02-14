@@ -675,7 +675,7 @@ struct Scope : Module {
 };
 
 
-struct ScopeDisplay : ModuleLightWidget {
+struct ScopeDisplay : TransparentWidget {
 	Scope* module{};
 	int frame = 0;
 
@@ -1132,7 +1132,7 @@ struct ScopeDisplay : ModuleLightWidget {
 		drawGrid(args);
 		drawStats(args);
 		drawTrigger(args);
-		Widget::draw(args); //to make label appear
+		//Widget::draw(args); //to make label appear
 	}
 
 	void drawLayer(const DrawArgs& args, const int layer) override {
