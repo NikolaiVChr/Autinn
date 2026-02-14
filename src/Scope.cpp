@@ -654,7 +654,14 @@ struct ScopeDisplay : TransparentWidget {
 	NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
 	NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
 
-
+	Label* statsLabels[4]{};
+	ScopeDisplay() {
+		for (auto & statsLabel : statsLabels) {
+			statsLabel = new Label();
+			statsLabel->fontSize = 13.0f; // Rack scales this automatically
+			addChild(statsLabel);
+		}
+	}
 
 	NVGcolor getColor(int ch) const {
 		switch (ch) {
@@ -1038,6 +1045,7 @@ struct ScopeDisplay : TransparentWidget {
 		drawGrid(args);
 		drawStats(args);
 		drawTrigger(args);
+		Widget::draw(args); //to make label appear
 	}
 
 	void drawLayer(const DrawArgs& args, const int layer) override {
@@ -1062,6 +1070,8 @@ struct ScopeDisplay : TransparentWidget {
 	}
 
 	void drawStats(const DrawArgs& args) {
+		for (auto & statsLabel : statsLabels) statsLabel->visible = false;
+
 		if (!module || module->showStats == STATS_OFF) return;
 
 		if (fontPath.empty()) {
@@ -1081,26 +1091,10 @@ struct ScopeDisplay : TransparentWidget {
 			}
 		}
 
-		// We scale the view DOWN by 4x, and multiply all sizes UP by 4x.
-		// This forces the font engine to render large, smooth glyphs with no grid snapping.
-		const float S = 4.0f;
-
-		nvgSave(args.vg);
-		nvgScale(args.vg, 1.0f/S, 1.0f/S);
-
-		float fontSize = 13.0f * S;
-		float textBoxHeight = 20.0f * S;
-		float widthScaled = box.size.x * S;
-		float heightScaled = box.size.y * S;
-		float marginScaled = 10.0f * S;
-
-		nvgFontSize(args.vg, fontSize);
+		//nvgFontSize(args.vg, 13.0f);
 
 		const int chTrig = module->trigSource;
-		if (chTrig >= 4 && module->showStats == STATS_ONE) {
-			nvgRestore(args.vg);
-			return;  // no stats for ext trigger
-		}
+		if (chTrig >= 4 && module->showStats == STATS_ONE) return; // no stats for ext trigger
 
 		int done = 0;
 
@@ -1146,15 +1140,16 @@ struct ScopeDisplay : TransparentWidget {
 			float rms = (count > 0) ? (float)std::sqrt(sumSq / count) : 0.0f;
 
 			// Text box
-			float textY = getTextY(done, textBoxHeight, 0.0f, heightScaled);
+			float textBoxHeight = 20.0f;
+			float textY = getTextY(done, textBoxHeight, 0.0f);
 			nvgBeginPath(args.vg);
-			nvgRoundedRect(args.vg, 0, textY, widthScaled, textBoxHeight, 0.0f);
+			nvgRoundedRect(args.vg, 0, textY, box.size.x, textBoxHeight, 0.0f);
 			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 128));
 			nvgFill(args.vg);
 
 			// Text
-			nvgFillColor(args.vg, getColor(ch));
-			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+			//nvgFillColor(args.vg, getColor(ch));
+			//nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			char text[128];
 			if (ch == module->trigSource) {
 				char textF[128];
@@ -1187,13 +1182,18 @@ struct ScopeDisplay : TransparentWidget {
 					rms);
 			}
 
-			nvgText(args.vg, marginScaled, getTextY(done, textBoxHeight, marginScaled, heightScaled), text, nullptr);
+			//nvgText(args.vg, 10, getTextY(done, textBoxHeight, 10.0f), text, nullptr);
+			statsLabels[ch]->text = text;
+			statsLabels[ch]->color = getColor(ch);
+			// +3.0f adjusts for the difference between middle alignment and top alignment
+			statsLabels[ch]->box.pos = Vec(10.0f, getTextY(done, textBoxHeight, 10.0f) + 3.0f);
+			statsLabels[ch]->visible = true;
 			done++;
 		}
-		nvgRestore(args.vg);
 	}
 
-	float getTextY(const int done, const float textBoxHeight, const float margin, const float height) const {
+	float getTextY(const int done, const float textBoxHeight, const float margin) const {
+		const float height = box.size.y;
 		switch (done) {
 			case 0: return margin;
 			case 1: return height - textBoxHeight + margin;
