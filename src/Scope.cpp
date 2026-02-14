@@ -638,7 +638,7 @@ struct ScopeDisplay : TransparentWidget {
 	Scope* module{};
 	int frame = 0;
 
-	std::string fontPath;
+	static std::string fontPath;
 
 	float lastTrigLevel = -999.0f;
 	float trigVisibilityTimer = 0.0f;
@@ -654,10 +654,39 @@ struct ScopeDisplay : TransparentWidget {
 	NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
 	NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
 
+	struct VectorLabel : Label {
+		void draw(const DrawArgs& args) override {
+			if (text.empty()) return;
+			if (fontPath.empty()) {
+				fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
+				if (!fontPath.empty()) {
+					std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
+
+					if (font) {
+						nvgFontFaceId(args.vg, font->handle);
+					}
+				}
+			} else {
+				std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
+
+				if (font) {
+					nvgFontFaceId(args.vg, font->handle);
+				}
+			}
+			nvgFontSize(args.vg, fontSize);
+			nvgFillColor(args.vg, color);
+			// Force text to be drawn as vector shapes (No Pixel Snapping!)
+			nvgSave(args.vg);
+			nvgRotate(args.vg, 0.00002f);
+			nvgText(args.vg, 0, 0, text.c_str(), nullptr);
+			nvgRestore(args.vg);
+		}
+	};
+
 	Label* statsLabels[4]{};
 	ScopeDisplay() {
 		for (auto & statsLabel : statsLabels) {
-			statsLabel = new Label();
+			statsLabel = new VectorLabel();
 			statsLabel->fontSize = 13.0f; // Rack scales this automatically
 			addChild(statsLabel);
 		}
@@ -1074,6 +1103,7 @@ struct ScopeDisplay : TransparentWidget {
 
 		if (!module || module->showStats == STATS_OFF) return;
 
+		/*
 		if (fontPath.empty()) {
 			fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
 			if (!fontPath.empty()) {
@@ -1090,6 +1120,7 @@ struct ScopeDisplay : TransparentWidget {
 				nvgFontFaceId(args.vg, font->handle);
 			}
 		}
+		*/
 
 		//nvgFontSize(args.vg, 13.0f);
 
