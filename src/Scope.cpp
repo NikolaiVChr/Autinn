@@ -247,10 +247,12 @@ struct Scope : Module {
 	}
 
 	void onReset(const ResetEvent& e) override {
-		// TODO: Reset everything
 
 		for (int c = 0; c < 4; c++) {
 			cvModeTrig[c].reset();
+			dcBlockers[c].reset();
+			cvMode[c] = false;
+			acCoupled[c] = false;
 		}
 		trigSchmitt.reset();
 		trigPulse.reset();
@@ -261,6 +263,31 @@ struct Scope : Module {
 		autoTimeBtnTrig.reset();
 		statsBtnTrig.reset();
 		trigOutPulse.reset();
+
+		triggerValid = false;
+		prev_triggerValid = false;
+		frozen = false;
+		freezePending = false;
+		period_s = 0.0;
+		samplesSinceTrigger = 0;
+		holdoffTime_s = 0.0f;
+		autoTrigTimer_s = 0.0f;
+		dspFrame = 1001;
+		autoTimeFrequency_hz = 0.0f;
+		blinkPhase = 0.0f;
+		autoTimeKnob = AUTO_TIME_KNOB_OFF;
+		trigFoundTimer = 0.0f;
+
+		autoTimeMode = false;
+		trigSource = 0; // 0-3: Channel, 4: Ext
+		trigMode = TRIG_MODE_AUTO;
+		trigEdge = TRIG_EDGE_RISE;
+		showBaselines = false;
+		showCenterline = false;
+		showGrid = true;
+		showStats = STATS_ONE;
+		autoTimePeriods = 3;
+
 		Module::onReset(e);
 	}
 
