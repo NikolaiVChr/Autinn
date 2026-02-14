@@ -675,17 +675,19 @@ struct ScopeDisplay : TransparentWidget {
 			}
 			nvgBeginPath(args.vg);
 			nvgFontSize(args.vg, fontSize);
-			nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_LEFT );
-			nvgTextLetterSpacing(args.vg, 1);
+			nvgTextAlign(args.vg, NVG_ALIGN_MIDDLE | NVG_ALIGN_LEFT );
+			//nvgTextLetterSpacing(args.vg, 0);
 			nvgFillColor(args.vg, color);
+
+			/*
 			float bounds[4];
 			nvgTextBounds( args.vg, 0.0, 0.0, text.c_str(), nullptr, bounds );
 			float textX = bounds[0];
 			float textY = bounds[1];
 			float textWidth = bounds[2];
 			float textHeight = bounds[3];
+			*/
 
-			// center
 			nvgText(args.vg, 0.0f, box.getHeight() / 2.0f, text.c_str(), nullptr);
 		}
 	};
@@ -1193,7 +1195,7 @@ struct ScopeDisplay : TransparentWidget {
 			if (ch == module->trigSource) {
 				char textF[128];
 				if (module->autoTimeFrequency_hz > 0.0f) {
-					sprintf(textF,"Freq: %7.1f Hz", module->autoTimeFrequency_hz);
+					sprintf(textF,"Freq %7.1f Hz", module->autoTimeFrequency_hz);
 				} else {
 					sprintf(textF,"");
 				}
@@ -1202,7 +1204,7 @@ struct ScopeDisplay : TransparentWidget {
 						:(module->holdoffTime_s > 0.0f?"HOLDOFF"
 						:(module->recording?"TRIGGER"
 						:"SCANNING")));
-				snprintf(text, sizeof(text), "%c Min: %+6.2fV Max: %+6.2fV  PP: %5.2fV AVG: %+6.2f RMS: %5.2f  %-8s  %s",
+				snprintf(text, sizeof(text), "%c Min %+6.2fV Max %+6.2fV  PP %5.2fV AVG %+6.2f RMS %5.2f %-8s %s",
 					'A' + ch,
 					minV,
 					maxV,
@@ -1212,7 +1214,7 @@ struct ScopeDisplay : TransparentWidget {
 					triggerStatus.c_str(),
 					textF);
 			} else {
-				snprintf(text, sizeof(text), "%c Min: %+6.2fV Max: %+6.2fV  PP: %5.2fV AVG: %+6.2f RMS: %5.2f",
+				snprintf(text, sizeof(text), "%c Min %+6.2fV Max %+6.2fV  PP %5.2fV AVG %+6.2f RMS %5.2f",
 					'A' + ch,
 					minV,
 					maxV,
@@ -1226,7 +1228,7 @@ struct ScopeDisplay : TransparentWidget {
 			statsLabels[ch]->color = getColor(ch);
 			// +3.0f adjusts for the difference between middle alignment and top alignment
 			statsLabels[ch]->box.pos = Vec(0.0f, getTextY(done, textBoxHeight, margin));
-			statsLabels[ch]->box.size = Vec(box.getWidth() - margin*2.0f, textBoxHeight);
+			statsLabels[ch]->box.size = Vec(box.getWidth(), textBoxHeight);
 			statsLabels[ch]->visible = true;
 			done++;
 		}
