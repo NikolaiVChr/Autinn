@@ -215,7 +215,7 @@ struct Scope : Module {
 		configButton(AUTO_TIME_PARAM, "Auto time");
 		configButton(STATS_PARAM, "Cycle stats");
 		for (int i = 0; i < 4; i++) {
-			configButton(CV_OR_AUDIO_PARAM, "Toggle CV or audio input (light on means CV)");
+			configButton(CV_OR_AUDIO_PARAM+i, "Toggle CV or audio input (light on means CV)");
 		}
 
 		// inputs
@@ -240,7 +240,7 @@ struct Scope : Module {
 		configLight(AUTO_TIME_LIGHT, "Auto time");
 		configLight(TRIG_FOUND_LIGHT, "Trigger found");
 		for (int i = 0; i < 4; i++) {
-			configLight(CV_OR_AUDIO_LIGHT+i, "Channel input is CV");
+			configLight(CV_OR_AUDIO_LIGHT+i, "Light means channel input is CV.");
 		}
 
 		readControls();
@@ -577,7 +577,8 @@ struct Scope : Module {
 			} else {
 				scale[ch] = -1.0f;
 			}
-			if (cvModeTrig.process(params[CV_OR_AUDIO_PARAM + ch].getValue())) {
+			bool cvModeBtn = (bool)params[CV_OR_AUDIO_PARAM + ch].getValue();
+			if (cvModeTrig.process(cvModeBtn)) {
 				cvMode[ch] = !cvMode[ch];
 			}
 		}
@@ -1616,7 +1617,7 @@ struct ScopeWidget : ModuleWidget {
 			addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(x, yRow2-(yRow2-yRow1)/4.0f), module, Scope::SCALE_A_PARAM + i));
 			addInput(createInputCentered<InPortAutinn>(Vec(x+HALF_KNOB_SMALL, yRow2+HALF_KNOB_SMALL), module, Scope::A_INPUT + i));
 			addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(x-HALF_KNOB_SMALL, yRow2+HALF_KNOB_SMALL), module, Scope::CV_OR_AUDIO_PARAM +i));
-			addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(x-HALF_KNOB_SMALL + 12, yRow2+HALF_KNOB_SMALL + 12), module, Scope::CV_OR_AUDIO_LIGHT + i));
+			addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(x-HALF_KNOB_SMALL + 6, yRow2+HALF_KNOB_SMALL + 12), module, Scope::CV_OR_AUDIO_LIGHT + i));
 		}
 
 		// Time
@@ -1715,6 +1716,7 @@ struct ScopeWidget : ModuleWidget {
 		menu->addChild(new ACItem(a, "Ch D - AC Coupled (Block DC)", 3));
 
 		menu->addChild(new MenuLabel());
+		/*
 		for (int i = 0; i < 4; i++) {
 			char label[32];
 			snprintf(label, sizeof(label), "Channel %c Input", 'A' + i);
@@ -1724,6 +1726,7 @@ struct ScopeWidget : ModuleWidget {
 			item->channel = i;
 			menu->addChild(item);
 		}
+		*/
 	}
 };
 
