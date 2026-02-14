@@ -111,6 +111,21 @@ struct Scope : Module {
 		NUM_LIGHTS
 	};
 
+	struct DCBlocker {
+		float x1 = 0.0f;
+		float y1 = 0.0f;
+		// Standard 1-pole hp at approx 10Hz
+		static constexpr float R = 0.995f;
+
+		float process(float x) {
+			float y = x - x1 + R * y1;
+			x1 = x;
+			y1 = y;
+			return y;
+		}
+		void reset() { x1 = 0.0f; y1 = 0.0f; }
+	};
+
 	dsp::SchmittTrigger trigSchmitt;
 	dsp::BooleanTrigger trigPulse;
 	dsp::BooleanTrigger srcBtnTrig;
@@ -142,6 +157,7 @@ struct Scope : Module {
 	float autoTimeKnob = AUTO_TIME_KNOB_OFF;
 	float trigFoundTimer = 0.0f; // Remaining time for trigger light and stats TRIGGER to be shown.
 	bool bufferFilled = false; // We wrapped the buffers at least once, so they has no garbage.
+	DCBlocker dcBlockers[4];
 
 	// persisted
 	bool autoTimeMode = false;
@@ -153,6 +169,7 @@ struct Scope : Module {
 	bool showGrid = true;
 	int showStats = STATS_ONE;
 	int autoTimePeriods = 3;
+	bool acCoupled = false;
 
 	// controls
 	bool sourceBtn = false;
@@ -231,6 +248,7 @@ struct Scope : Module {
 		json_object_set_new(rootJ, "showCenterline", json_boolean(showCenterline));
 		json_object_set_new(rootJ, "showBaselines", json_boolean(showBaselines));
 		json_object_set_new(rootJ, "autoTimePeriods", json_integer(autoTimePeriods));
+		json_object_set_new(rootJ, "acCoupled", json_boolean(acCoupled));
 		return rootJ;
 	}
 
@@ -266,6 +284,9 @@ struct Scope : Module {
 
 		json_t* pJ = json_object_get(rootJ, "autoTimePeriods");
 		if (pJ) autoTimePeriods = int(json_integer_value(pJ));
+
+		json_t* acJ = json_object_get(rootJ, "acCoupled");
+		if (acJ) acCoupled = json_is_true(acJ);
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -279,8 +300,15 @@ struct Scope : Module {
 		if (!frozen) {
 			period_s += args.sampleTime;
 
+
 			for (int c = 0; c < 4; c++) {
-				buffer[c][writeIndex] = inputs[A_INPUT + c].getVoltage();
+				float in = inputs[A_INPUT + c].getVoltage();
+
+				if (acCoupled) {
+					in = dcBlockers[c].process(in);
+				}
+
+				buffer[c][writeIndex] = in;
 			}
 
 			writeIndex = (writeIndex + 1) & BUFFER_MASK;
@@ -1450,6 +1478,16 @@ struct PeriodsMenuItem : MenuItem {
 	}
 };
 
+struct ACItem : MenuItem {
+	Scope* module{};
+	void onAction(const event::Action& e) override {
+		module->acCoupled = !module->acCoupled;
+	}
+	void step() override {
+		rightText = module->acCoupled ? "✔" : "";
+		MenuItem::step();
+	}
+};
 
 struct ScopeWidget : ModuleWidget {
 	explicit ScopeWidget(Scope* module) {
@@ -1587,6 +1625,11 @@ struct ScopeWidget : ModuleWidget {
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 10", 10));
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 25", 25));
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 50", 50));
+		menu->addChild(new MenuLabel());
+		ACItem* acItem = new ACItem();
+		acItem->text = "AC Coupled (Block DC)";
+		acItem->module = a;
+		menu->addChild(acItem);
 	}
 };
 
