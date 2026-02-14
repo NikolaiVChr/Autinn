@@ -675,7 +675,7 @@ struct Scope : Module {
 };
 
 
-struct ScopeDisplay : Widget {
+struct ScopeDisplay : ModuleWidget {
 	Scope* module{};
 	int frame = 0;
 
