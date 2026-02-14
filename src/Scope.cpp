@@ -695,11 +695,12 @@ struct ScopeDisplay : TransparentWidget {
 	NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
 	NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
 
-	struct VectorLabel : ModuleLightWidget {
+	struct VectorLabel : Widget {
 		std::string text{};
 		float fontSize = 12.0f;
+		NVGcolor color{};
 
-		void drawLight (const DrawArgs &args) override {
+		void draw (const DrawArgs &args) override {
 			if (text.empty()) return;
 			if (fontPath.empty()) {
 				fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
