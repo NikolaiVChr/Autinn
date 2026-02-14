@@ -168,8 +168,8 @@ struct Scope : Module {
 	bool showGrid = true;
 	int showStats = STATS_ONE;
 	int autoTimePeriods = 3;
-	bool acCoupled = false;
 	bool cvMode[4] = {false, false, false, false};
+	bool acCoupled[4] = {false, false, false, false};
 
 	// controls
 	bool sourceBtn = false;
@@ -248,7 +248,13 @@ struct Scope : Module {
 		json_object_set_new(rootJ, "showCenterline", json_boolean(showCenterline));
 		json_object_set_new(rootJ, "showBaselines", json_boolean(showBaselines));
 		json_object_set_new(rootJ, "autoTimePeriods", json_integer(autoTimePeriods));
-		json_object_set_new(rootJ, "acCoupled", json_boolean(acCoupled));
+
+		json_t* acdcJ = json_array();
+		for (int i = 0; i < 4; i++) {
+			json_array_append_new(acdcJ, json_boolean(acCoupled[i]));
+		}
+		json_object_set_new(rootJ, "acCoupling", acdcJ);
+
 		json_t* modesJ = json_array();
 		for (int i = 0; i < 4; i++) {
 			json_array_append_new(modesJ, json_boolean(cvMode[i]));
@@ -291,7 +297,21 @@ struct Scope : Module {
 		if (pJ) autoTimePeriods = int(json_integer_value(pJ));
 
 		json_t* acJ = json_object_get(rootJ, "acCoupled");
-		if (acJ) acCoupled = json_is_true(acJ);
+		if (acJ) {
+			bool b = json_is_true(acJ);
+			acCoupled[0] = b;
+			acCoupled[1] = b;
+			acCoupled[2] = b;
+			acCoupled[3] = b;
+		} else {
+			json_t* modesJ = json_object_get(rootJ, "acCoupling");
+			if (modesJ) {
+				for (int i = 0; i < 4; i++) {
+					const json_t* ac2J = json_array_get(modesJ, i);
+					if (ac2J) acCoupled[i] = json_is_true(ac2J);
+				}
+			}
+		}
 
 		json_t* modesJ = json_object_get(rootJ, "renderModes");
 		if (modesJ) {
@@ -317,7 +337,7 @@ struct Scope : Module {
 			for (int c = 0; c < 4; c++) {
 				float in = inputs[A_INPUT + c].getVoltage();
 
-				if (acCoupled) {
+				if (acCoupled[c]) {
 					in = dcBlockers[c].process(in);
 				}
 
@@ -1497,12 +1517,21 @@ struct PeriodsMenuItem : MenuItem {
 };
 
 struct ACItem : MenuItem {
-	Scope* module{};
-	void onAction(const event::Action& e) override {
-		module->acCoupled = !module->acCoupled;
+	Scope* _module;
+	int _os;
+
+	ACItem(Scope* module, const char* label, int os)
+	: _module(module), _os(os)
+	{
+		this->text = label;
 	}
+
+	void onAction(const event::Action& e) override {
+		_module->acCoupled[_os] = !_module->acCoupled[_os];
+	}
+
 	void step() override {
-		rightText = module->acCoupled ? "✔" : "";
+		rightText = _module->acCoupled[_os] ? "✔" : "";
 		MenuItem::step();
 	}
 };
@@ -1659,10 +1688,11 @@ struct ScopeWidget : ModuleWidget {
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 25", 25));
 		menu->addChild(new PeriodsMenuItem(a, "Auto time periods 50", 50));
 		menu->addChild(new MenuLabel());
-		auto* acItem = new ACItem();
-		acItem->text = "AC Coupled (Block DC)";
-		acItem->module = a;
-		menu->addChild(acItem);
+		menu->addChild(new ACItem(a, "Ch A - AC Coupled (Block DC)", 0));
+		menu->addChild(new ACItem(a, "Ch B - AC Coupled (Block DC)", 1));
+		menu->addChild(new ACItem(a, "Ch C - AC Coupled (Block DC)", 2));
+		menu->addChild(new ACItem(a, "Ch D - AC Coupled (Block DC)", 3));
+
 		menu->addChild(new MenuLabel());
 		for (int i = 0; i < 4; i++) {
 			char label[32];
