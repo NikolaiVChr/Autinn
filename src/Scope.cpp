@@ -135,7 +135,7 @@ struct Scope : Module {
 	dsp::BooleanTrigger freezeBtnTrig;
 	dsp::BooleanTrigger autoTimeBtnTrig;
 	dsp::BooleanTrigger statsBtnTrig;
-	dsp::BooleanTrigger cvModeTrig;
+	dsp::BooleanTrigger cvModeTrig[4];
 	dsp::PulseGenerator trigOutPulse;
 
 	// transient
@@ -244,6 +244,24 @@ struct Scope : Module {
 		}
 
 		readControls();
+	}
+
+	void onReset(const ResetEvent& e) override {
+		// TODO: Reset everything
+
+		for (int c = 0; c < 4; c++) {
+			cvModeTrig[c].reset();
+		}
+		trigSchmitt.reset();
+		trigPulse.reset();
+		srcBtnTrig.reset();
+		modeBtnTrig.reset();
+		edgeBtnTrig.reset();
+		freezeBtnTrig.reset();
+		autoTimeBtnTrig.reset();
+		statsBtnTrig.reset();
+		trigOutPulse.reset();
+		Module::onReset(e);
 	}
 
 	json_t* dataToJson() override {
@@ -383,7 +401,6 @@ struct Scope : Module {
 	 *		Update manual.
 	 *		AC/DC switch to remove DC
 	 *		Stats: Duty cycle %, period, pulse width, crest factor, rise time, fall time, overshoot, compare phase
-	 *		Reset
 	 *		Randomize
 	 *
 	 */
@@ -578,7 +595,7 @@ struct Scope : Module {
 				scale[ch] = -1.0f;
 			}
 			bool cvModeBtn = (bool)params[CV_OR_AUDIO_PARAM + ch].getValue();
-			if (cvModeTrig.process(cvModeBtn)) {
+			if (cvModeTrig[ch].process(cvModeBtn)) {
 				cvMode[ch] = !cvMode[ch];
 			}
 		}
@@ -1646,11 +1663,11 @@ struct ScopeWidget : ModuleWidget {
 
 		// Freeze
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigLevel, yRow2), module, Scope::FREEZE_PARAM));
-		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigLevel + 12, yRow2 + 12), module, Scope::FREEZE_LIGHT_RGB));
+		addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(Vec(xTrigLevel - 12, yRow2 + 12), module, Scope::FREEZE_LIGHT_RGB));
 
 		// Auto time
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTime, yRow2), module, Scope::AUTO_TIME_PARAM));
-		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTime + 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
+		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTime - 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
 
 		// Stats
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xHoldoff, yRow2), module, Scope::STATS_PARAM));
