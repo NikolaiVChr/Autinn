@@ -638,6 +638,8 @@ struct ScopeDisplay : TransparentWidget {
 	Scope* module{};
 	int frame = 0;
 
+	static std::string fontPath;
+
 	float lastTrigLevel = -999.0f;
 	float trigVisibilityTimer = 0.0f;
 
