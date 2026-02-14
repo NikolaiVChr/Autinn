@@ -675,7 +675,7 @@ struct Scope : Module {
 };
 
 
-struct ScopeDisplay : TransparentWidget {
+struct ScopeDisplay : Widget {
 	Scope* module{};
 	int frame = 0;
 
@@ -699,8 +699,8 @@ struct ScopeDisplay : TransparentWidget {
 		void draw(const DrawArgs& args) override {
 			if (text.empty()) return;
 			if (fontPath.empty()) {
-				//fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
-				fontPath = asset::plugin(pluginInstance, "res/fonts/FragmentMono-Regular.ttf");
+				fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
+				//fontPath = asset::plugin(pluginInstance, "res/fonts/FragmentMono-Regular.ttf");
 				if (!fontPath.empty()) {
 					std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
 
