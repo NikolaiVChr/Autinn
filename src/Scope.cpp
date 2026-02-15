@@ -784,43 +784,8 @@ struct ScopeDisplay : TransparentWidget {
 		NVGcolor color{};
 
 		void draw (const DrawArgs &args) override {
-			if (text.empty()) return;
-			if (fontPath.empty()) {
-				fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
-				//fontPath = asset::plugin(pluginInstance, "res/fonts/FragmentMono-Regular.ttf");
-				if (!fontPath.empty()) {
-					std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
-
-					if (font) {
-						nvgFontFaceId(args.vg, font->handle);
-					}
-				}
-			} else {
-				std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
-
-				if (font) {
-					nvgFontFaceId(args.vg, font->handle);
-				}
-			}
-			//nvgBeginPath(args.vg);
-			nvgShapeAntiAlias(args.vg, true);
-			nvgFontSize(args.vg, fontSize);
-			nvgTextAlign(args.vg, NVG_ALIGN_MIDDLE | NVG_ALIGN_LEFT );
-			nvgTextLetterSpacing(args.vg, 0.0f);
-			nvgFontBlur(args.vg, 0.0f);
-			nvgFillColor(args.vg, color);
-
-
-			float bounds[4];
-			nvgTextBounds( args.vg, 0.0, box.getHeight() / 2.0f, text.c_str(), nullptr, bounds );
-			float textX = bounds[0];
-			float textY = bounds[1];
-			float textWidth = bounds[2];
-			float textHeight = bounds[3];
-
-			INFO("Text width = %.1f, RackScrollWidget-zoom = %.5f", textWidth, APP->scene->rackScroll->getZoom());
-
-			nvgText(args.vg, 0.0f, box.getHeight() / 2.0f, text.c_str(), nullptr);
+			((ScopeDisplay*)getParent())->drawText(args, text, fontSize, box.getHeight() / 2.0f, color);
+			Widget::draw(args);
 		}
 	};
 
@@ -831,6 +796,47 @@ struct ScopeDisplay : TransparentWidget {
 			statsLabel->fontSize = 12.0f;
 			addChild(statsLabel);
 		}
+	}
+
+	void drawText(const DrawArgs& args, const std::string& text, const float fontSize, const float y, const NVGcolor color) const {
+		if (text.empty()) return;
+		nvgBeginPath(args.vg);
+		if (fontPath.empty()) {
+			fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
+			//fontPath = asset::plugin(pluginInstance, "res/fonts/FragmentMono-Regular.ttf");
+			if (!fontPath.empty()) {
+				std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
+
+				if (font) {
+					nvgFontFaceId(args.vg, font->handle);
+				}
+			}
+		} else {
+			std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
+
+			if (font) {
+				nvgFontFaceId(args.vg, font->handle);
+			}
+		}
+		nvgShapeAntiAlias(args.vg, true);
+		nvgFontSize(args.vg, fontSize);
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE );
+		nvgTextLetterSpacing(args.vg, 0.0f);
+		nvgFontBlur(args.vg, 0.0f);
+		nvgFillColor(args.vg, color);
+
+		/*
+		float bounds[4];
+		nvgTextBounds( args.vg, 0.0, y, text.c_str(), nullptr, bounds );
+		float textX = bounds[0];
+		float textY = bounds[1];
+		float textWidth = bounds[2];
+		float textHeight = bounds[3];
+
+		INFO("Text width = %.1f, RackScrollWidget-zoom = %.5f", textWidth, APP->scene->rackScroll->getZoom());
+		*/
+
+		nvgText(args.vg, 0.0f, box.getHeight() / 2.0f, text.c_str(), nullptr);
 	}
 
 	NVGcolor getColor(int ch) const {
@@ -1344,6 +1350,7 @@ struct ScopeDisplay : TransparentWidget {
 			statsLabels[ch]->setPosition(Vec(0.0f, getTextY(done, textBoxHeight, 0.0f)));
 			statsLabels[ch]->setSize(Vec(box.getWidth(), textBoxHeight));
 			statsLabels[ch]->show();
+			drawText(args, text, 12, 30, statsLabels[ch]->color);
 			done++;
 		}
 	}
