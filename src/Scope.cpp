@@ -799,7 +799,12 @@ struct ScopeDisplay : OpaqueWidget {
 	float lastTrigLevel = -999.0f;
 	float trigVisibilityTimer = 0.0f;
 
-
+	const float column0 = 0.0f;
+	const float column1 = 0.975f*1.0f/6.0f;
+	const float column2 = 0.975f*2.0f/6.0f;
+	const float column3 = 0.975f*2.8f/6.0f;
+	const float column4 = 0.975f*4.4f/6.0f;
+	const float column5 = 0.975f*5.0f/6.0f;
 
 	ScopeDisplay() = default;
 
@@ -832,7 +837,7 @@ struct ScopeDisplay : OpaqueWidget {
 		nvgFontBlur(args.vg, 0.0f);
 	}
 
-	NVGcolor getColor(int ch) const {
+	static NVGcolor getColor(const int ch) {
 		switch (ch) {
 		case 0: return color0;
 		case 1: return color1;
@@ -917,7 +922,9 @@ struct ScopeDisplay : OpaqueWidget {
 		}
 
 		int drawLimit_px = int(width_px)+1;
-		if (module->recording) {// TODO: 1 - works, but I really don't like using this field here
+		const bool holdoffActive = module->holdoffTime_s > 0.0f;
+		const bool recording = module->recording;
+		if (recording) { //  || holdoffActive is not needed, as all data is new when holdoff is active
 			// we only draw enough pixels to reach writeIndex from trigger
 			double validPixels = (double)module->samplesSinceTrigger / samplesPerPixel;
 			drawLimit_px = (int)validPixels;
@@ -936,7 +943,7 @@ struct ScopeDisplay : OpaqueWidget {
 				// right: old
 				// extreme right: ahead of bufferhead
 				bool isNewData = true;
-				if (module->recording) {// TODO: 2 - works, but I really don't like using this field here
+				if (recording) {
 					isNewData = curr_px <= drawLimit_px;
 				}
 
@@ -1085,7 +1092,7 @@ struct ScopeDisplay : OpaqueWidget {
 			}
 		}
 		nvgStroke(args.vg);
-		if (module->recording && float(drawLimit_px) <= width_px) {
+		if (module->recording && float(drawLimit_px) <= width_px && !holdoffActive) {
 			// scanline
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, colorScanLine); // Faint white
@@ -1245,7 +1252,7 @@ struct ScopeDisplay : OpaqueWidget {
 		if (frame > 60) frame = 0;
 	}
 
-	void drawStats(const DrawArgs& args) {
+	void drawStats(const DrawArgs& args) const {
 
 		if (!module || module->showStats == STATS_OFF) return;
 
@@ -1336,9 +1343,9 @@ struct ScopeDisplay : OpaqueWidget {
 				} else {
 					text.emplace_back("");
 				}
-				x = {0.0f, box.size.x*1.025f*1.0f/6.0f, box.size.x*1.025f*2.0f/6.0f, box.size.x*1.025f*2.8f/6.0f, box.size.x*1.025f*4.4f/6.0f, box.size.x*1.025f*5.0f/6.0f};
+				x = {column0, box.size.x*column1, box.size.x*column2, box.size.x*column3, box.size.x*column4, box.size.x*column5};
 			} else {
-				x = {0.0f, box.size.x*1.025f*1.0f/6.0f, box.size.x*1.025f*2.0f/6.0f, box.size.x*1.025f*2.8f/6.0f};
+				x = {column0, box.size.x*column1, box.size.x*column2, box.size.x*column3};
 			}
 			float y = getTextY(done, textBoxHeight, textBoxHeight*0.5f);
 
