@@ -425,10 +425,9 @@ struct Scope : Module {
 
 	/*
 	 * TODO:
-	 *		Update manual.
-	 *		AC/DC switch to remove DC
-	 *		Stats: Duty cycle %, period, pulse width, crest factor, rise time, fall time, overshoot, compare phase
-	 *		Randomize
+	 *		Stats: Duty cycle %, period, pulse width, crest factor, rise time, fall time, overshoot, compare phase.
+	 *		Randomize.
+	 *		Stats: figure out why nvgText does not scale well with Rack zoom.
 	 *
 	 */
 
@@ -803,20 +802,23 @@ struct ScopeDisplay : TransparentWidget {
 					nvgFontFaceId(args.vg, font->handle);
 				}
 			}
-			nvgBeginPath(args.vg);
+			//nvgBeginPath(args.vg);
+			nvgShapeAntiAlias(args.vg, false);
 			nvgFontSize(args.vg, fontSize);
 			nvgTextAlign(args.vg, NVG_ALIGN_MIDDLE | NVG_ALIGN_LEFT );
-			//nvgTextLetterSpacing(args.vg, -1);
+			nvgTextLetterSpacing(args.vg, 0.0f);
+			nvgFontBlur(args.vg, 0.0f);
 			nvgFillColor(args.vg, color);
 
-			/*
+
 			float bounds[4];
-			nvgTextBounds( args.vg, 0.0, 0.0, text.c_str(), nullptr, bounds );
+			nvgTextBounds( args.vg, 0.0, box.getHeight() / 2.0f, text.c_str(), nullptr, bounds );
 			float textX = bounds[0];
 			float textY = bounds[1];
 			float textWidth = bounds[2];
 			float textHeight = bounds[3];
-			*/
+
+			INFO("Text width = %.0f, zoom = %.0f", textWidth, settings::browserZoom);
 
 			nvgText(args.vg, 0.0f, box.getHeight() / 2.0f, text.c_str(), nullptr);
 		}
