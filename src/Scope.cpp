@@ -771,7 +771,7 @@ struct Scope : Module {
 
 static std::string fontPath;
 
-struct ScopeDisplay : TransparentWidget {
+struct ScopeDisplay : OpaqueWidget {
 	Scope* module{};
 	int frame = 0;
 
@@ -1549,7 +1549,7 @@ struct ScopeDisplay : TransparentWidget {
 
 
 
-struct ScopeCanvas : TransparentWidget {
+struct ScopeCanvas : OpaqueWidget {
     Scope* module{};
 
 	NVGcolor color0 = nvgRGBA(255, 230, 50, 230);  // Yellow
@@ -1662,7 +1662,7 @@ struct ScopeCanvas : TransparentWidget {
         if (module) {
             drawStats(args);
         }
-		TransparentWidget::draw(args);
+		OpaqueWidget::draw(args);
     }
 
 	void drawStats(const DrawArgs& args) {
@@ -1967,7 +1967,7 @@ struct ScopeWidget : ModuleWidget {
 		float margin = mm2px(margin_mm);
 
 		auto* display = createWidget<ScopeDisplay>(Vec(std::round(margin), std::round(margin)));
-		display->box.size = Vec(std::round(panelWidth_px - 2 * margin), std::round(displayHeight_px));
+		display->setSize(Vec(std::round(panelWidth_px - 2 * margin), std::round(displayHeight_px)));
 		display->module = module;
 		addChild(display);
 
