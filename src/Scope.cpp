@@ -784,7 +784,7 @@ struct ScopeDisplay : TransparentWidget {
 		NVGcolor color{};
 
 		void draw (const DrawArgs &args) override {
-			ScopeDisplay::drawText(args, text, fontSize, box.getHeight() / 2.0f, color);
+			ScopeDisplay::drawText(args, text, fontSize, 0, color);
 			//Widget::draw(args);
 		}
 	};
@@ -818,7 +818,7 @@ struct ScopeDisplay : TransparentWidget {
 		INFO("Text width = %.1f, RackScrollWidget-zoom = %.5f", textWidth, APP->scene->rackScroll->getZoom());
 		*/
 
-		nvgText(args.vg, 0.0f, y, text.c_str(), nullptr);
+		nvgText(args.vg, 0.0f, y, text.c_str(), nullptr);//TODO:
 
 	}
 
@@ -931,7 +931,7 @@ struct ScopeDisplay : TransparentWidget {
 		}
 
 		int drawLimit_px = int(width_px)+1;
-		if (module->recording) {
+		if (module->recording) {// TODO: test1
 			// we only draw enough pixels to reach writeIndex from trigger
 			double validPixels = (double)module->samplesSinceTrigger / samplesPerPixel;
 			drawLimit_px = (int)validPixels;
@@ -950,7 +950,7 @@ struct ScopeDisplay : TransparentWidget {
 				// right: old
 				// extreme right: ahead of bufferhead
 				bool isNewData = true;
-				if (module->recording) {// TODO: test1
+				if (module->recording) {// TODO: test2
 					isNewData = curr_px <= drawLimit_px;
 				}
 
@@ -1235,7 +1235,7 @@ struct ScopeDisplay : TransparentWidget {
 		drawGrid(args);
 		drawStats(args);
 		drawTrigger(args);
-		Widget::draw(args); //to make label appear by drawing children
+		//TODO:
 	}
 
 	void drawLayer(const DrawArgs& args, const int layer) override {
@@ -1254,6 +1254,7 @@ struct ScopeDisplay : TransparentWidget {
 			} else {
 				drawStaticWaveform(args);
 			}
+			Widget::draw(args); //to make label appear by drawing children
 		}
 		frame++;
 		if (frame > 60) frame = 0;
@@ -1360,7 +1361,7 @@ struct ScopeDisplay : TransparentWidget {
 			statsLabels[ch]->setPosition(Vec(0.0f, y));
 			statsLabels[ch]->setSize(Vec(box.getWidth(), textBoxHeight));
 			statsLabels[ch]->show();
-			drawText(args, text, 12, y+30, statsLabels[ch]->color);
+			drawText(args, text, 12, y+30, statsLabels[ch]->color);//TODO:
 			done++;
 		}
 	}
