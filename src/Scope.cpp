@@ -161,26 +161,27 @@ struct Scope : Module {
 
 	// transient
 	float buffer[4][BUFFER_SIZE] = {};
-	int writeIndex = 0;
-	int triggerIndex = 0; // last valid trigger
-	int lastTriggerIndex = 0;
-	bool recording = false; // We found trigger, we are now filling enough data into buffer to fill display.
-	bool triggerValid = false;       // triggerIndex is valid
-	bool prev_triggerValid = false;       // lastTriggerIndex is valid
+	std::atomic<int> writeIndex = {0};
+	std::atomic<int> triggerIndex = {0}; // last valid trigger
+	std::atomic<int> lastTriggerIndex = {0};
+	std::atomic<bool> recording = {false}; // We found trigger, we are now filling enough data into buffer to fill display.
+	std::atomic<bool> triggerValid = {false};       // triggerIndex is valid
+	std::atomic<bool> prev_triggerValid = {false};       // lastTriggerIndex is valid
 	float sampleRate = 44100.0f;
-	bool frozen = false;
+	std::atomic<bool> frozen = {false};
 	bool freezePending = false;
 	double period_s = 0.0; // time since last actual trigger event. Does not count up during freeze.
-	int samplesSinceTrigger = 0;  // samples since last trigger. Trigger as in, triggered outside holdoff durations.
+	std::atomic<int> samplesSinceTrigger = {0};  // samples since last trigger. Trigger as in, triggered outside holdoff durations.
 	float holdoffTime_s = 0.0f;     // Remaining holdoff in seconds
 	float autoTrigTimer_s = 0.0f;   // Time since we in AUTO saw a trigger
 	int dspFrame = 1001; // 1000 of these and we do lights and controls.
-	float autoTimeFrequency_hz = 0.0f;
+	std::atomic<float> autoTimeFrequency_hz = {0.0f};
 	float blinkPhase = 0.0f;
 	float autoTimeKnob = AUTO_TIME_KNOB_OFF;
 	float trigFoundTimer = 0.0f; // Remaining time for trigger light and stats TRIGGER to be shown.
-	bool bufferFilled = false; // We wrapped the buffers at least once, so they has no garbage.
+	std::atomic<bool> bufferFilled = {false}; // We wrapped the buffers at least once, so they has no garbage.
 	DCBlocker dcBlockers[4];
+
 
 	// persisted
 	bool autoTimeMode = false;
@@ -486,10 +487,11 @@ struct Scope : Module {
 		float signal = trigSig;
 		if (trigEdge == TRIG_EDGE_FALL) {
 			signal = -signal;
-			hysteresis = -hysteresis;
+			//hysteresis = -hysteresis;
 			threshold = -threshold;
 		}
 		bool schmittState = trigSchmitt.process(signal, threshold, threshold+hysteresis);
+
 		bool edgeFound = trigPulse.process(schmittState);
 
 		if (edgeFound) {
@@ -525,7 +527,7 @@ struct Scope : Module {
 		if (recording) {
 			// Recording
 			// We have triggered, now we fill the buffer for the rest of the display
-			samplesSinceTrigger++;
+			++samplesSinceTrigger;
 
 			if (samplesSinceTrigger >= samplesToRecord) {
 				// buffer full
@@ -544,13 +546,12 @@ struct Scope : Module {
 			if (!holdoff_active) {
 				if (edgeFound) {
 					// switch to recording
-					//triggerCandidate = writeIndex;
-					lastTriggerIndex = triggerIndex;
-					prev_triggerValid = triggerValid;
-					recording = true;
-					triggerValid = true;
-					triggerIndex = writeIndex;
-					samplesSinceTrigger = 0;
+					lastTriggerIndex.store(triggerIndex);
+					prev_triggerValid.store(triggerValid);
+					triggerIndex.store(writeIndex);
+					triggerValid.store(true);
+					samplesSinceTrigger.store(0);
+					recording.store(true);
 					autoTrigTimer_s = 0.0f;
 				}
 
@@ -577,7 +578,7 @@ struct Scope : Module {
 
 					if (autoTrigTimer_s > timeout) {
 						// Force rolling trigger
-						lastTriggerIndex = triggerIndex;
+						lastTriggerIndex.store(triggerIndex);
 						triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;
 						recording = false;
 						triggerValid = false;
@@ -921,12 +922,19 @@ struct ScopeDisplay : OpaqueWidget {
 			if (iteratorStep < 1) iteratorStep = 1;
 		}
 
+		int idxWrite = module->writeIndex.load();
+		int idxTrigger = module->triggerIndex.load();
+		int idxLastTrig = module->lastTriggerIndex.load();
+		int sSinceTrig = module->samplesSinceTrigger.load();
+		bool idxValid = module->triggerValid.load();
+		bool idxLastValid = module->prev_triggerValid.load();
+		bool recording = module->recording.load();
+
 		int drawLimit_px = int(width_px)+1;
 		const bool holdoffActive = module->holdoffTime_s > 0.0f;
-		const bool recording = module->recording;
 		if (recording) { //  || holdoffActive is not needed, as all data is new when holdoff is active
 			// we only draw enough pixels to reach writeIndex from trigger
-			double validPixels = (double)module->samplesSinceTrigger / samplesPerPixel;
+			double validPixels = (double)sSinceTrig / samplesPerPixel;
 			drawLimit_px = (int)validPixels;
 
 			if (drawLimit_px > int(width_px)+1) drawLimit_px = int(width_px)+1;
@@ -949,7 +957,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 				// If we drawing past writeIndex, then we draw old data from previous trigger.
 				// else we draw from current trigger.
-				const int startIdx = isNewData ? module->triggerIndex : module->lastTriggerIndex;
+				const int startIdx = isNewData ? idxTrigger : idxLastTrig;
 
 				int sampleOffset = (int)(curr_px * samplesPerPixel);
 				if (sampleOffset >= BUFFER_SIZE) {
@@ -961,9 +969,9 @@ struct ScopeDisplay : OpaqueWidget {
 
 				if (!isNewData) {
 					// Distance from new trigger to this readIndex
-					int distFromNew = (readIndex - module->triggerIndex) & BUFFER_MASK;
+					int distFromNew = (readIndex - idxTrigger) & BUFFER_MASK;
 
-					if (distFromNew >= 0 && distFromNew < module->samplesSinceTrigger) {
+					if (distFromNew >= 0 && distFromNew < sSinceTrig) {
 						// distFromNew is small and positive, it means this old pixel
 						// is wrapped in the buffer. As in, we have drawn the entire buffer
 						// and if we continue, we will be repeating data.
@@ -980,7 +988,7 @@ struct ScopeDisplay : OpaqueWidget {
 				float maxV = -100.0f;
 				bool found = false;
 				for (int readIndexOffset = iterStart; readIndexOffset < iterEnd; readIndexOffset += iteratorStep) {
-					if (module->recording && isNewData && readIndexOffset >= module->samplesSinceTrigger) {//test2
+					if (recording && isNewData && readIndexOffset >= sSinceTrig) {//test2
 						continue;
 					}
 					int readIndexRaw = (startIdx + readIndexOffset) & BUFFER_MASK;
@@ -1047,22 +1055,22 @@ struct ScopeDisplay : OpaqueWidget {
 				// right: old
 				// extreme right: ahead of bufferhead
 				bool isNewData = true;
-				if (module->recording) {
-					if (sampleOffset >= module->samplesSinceTrigger) {
+				if (recording) {
+					if (sampleOffset >= sSinceTrig) {
 						isNewData = false;
 					}
 				}
 
 				// If we drawing past writeIndex, then we draw old data from previous trigger.
 				// else we draw from current trigger.
-				const int startIdx = isNewData ? module->triggerIndex : module->lastTriggerIndex;
+				const int startIdx = isNewData ? idxTrigger : idxLastTrig;
 				int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
 
 				if (!isNewData) {
 					// Distance from new trigger to this readIndex
-					int distFromNew = (readIndex - module->triggerIndex) & BUFFER_MASK;
+					int distFromNew = (readIndex - idxTrigger) & BUFFER_MASK;
 
-					if (distFromNew >= 0 && distFromNew < module->samplesSinceTrigger) {
+					if (distFromNew >= 0 && distFromNew < sSinceTrig) {
 						// We have lapped the buffer. Stop drawing to prevent garbage/repeat data.
 						// distFromNew is small and positive, it means this old pixel
 						// is wrapped in the buffer. As in, we have drawn the entire buffer
@@ -1092,7 +1100,7 @@ struct ScopeDisplay : OpaqueWidget {
 			}
 		}
 		nvgStroke(args.vg);
-		if (module->recording && float(drawLimit_px) <= width_px && !holdoffActive) {
+		if (recording && float(drawLimit_px) <= width_px && !holdoffActive) {
 			// scanline
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, colorScanLine); // Faint white
@@ -1113,6 +1121,13 @@ struct ScopeDisplay : OpaqueWidget {
 
 		// Check connections
 		if (!AB && !CD) return;
+
+		int idxWrite = module->writeIndex.load();
+		int idxTrigger = module->triggerIndex.load();
+		int idxLastTrig = module->lastTriggerIndex.load();
+		int sSinceTrig = module->samplesSinceTrigger.load();
+		bool idxValid = module->triggerValid.load();
+		bool idxLastValid = module->prev_triggerValid.load();
 
 		const float* signalX = module->buffer[0]; // Channel A
 		const float* signalY = module->buffer[1]; // Channel B
@@ -1135,9 +1150,9 @@ struct ScopeDisplay : OpaqueWidget {
 
 		// start index
 		// Calc how many samples exist between trigger and write index
-		int samplesRecorded = (module->writeIndex - module->triggerIndex) & BUFFER_MASK;
+		int samplesRecorded = (idxWrite - idxTrigger) & BUFFER_MASK;
 		bool enoughNew = (samplesRecorded >= samplesToDraw);
-		int samplesRecorded2 = (module->writeIndex - module->lastTriggerIndex) & BUFFER_MASK;
+		int samplesRecorded2 = (idxWrite - idxLastTrig) & BUFFER_MASK;
 		bool enoughOld = (samplesRecorded2 >= samplesToDraw);
 		/*
 		const int startIdx = module->triggerValid && enough?module->triggerIndex
@@ -1147,13 +1162,13 @@ struct ScopeDisplay : OpaqueWidget {
 		int startIdx;
 		int endIdx;
 		int countMax = samplesToDraw;
-		if (module->triggerValid && enoughNew) {
+		if (idxValid && enoughNew) {
 			// Draw newest data from trigger forward
-			startIdx = module->triggerIndex;
+			startIdx = idxTrigger;
 			//endIdx = (startIdx + samplesToDraw) & BUFFER_MASK;
-		} else if (module->prev_triggerValid && module->triggerValid && enoughOld) {
+		} else if (idxLastValid && idxValid && enoughOld) {
 			// Draw old data from prev trigger till new trigger
-			startIdx = module->lastTriggerIndex;
+			startIdx = idxLastTrig;
 			//endIdx = (startIdx + samplesToDraw) & BUFFER_MASK;
 		} else {
 			// Just draw latest data, ignoring triggers
@@ -1163,11 +1178,11 @@ struct ScopeDisplay : OpaqueWidget {
 
 			// If buffer hasn't wrapped yet, we only have 'writeIndex' amount of data.
 			// Don't draw past what we have recorded.
-			int available = module->bufferFilled ? BUFFER_SIZE : module->writeIndex;
+			int available = module->bufferFilled.load() ? BUFFER_SIZE : idxWrite;
 
 			if (countMax > available) countMax = available;
 
-			startIdx = (module->writeIndex - countMax) & BUFFER_MASK;
+			startIdx = (idxWrite - countMax) & BUFFER_MASK;
 		}
 		/*
 		 Is okay, but countMax is always samplesToDraw so I simplified it
@@ -1273,14 +1288,19 @@ struct ScopeDisplay : OpaqueWidget {
 			int samplesToScan = (int)(totalTime * module->sampleRate);
 			if (samplesToScan > BUFFER_SIZE) samplesToScan = BUFFER_SIZE;
 
+			int idxWrite = module->writeIndex.load();
+			int idxTrigger = module->triggerIndex.load();
+			int idxLastTrig = module->lastTriggerIndex.load();
+			bool idxValid = module->triggerValid.load();
+			bool idxLastValid = module->prev_triggerValid.load();
 
 			// start index
 			// Calc how many samples exist between trigger and write index
-			int samplesRecorded = (module->writeIndex - module->triggerIndex) & BUFFER_MASK;
+			int samplesRecorded = (idxWrite - idxTrigger) & BUFFER_MASK;
 			bool enough = (samplesRecorded >= samplesToScan);
-			const int startIndex = module->triggerValid && enough?module->triggerIndex
-										:(module->prev_triggerValid?module->lastTriggerIndex
-										:((module->writeIndex - samplesToScan) & BUFFER_MASK));
+			const int startIndex = idxValid && enough?idxTrigger
+										:(idxLastValid?idxLastTrig
+										:((idxWrite - samplesToScan) & BUFFER_MASK));
 
 			float minV = 100.0f;
 			float maxV = -100.0f;
@@ -1338,7 +1358,7 @@ struct ScopeDisplay : OpaqueWidget {
 				text.emplace_back(triggerStatus);
 
 				if (module->autoTimeFrequency_hz > 0.0f) {
-					std::string t = string::f("Freq: %7.1f Hz", module->autoTimeFrequency_hz);
+					std::string t = string::f("Freq: %7.1f Hz", module->autoTimeFrequency_hz.load());
 					text.push_back(t);
 				} else {
 					text.emplace_back("");
