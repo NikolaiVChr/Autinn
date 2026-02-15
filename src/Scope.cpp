@@ -1690,7 +1690,7 @@ struct ScopeWidget : ModuleWidget {
 			addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(x, yRow1), module, Scope::POS_A_PARAM + i));
 			addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(x, yRow2-(yRow2-yRow1)/4.0f), module, Scope::SCALE_A_PARAM + i));
 			addInput(createInputCentered<InPortAutinn>(Vec(x+HALF_KNOB_SMALL, yRow2+HALF_KNOB_SMALL), module, Scope::A_INPUT + i));
-			addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(x-HALF_KNOB_SMALL, yRow2+HALF_KNOB_SMALL), module, Scope::CV_OR_AUDIO_PARAM +i));
+			addParam(createParamCentered<RoundCVButtonSmallAutinn>(Vec(x-HALF_KNOB_SMALL, yRow2+HALF_KNOB_SMALL), module, Scope::CV_OR_AUDIO_PARAM +i));
 			addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(x-HALF_KNOB_SMALL + 6, yRow2+HALF_KNOB_SMALL + 12), module, Scope::CV_OR_AUDIO_LIGHT + i));
 		}
 
