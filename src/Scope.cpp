@@ -784,7 +784,7 @@ struct ScopeDisplay : TransparentWidget {
 		NVGcolor color{};
 
 		void draw (const DrawArgs &args) override {
-			((ScopeDisplay*)getParent())->drawText(args, text, fontSize, box.getHeight() / 2.0f, color);
+			ScopeDisplay::drawText(args, text, fontSize, box.getHeight() / 2.0f, color);
 			//Widget::draw(args);
 		}
 	};
@@ -798,9 +798,31 @@ struct ScopeDisplay : TransparentWidget {
 		}
 	}
 
-	void drawText(const DrawArgs& args, const std::string& text, const float fontSize, const float y, const NVGcolor color) const {
+	static void drawText(const DrawArgs& args, const std::string& text, const float fontSize, const float y, const NVGcolor color) {
 		if (text.empty()) return;
+
 		nvgBeginPath(args.vg);
+
+		//nvgShapeAntiAlias(args.vg, true);
+
+		nvgFillColor(args.vg, color);
+
+		/*
+		float bounds[4];
+		nvgTextBounds( args.vg, 0.0, y, text.c_str(), nullptr, bounds );
+		float textX = bounds[0];
+		float textY = bounds[1];
+		float textWidth = bounds[2];
+		float textHeight = bounds[3];
+
+		INFO("Text width = %.1f, RackScrollWidget-zoom = %.5f", textWidth, APP->scene->rackScroll->getZoom());
+		*/
+
+		nvgText(args.vg, 0.0f, y, text.c_str(), nullptr);
+
+	}
+
+	static void setupFont(const DrawArgs& args, const float fontSize) {
 		if (fontPath.empty()) {
 			fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
 			//fontPath = asset::plugin(pluginInstance, "res/fonts/FragmentMono-Regular.ttf");
@@ -818,25 +840,10 @@ struct ScopeDisplay : TransparentWidget {
 				nvgFontFaceId(args.vg, font->handle);
 			}
 		}
-		nvgShapeAntiAlias(args.vg, true);
 		nvgFontSize(args.vg, fontSize);
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE );
-		nvgTextLetterSpacing(args.vg, -1.0f);
+		nvgTextLetterSpacing(args.vg, 0.0f);
 		nvgFontBlur(args.vg, 0.0f);
-		nvgFillColor(args.vg, color);
-
-		/*
-		float bounds[4];
-		nvgTextBounds( args.vg, 0.0, y, text.c_str(), nullptr, bounds );
-		float textX = bounds[0];
-		float textY = bounds[1];
-		float textWidth = bounds[2];
-		float textHeight = bounds[3];
-
-		INFO("Text width = %.1f, RackScrollWidget-zoom = %.5f", textWidth, APP->scene->rackScroll->getZoom());
-		*/
-
-		nvgText(args.vg, 0.0f, box.getHeight() / 2.0f, text.c_str(), nullptr);
 	}
 
 	NVGcolor getColor(int ch) const {
@@ -1228,11 +1235,7 @@ struct ScopeDisplay : TransparentWidget {
 		drawGrid(args);
 		drawStats(args);
 		drawTrigger(args);
-		//Widget::draw(args); //to make label appear
-		drawChild(statsLabels[0], args);
-		drawChild(statsLabels[1], args);
-		drawChild(statsLabels[2], args);
-		drawChild(statsLabels[3], args);
+		Widget::draw(args); //to make label appear by drawing children
 	}
 
 	void drawLayer(const DrawArgs& args, const int layer) override {
@@ -1257,9 +1260,11 @@ struct ScopeDisplay : TransparentWidget {
 	}
 
 	void drawStats(const DrawArgs& args) {
-		for (auto & statsLabel : statsLabels) statsLabel->visible = false;
+		for (auto & statsLabel : statsLabels) statsLabel->setVisible(false);
 
 		if (!module || module->showStats == STATS_OFF) return;
+
+		setupFont(args, 12.0f);
 
 		const int chTrig = module->trigSource;
 		if (chTrig >= 4 && module->showStats == STATS_ONE) return; // no stats for ext trigger
