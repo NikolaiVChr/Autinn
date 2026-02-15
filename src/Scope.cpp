@@ -1602,7 +1602,7 @@ struct ScopeCanvas : OpaqueWidget {
 		INFO("Text width = %.1f, RackScrollWidget-zoom = %.5f", textWidth, APP->scene->rackScroll->getZoom());
 		*/
 
-		nvgText(args.vg, 0.0f, y, text.c_str(), nullptr);//TODO: 1
+		nvgText(args.vg, 0.0f, y, text.c_str(), NULL);//TODO: 1
 
 	}
 
@@ -1651,7 +1651,7 @@ struct ScopeCanvas : OpaqueWidget {
         nvgTextLetterSpacing(args.vg, 0.0f);
         nvgFillColor(args.vg, color);
 
-        nvgText(args.vg, std::round(x), std::round(y), text, nullptr);
+        nvgText(args.vg, std::round(x), std::round(y), text, NULL);
     }
 
     void draw(const DrawArgs& args) override {
@@ -1966,10 +1966,12 @@ struct ScopeWidget : ModuleWidget {
 		float displayHeight_px = mm2px(80.0f);
 		float margin = mm2px(margin_mm);
 
+		/*
 		auto* display = createWidget<ScopeDisplay>(Vec(std::round(margin), std::round(margin)));
 		display->setSize(Vec(std::round(panelWidth_px - 2 * margin), std::round(displayHeight_px)));
 		display->module = module;
 		addChild(display);
+		*/
 
 		auto* display2 = createWidget<ScopeDisplay2>(Vec(std::round(margin), displayHeight_px+margin*2.0f));
 		display2->setSize(Vec(std::round(panelWidth_px - 2 * margin), std::round(displayHeight_px*0.25f)));
