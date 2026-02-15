@@ -803,7 +803,7 @@ struct ScopeDisplay : TransparentWidget {
 				}
 			}
 			//nvgBeginPath(args.vg);
-			nvgShapeAntiAlias(args.vg, false);
+			nvgShapeAntiAlias(args.vg, true);
 			nvgFontSize(args.vg, fontSize);
 			nvgTextAlign(args.vg, NVG_ALIGN_MIDDLE | NVG_ALIGN_LEFT );
 			nvgTextLetterSpacing(args.vg, 0.0f);
