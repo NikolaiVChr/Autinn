@@ -818,7 +818,7 @@ struct ScopeDisplay : TransparentWidget {
 			float textWidth = bounds[2];
 			float textHeight = bounds[3];
 
-			INFO("Text width = %.1f, zoom = %.3f", textWidth, settings::browserZoom);
+			INFO("Text width = %.1f, RackScrollWidget-zoom = %.5f", textWidth, APP->scene->rackScroll->getZoom());
 
 			nvgText(args.vg, 0.0f, box.getHeight() / 2.0f, text.c_str(), nullptr);
 		}
