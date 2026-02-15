@@ -785,7 +785,7 @@ struct ScopeDisplay : TransparentWidget {
 
 		void draw (const DrawArgs &args) override {
 			((ScopeDisplay*)getParent())->drawText(args, text, fontSize, box.getHeight() / 2.0f, color);
-			Widget::draw(args);
+			//Widget::draw(args);
 		}
 	};
 
@@ -821,7 +821,7 @@ struct ScopeDisplay : TransparentWidget {
 		nvgShapeAntiAlias(args.vg, true);
 		nvgFontSize(args.vg, fontSize);
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE );
-		nvgTextLetterSpacing(args.vg, 0.0f);
+		nvgTextLetterSpacing(args.vg, -1.0f);
 		nvgFontBlur(args.vg, 0.0f);
 		nvgFillColor(args.vg, color);
 
@@ -1228,7 +1228,11 @@ struct ScopeDisplay : TransparentWidget {
 		drawGrid(args);
 		drawStats(args);
 		drawTrigger(args);
-		Widget::draw(args); //to make label appear
+		//Widget::draw(args); //to make label appear
+		drawChild(statsLabels[0], args);
+		drawChild(statsLabels[1], args);
+		drawChild(statsLabels[2], args);
+		drawChild(statsLabels[3], args);
 	}
 
 	void drawLayer(const DrawArgs& args, const int layer) override {
@@ -1347,10 +1351,11 @@ struct ScopeDisplay : TransparentWidget {
 
 			statsLabels[ch]->text = text;
 			statsLabels[ch]->color = getColor(ch);
-			statsLabels[ch]->setPosition(Vec(0.0f, getTextY(done, textBoxHeight, 0.0f)));
+			float y = getTextY(done, textBoxHeight, 0.0f);
+			statsLabels[ch]->setPosition(Vec(0.0f, y));
 			statsLabels[ch]->setSize(Vec(box.getWidth(), textBoxHeight));
 			statsLabels[ch]->show();
-			drawText(args, text, 12, 30, statsLabels[ch]->color);
+			drawText(args, text, 12, y+30, statsLabels[ch]->color);
 			done++;
 		}
 	}
