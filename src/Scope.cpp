@@ -1,5 +1,6 @@
 #include "Autinn.hpp"
 #include <cmath>
+#include <cstdio>
 
 static constexpr int BUFFER_SIZE = 1 << 22;// 2^20 (5.4 seconds at 192khz) - 2^22 (22 seconds at 192khz)
 static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
@@ -7,11 +8,6 @@ static constexpr float DIVS_VERT = 8.0f;// total vert divs (audio scope std)
 static constexpr float DIVS_HORIZ = 20.0f;// total horiz divs (approx effective 1:1)
 static constexpr float DIVS_VERT_INV = 1.0f/DIVS_VERT;
 static constexpr float DIVS_HORIZ_INV = 1.0f/DIVS_HORIZ;
-static constexpr float WAVEFORM_SAMPLES_PER_PX = 64.0f;
-static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
-static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
-static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable average/RMS, but we allow
-static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
 static constexpr float TRIG_AUTO_MIN_TIMEOUT = 0.04f;    // seconds
 static constexpr float TRIG_AUTO_MAX_TIMEOUT = 0.1f;    // seconds
 static constexpr double AUTO_TIME_PERIOD_MAX = 10.0; // seconds
@@ -38,6 +34,27 @@ static constexpr float TIME_KNOB_MAX = 0.0f; //      to   1s
 static constexpr float HOLDOFF_KNOB_MIN = -4.0f;// from 100µs
 static constexpr float HOLDOFF_KNOB_MAX = 1.0f; //   to  10s
 static constexpr float TRIG_FOUND_TIMER = 0.1f;
+
+// display
+static constexpr float WAVEFORM_SAMPLES_PER_PX = 64.0f;
+static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
+static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
+static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable average/RMS, but we allow
+static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
+static constexpr float STROKE_WAVE = 1.0f;
+static constexpr float STROKE_SCANLINE = 1.0f;
+static constexpr float STROKE_XY = 1.0f;
+static constexpr float FONTSIZE_STATS = 12.0f;
+static const NVGcolor color0 = nvgRGBA(255, 230, 50, 230);  // Yellow
+static const NVGcolor color1 = nvgRGBA(255, 50, 50, 230);   // Red
+static const NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
+static const NVGcolor color3 = nvgRGBA(50, 150, 255, 230);  // Blue
+static const NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
+static const NVGcolor colorScanLine = nvgRGBA(255, 255, 255, 90);// faint white
+static const NVGcolor colorXY1 = nvgRGBA(100, 255, 200, 200);//cyan
+static const NVGcolor colorXY2 = nvgRGBA(255, 100, 255, 200);//magenta
+static const NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
+static const NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
 
 static std::vector<std::string> scales = {
 	"OFF","20 V/Div","10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
@@ -426,8 +443,8 @@ struct Scope : Module {
 	/*
 	 * TODO:
 	 *		Stats: Duty cycle %, period, pulse width, crest factor, rise time, fall time, overshoot, compare phase.
-	 *		Randomize.
-	 *		Stats: figure out why nvgText does not scale well with Rack zoom.
+	 *		Randomize. [not needed]
+	 *		trigger line more discrete
 	 *
 	 */
 
@@ -778,72 +795,27 @@ struct ScopeDisplay : OpaqueWidget {
 	float lastTrigLevel = -999.0f;
 	float trigVisibilityTimer = 0.0f;
 
-	NVGcolor color0 = nvgRGBA(255, 230, 50, 230);  // Yellow
-	NVGcolor color1 = nvgRGBA(255, 50, 50, 230);   // Red
-	NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
-	NVGcolor color3 = nvgRGBA(50, 150, 255, 230);  // Blue
-	NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
-	NVGcolor colorScanLine = nvgRGBA(255, 255, 255, 90);// faint white
-	NVGcolor colorXY1 = nvgRGBA(100, 255, 200, 200);//cyan
-	NVGcolor colorXY2 = nvgRGBA(255, 100, 255, 200);//magenta
-	NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
-	NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
 
-	struct VectorLabel : Widget {
-		std::string text{};
-		float fontSize = 12.0f;
-		NVGcolor color{};
 
-		void draw (const DrawArgs &args) override {
-			ScopeDisplay::drawText(args, text, fontSize, 0, color);
-			//Widget::draw(args);
-		}
-	};
+	ScopeDisplay() = default;
 
-	VectorLabel* statsLabels[4]{};
-	ScopeDisplay() {
-		for (auto & statsLabel : statsLabels) {
-			statsLabel = new VectorLabel();
-			addChild(statsLabel);
-		}
-	}
-
-	static void drawText(const DrawArgs& args, const std::string& text, const float fontSize, const float y, const NVGcolor color) {
-		if (text.empty()) return;
+	static void drawText(const DrawArgs& args, const std::vector<std::string>& text, const float fontSize, const float y, const std::vector<float>& x, const NVGcolor color) {
+		if (text[0].empty()) return;
 
 		nvgBeginPath(args.vg);
-
-		//nvgShapeAntiAlias(args.vg, true);
-
 		nvgFillColor(args.vg, color);
 
-		/*
-		float bounds[4];
-		nvgTextBounds( args.vg, 0.0, y, text.c_str(), nullptr, bounds );
-		float textX = bounds[0];
-		float textY = bounds[1];
-		float textWidth = bounds[2];
-		float textHeight = bounds[3];
-
-		INFO("Text width = %.1f, RackScrollWidget-zoom = %.5f", textWidth, APP->scene->rackScroll->getZoom());
-		*/
-
-		nvgText(args.vg, 0.0f, y, text.c_str(), nullptr);//TODO: 1
-
+		for (int i = 0; i < x.size() ; i++) {
+			nvgText(args.vg, x[i], y, text[i].c_str(), nullptr);
+		}
 	}
 
 	static void setupFont(const DrawArgs& args, const float fontSize) {
 		if (fontPath.empty()) {
 			fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
 			//fontPath = asset::plugin(pluginInstance, "res/fonts/FragmentMono-Regular.ttf");
-			if (!fontPath.empty()) {
-				std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
-
-				if (font) {
-					nvgFontFaceId(args.vg, font->handle);
-				}
-			}
-		} else {
+		}
+		if (!fontPath.empty()) {
 			std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
 
 			if (font) {
@@ -930,7 +902,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, color);
-		nvgStrokeWidth(args.vg, 1.25f); // Slightly thicker line
+		nvgStrokeWidth(args.vg, STROKE_WAVE); // Slightly thicker line
 		nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
 		int iteratorStep = 1;
@@ -941,7 +913,7 @@ struct ScopeDisplay : OpaqueWidget {
 		}
 
 		int drawLimit_px = int(width_px)+1;
-		if (module->recording) {// TODO: test1
+		if (module->recording) {// TODO: 1 - works, but I really don't like using this field here
 			// we only draw enough pixels to reach writeIndex from trigger
 			double validPixels = (double)module->samplesSinceTrigger / samplesPerPixel;
 			drawLimit_px = (int)validPixels;
@@ -960,7 +932,7 @@ struct ScopeDisplay : OpaqueWidget {
 				// right: old
 				// extreme right: ahead of bufferhead
 				bool isNewData = true;
-				if (module->recording) {// TODO: test2
+				if (module->recording) {// TODO: 2 - works, but I really don't like using this field here
 					isNewData = curr_px <= drawLimit_px;
 				}
 
@@ -1113,7 +1085,7 @@ struct ScopeDisplay : OpaqueWidget {
 			// scanline
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, colorScanLine); // Faint white
-			nvgStrokeWidth(args.vg, 1.0f);
+			nvgStrokeWidth(args.vg, STROKE_SCANLINE);
 			nvgMoveTo(args.vg, (float)drawLimit_px, 0);
 			nvgLineTo(args.vg, (float)drawLimit_px, box.size.y);
 			nvgStroke(args.vg);
@@ -1197,7 +1169,7 @@ struct ScopeDisplay : OpaqueWidget {
 		auto drawPair = [&](const float* sigX, const float* sigY, const int scaleIdxX, const int scaleIdxY, const NVGcolor color) {
 			bool first = true;
 			nvgBeginPath(args.vg);
-			nvgStrokeWidth(args.vg, 1.5f);
+			nvgStrokeWidth(args.vg, STROKE_XY);
 			nvgStrokeColor(args.vg, color);
 			for (int i = 0; i < countMax; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
@@ -1245,7 +1217,7 @@ struct ScopeDisplay : OpaqueWidget {
 		drawGrid(args);
 		drawStats(args);
 		drawTrigger(args);
-		//TODO: 2
+		Widget::draw(args); //to make label appear by drawing children
 	}
 
 	void drawLayer(const DrawArgs& args, const int layer) override {
@@ -1264,18 +1236,16 @@ struct ScopeDisplay : OpaqueWidget {
 			} else {
 				drawStaticWaveform(args);
 			}
-			Widget::draw(args); //to make label appear by drawing children
 		}
 		frame++;
 		if (frame > 60) frame = 0;
 	}
 
 	void drawStats(const DrawArgs& args) {
-		for (auto & statsLabel : statsLabels) statsLabel->setVisible(false);
 
 		if (!module || module->showStats == STATS_OFF) return;
 
-		setupFont(args, 12.0f);
+		setupFont(args, FONTSIZE_STATS);
 
 		const int chTrig = module->trigSource;
 		if (chTrig >= 4 && module->showStats == STATS_ONE) return; // no stats for ext trigger
@@ -1333,45 +1303,39 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgFill(args.vg);
 
 			// Text
-			char text[128];
+			std::vector<std::string> text;
+
+			std::string t1 = string::f("%c Min: %+6.2fV", 'A' + ch, minV);
+			text.push_back(t1);
+
+			std::string t2 = string::f("Max: %+6.2fV", maxV);
+			text.push_back(t2);
+
+			std::string t3 = string::f("PP: %5.2fV", maxV - minV);
+			text.push_back(t3);
+
+			std::string t4 = string::f("AVG: %+6.2f RMS: %5.2f", avg, rms);
+			text.push_back(t4);
+
 			if (ch == module->trigSource) {
-				char textF[128];
-				if (module->autoTimeFrequency_hz > 0.0f) {
-					sprintf(textF,"Freq: %7.1f Hz", module->autoTimeFrequency_hz);
-				} else {
-					sprintf(textF,"");
-				}
 				std::string triggerStatus = module->frozen?"FROZEN"
 						:(module->trigFoundTimer > 0.0f?"TRIGGER"
 						:(module->holdoffTime_s > 0.0f?"HOLDOFF"
 						:(module->recording?"TRIGGER"
 						:"SCANNING")));
-				snprintf(text, sizeof(text), "%c Min: %+6.2fV Max: %+6.2fV  PP: %5.2fV AVG: %+6.2f RMS: %5.2f %-8s %s",
-					'A' + ch,
-					minV,
-					maxV,
-					(maxV - minV),
-					avg,
-					rms,
-					triggerStatus.c_str(),
-					textF);
-			} else {
-				snprintf(text, sizeof(text), "%c Min: %+6.2fV Max: %+6.2fV  PP: %5.2fV AVG: %+6.2f RMS: %5.2f",
-					'A' + ch,
-					minV,
-					maxV,
-					(maxV - minV),
-					avg,
-					rms);
-			}
+				text.emplace_back(triggerStatus);
 
-			statsLabels[ch]->text = text;
-			statsLabels[ch]->color = getColor(ch);
-			float y = getTextY(done, textBoxHeight, 0.0f);
-			statsLabels[ch]->setPosition(Vec(0.0f, y));
-			statsLabels[ch]->setSize(Vec(box.getWidth(), textBoxHeight));
-			statsLabels[ch]->show();
-			drawText(args, text, 12, y+30, statsLabels[ch]->color);//TODO: 3
+				if (module->autoTimeFrequency_hz > 0.0f) {
+					std::string t = string::f("Freq: %7.1f Hz", module->autoTimeFrequency_hz);
+					text.push_back(t);
+				} else {
+					text.emplace_back("");
+				}
+			}
+			float y = getTextY(done, textBoxHeight, textBoxHeight*0.5f);
+			std::vector<float> x = {0.0f, 1.0f/6.0f, 2.0f/6.0f, 3.0f/6.0f, 4.0f/6.0f, 5.0f/6.0f};
+			drawText(args,text,12.0f,y,x,getColor(ch));
+
 			done++;
 		}
 	}
@@ -1424,7 +1388,9 @@ struct ScopeDisplay : OpaqueWidget {
 		if (y > box.size.y) y = box.size.y;
 
 		// Line
-		drawDashedLine(args.vg, 0, y, box.size.x, y, 1.0f, getColor(ch));
+		auto color = getColor(ch);
+		color.a *= 0.5f;
+		drawDashedLine(args.vg, 0, y, box.size.x, y, 0.8f, color);
 		/*
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, getColor(ch)); // Match Source Color
@@ -1436,7 +1402,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 		// Label
 		nvgFontSize(args.vg, 12.0f);
-		nvgFillColor(args.vg, getColor(ch));
+		nvgFillColor(args.vg, color);
 		nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_BOTTOM);
 
 		char text[32];
@@ -1535,284 +1501,6 @@ struct ScopeDisplay : OpaqueWidget {
 		}
 	}
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-struct ScopeCanvas : OpaqueWidget {
-    Scope* module{};
-
-	NVGcolor color0 = nvgRGBA(255, 230, 50, 230);  // Yellow
-	NVGcolor color1 = nvgRGBA(255, 50, 50, 230);   // Red
-	NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
-	NVGcolor color3 = nvgRGBA(50, 150, 255, 230);  // Blue
-	NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
-	NVGcolor colorScanLine = nvgRGBA(255, 255, 255, 90);// faint white
-	NVGcolor colorXY1 = nvgRGBA(100, 255, 200, 200);//cyan
-	NVGcolor colorXY2 = nvgRGBA(255, 100, 255, 200);//magenta
-	NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
-	NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
-
-	struct VectorLabel : Widget {
-		std::string text{};
-		float fontSize = 12.0f;
-		NVGcolor color{};
-
-		void draw (const DrawArgs &args) override {
-			ScopeDisplay::drawText(args, text, fontSize, 0, color);
-			//Widget::draw(args);
-		}
-	};
-
-	VectorLabel* statsLabels[4]{};
-	ScopeCanvas() {
-		for (auto & statsLabel : statsLabels) {
-			statsLabel = new VectorLabel();
-			addChild(statsLabel);
-		}
-	}
-
-	static void drawText(const DrawArgs& args, const std::string& text, const float fontSize, const float y, const NVGcolor color) {
-		if (text.empty()) return;
-
-		nvgBeginPath(args.vg);
-
-		//nvgShapeAntiAlias(args.vg, true);
-
-		nvgFillColor(args.vg, color);
-
-		/*
-		float bounds[4];
-		nvgTextBounds( args.vg, 0.0, y, text.c_str(), nullptr, bounds );
-		float textX = bounds[0];
-		float textY = bounds[1];
-		float textWidth = bounds[2];
-		float textHeight = bounds[3];
-
-		INFO("Text width = %.1f, RackScrollWidget-zoom = %.5f", textWidth, APP->scene->rackScroll->getZoom());
-		*/
-
-		nvgText(args.vg, 0.0f, y, text.c_str(), NULL);//TODO: 1
-
-	}
-
-	static void setupFont(const DrawArgs& args, const float fontSize) {
-		if (fontPath.empty()) {
-			fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
-			//fontPath = asset::plugin(pluginInstance, "res/fonts/FragmentMono-Regular.ttf");
-			if (!fontPath.empty()) {
-				std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
-
-				if (font) {
-					nvgFontFaceId(args.vg, font->handle);
-				}
-			}
-		} else {
-			std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
-
-			if (font) {
-				nvgFontFaceId(args.vg, font->handle);
-			}
-		}
-		nvgFontSize(args.vg, fontSize);
-		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE );
-		nvgTextLetterSpacing(args.vg, 0.0f);
-		nvgFontBlur(args.vg, 0.0f);
-	}
-
-	NVGcolor getColor(int ch) const {
-		switch (ch) {
-		case 0: return color0;
-		case 1: return color1;
-		case 2: return color2;
-		case 3: return color3;
-		default: return colorExt;
-		}
-	}
-
-    void drawText(const DrawArgs& args, float x, float y, const char* text, NVGcolor color) {
-        if (fontPath.empty()) fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
-        std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
-        if (!font) return;
-
-        nvgFontFaceId(args.vg, font->handle);
-        nvgFontSize(args.vg, 12.0f);
-        nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-        nvgTextLetterSpacing(args.vg, 0.0f);
-        nvgFillColor(args.vg, color);
-
-        nvgText(args.vg, std::round(x), std::round(y), text, NULL);
-    }
-
-    void draw(const DrawArgs& args) override {
-        nvgBeginPath(args.vg);
-        nvgRect(args.vg, 0, 0, box.size.x, box.size.y);
-        nvgFillColor(args.vg, nvgRGB(100, 100, 100));
-        nvgFill(args.vg);
-        if (module) {
-            drawStats(args);
-        }
-		OpaqueWidget::draw(args);
-    }
-
-	void drawStats(const DrawArgs& args) {
-		for (auto & statsLabel : statsLabels) statsLabel->setVisible(false);
-
-		if (!module || module->showStats == STATS_OFF) return;
-
-		setupFont(args, 12.0f);
-
-		const int chTrig = module->trigSource;
-		if (chTrig >= 4 && module->showStats == STATS_ONE) return; // no stats for ext trigger
-
-		int done = 0;
-
-		for (int ch = 0; ch < TRIG_SOURCE_EXT; ch++) {
-			if (!module->inputs[Scope::A_INPUT + ch].isConnected()) continue;
-			if (module->showStats == STATS_ONE && ch != module->trigSource) continue;
-
-			// limit
-			const float timePerDiv_s = module->getTimeDiv();
-			const float totalTime = DIVS_HORIZ * timePerDiv_s;
-			int samplesToScan = (int)(totalTime * module->sampleRate);
-			if (samplesToScan > BUFFER_SIZE) samplesToScan = BUFFER_SIZE;
-
-
-			// start index
-			// Calc how many samples exist between trigger and write index
-			int samplesRecorded = (module->writeIndex - module->triggerIndex) & BUFFER_MASK;
-			bool enough = (samplesRecorded >= samplesToScan);
-			const int startIndex = module->triggerValid && enough?module->triggerIndex
-										:(module->prev_triggerValid?module->lastTriggerIndex
-										:((module->writeIndex - samplesToScan) & BUFFER_MASK));
-
-			float minV = 100.0f;
-			float maxV = -100.0f;
-			double sum = 0.0;
-			double sumSq = 0.0;
-			int count = 0;
-
-			int step = 1;
-			if (samplesToScan > STATS_DECIMATION_THRESHOLD) step = samplesToScan / STATS_SAMPLE_DECIMATION_COUNT;
-
-			for (int i = 0; i < samplesToScan; i += step) {
-				const int idx = (startIndex + i) & BUFFER_MASK;
-				const float v = module->buffer[ch][idx];
-				if (v < minV) minV = v;
-				if (v > maxV) maxV = v;
-				sum += v;
-				sumSq += v*v;
-				count++;
-			}
-
-			float avg = (count > 0) ? (float)(sum / count) : 0.0f;
-			float rms = (count > 0) ? (float)std::sqrt(sumSq / count) : 0.0f;
-
-			// Text box
-			float textBoxHeight = 16.0f;
-			float margin = 10.0f;
-			float textY = getTextY(done, textBoxHeight, 0.0f);
-			nvgBeginPath(args.vg);
-			nvgRoundedRect(args.vg, 0, textY, box.size.x, textBoxHeight, 0.0f);
-			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 128));
-			nvgFill(args.vg);
-
-			// Text
-			char text[128];
-			if (ch == module->trigSource) {
-				char textF[128];
-				if (module->autoTimeFrequency_hz > 0.0f) {
-					sprintf(textF,"Freq: %7.1f Hz", module->autoTimeFrequency_hz);
-				} else {
-					sprintf(textF,"");
-				}
-				std::string triggerStatus = module->frozen?"FROZEN"
-						:(module->trigFoundTimer > 0.0f?"TRIGGER"
-						:(module->holdoffTime_s > 0.0f?"HOLDOFF"
-						:(module->recording?"TRIGGER"
-						:"SCANNING")));
-				snprintf(text, sizeof(text), "%c Min: %+6.2fV Max: %+6.2fV  PP: %5.2fV AVG: %+6.2f RMS: %5.2f %-8s %s",
-					'A' + ch,
-					minV,
-					maxV,
-					(maxV - minV),
-					avg,
-					rms,
-					triggerStatus.c_str(),
-					textF);
-			} else {
-				snprintf(text, sizeof(text), "%c Min: %+6.2fV Max: %+6.2fV  PP: %5.2fV AVG: %+6.2f RMS: %5.2f",
-					'A' + ch,
-					minV,
-					maxV,
-					(maxV - minV),
-					avg,
-					rms);
-			}
-
-			statsLabels[ch]->text = text;
-			statsLabels[ch]->color = getColor(ch);
-			float y = getTextY(done, textBoxHeight, 0.0f);
-			statsLabels[ch]->setPosition(Vec(0.0f, y));
-			statsLabels[ch]->setSize(Vec(box.getWidth(), textBoxHeight));
-			statsLabels[ch]->show();
-			drawText(args, text, 12, y+30, statsLabels[ch]->color);//TODO: 3
-			done++;
-		}
-	}
-
-	float getTextY(const int done, const float textBoxHeight, const float margin) const {
-		const float height = box.size.y;
-		switch (done) {
-			case 0: return margin;
-			case 1: return height - textBoxHeight + margin;
-			case 2: return textBoxHeight + margin;
-			case 3: return height - textBoxHeight * 2.0f + margin;
-			default: return height * 0.5f;
-		}
-	}
-};
-struct ScopeDisplay2 : FramebufferWidget {
-	Scope* module{};
-	ScopeCanvas* canvas;
-
-	ScopeDisplay2() {
-		canvas = new ScopeCanvas();
-		addChild(canvas);
-	}
-
-	void setModule(Scope* m) {
-		module = m;
-		canvas->module = m;
-	}
-
-	void onResize(const ResizeEvent& e) override {
-		FramebufferWidget::onResize(e);
-		canvas->setSize(getSize());
-	}
-
-	void step() override {
-		if (module) {
-			dirty = true;
-		}
-		FramebufferWidget::step();
-	}
-};
-
-
-
-
-
 
 
 
@@ -1966,17 +1654,10 @@ struct ScopeWidget : ModuleWidget {
 		float displayHeight_px = mm2px(80.0f);
 		float margin = mm2px(margin_mm);
 
-		/*
 		auto* display = createWidget<ScopeDisplay>(Vec(std::round(margin), std::round(margin)));
 		display->setSize(Vec(std::round(panelWidth_px - 2 * margin), std::round(displayHeight_px)));
 		display->module = module;
 		addChild(display);
-		*/
-
-		auto* display2 = createWidget<ScopeDisplay2>(Vec(std::round(margin), displayHeight_px+margin*2.0f));
-		display2->setSize(Vec(std::round(panelWidth_px - 2 * margin), std::round(displayHeight_px*0.25f)));
-		display2->setModule(module);
-		addChild(display2);
 
 		// Controls
 		float controlTop = margin + displayHeight_px;
