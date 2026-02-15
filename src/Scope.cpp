@@ -1333,7 +1333,7 @@ struct ScopeDisplay : OpaqueWidget {
 				}
 			}
 			float y = getTextY(done, textBoxHeight, textBoxHeight*0.5f);
-			std::vector<float> x = {0.0f, 1.0f/6.0f, 2.0f/6.0f, 3.0f/6.0f, 4.0f/6.0f, 5.0f/6.0f};
+			std::vector<float> x = {0.0f, box.size.x*1.0f/6.0f, box.size.x*2.0f/6.0f, box.size.x*3.0f/6.0f, box.size.x*4.0f/6.0f, box.size.x*5.0f/6.0f};
 			drawText(args,text,12.0f,y,x,getColor(ch));
 
 			done++;
