@@ -307,6 +307,15 @@ struct RoundButtonSmallAutinn : app::SvgSwitch {
 	}
 };
 
+struct RoundCVButtonSmallAutinn : app::SvgSwitch {
+	RoundCVButtonSmallAutinn() {
+		if (!pluginInstance) return;
+		momentary = true;
+		addFrame(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundCVButtonSmallAutinn.svg")));//up
+		addFrame(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundCVButtonSmallAutinnDown.svg")));//depressed state
+	}
+};
+
 /* px
 medium knob       38.0
 small knob        28.0

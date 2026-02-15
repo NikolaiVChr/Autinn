@@ -236,7 +236,7 @@ struct Scope : Module {
 		configButton(AUTO_TIME_PARAM, "Auto time");
 		configButton(STATS_PARAM, "Cycle stats");
 		for (int i = 0; i < 4; i++) {
-			configButton(CV_OR_AUDIO_PARAM+i, "Toggle CV or audio input (light on means CV)");
+			configButton(CV_OR_AUDIO_PARAM+i, "Toggle CV or audio input");
 		}
 
 		// inputs
@@ -261,7 +261,7 @@ struct Scope : Module {
 		configLight(AUTO_TIME_LIGHT, "Auto time");
 		configLight(TRIG_FOUND_LIGHT, "Trigger found");
 		for (int i = 0; i < 4; i++) {
-			configLight(CV_OR_AUDIO_LIGHT+i, "Light means channel input is CV.");
+			configLight(CV_OR_AUDIO_LIGHT+i, "Input is CV");
 		}
 
 		readControls();

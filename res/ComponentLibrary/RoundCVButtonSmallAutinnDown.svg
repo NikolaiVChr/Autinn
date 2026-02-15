@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="15"
+   height="15"
+   viewBox="0 0 3.9687502 3.9687501"
+   version="1.1"
+   id="svg3"
+   sodipodi:docname="RoundButtonSmallAutinnDown.svg"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="53.8"
+     inkscape:cx="7.5"
+     inkscape:cy="7.5"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3" />
+  <defs
+     id="defs2">
+    <linearGradient
+       id="gradDown"
+       gradientUnits="userSpaceOnUse"
+       x1="76.54"
+       y1="83.998"
+       x2="76.54"
+       y2="87.648">
+      <stop
+         offset="0"
+         stop-color="#909090"
+         stop-opacity="1"
+         id="stop1" />
+      <stop
+         offset="1"
+         stop-color="#c0c0c0"
+         stop-opacity="1"
+         id="stop2" />
+    </linearGradient>
+  </defs>
+  <g
+     transform="translate(-74.555601,-83.839162)"
+     id="g3">
+    <rect
+       fill="#707070"
+       stroke="#505050"
+       stroke-width="0.065"
+       width="3.903"
+       height="3.903"
+       x="74.588"
+       y="83.871"
+       ry="1.552"
+       id="rect2" />
+    <rect
+       fill="url(#gradDown)"
+       stroke="#606060"
+       stroke-width="0.061"
+       width="3.285"
+       height="3.285"
+       x="74.8975"
+       y="84.1805"
+       ry="1.3"
+       id="rect3" />
+  </g>
+  <path
+     style="font-weight:500;font-size:2.46944px;font-family:OldSansBlack;-inkscape-font-specification:'OldSansBlack Medium';fill:#333333;stroke-width:0.081"
+     d="m 1.7833505,2.6484568 q 0.070008,-0.050006 0.122015,-0.1260154 0.054007,-0.07601 0.098012,-0.1900235 L 1.7033406,2.2544084 q -0.022003,0.048006 -0.046005,0.088011 -0.024003,0.040005 -0.054006,0.070008 -0.030004,0.028004 -0.072009,0.044006 -0.040005,0.016002 -0.098012,0.016002 -0.1480182,0 -0.2120262,-0.1180146 -0.070008,-0.122015 -0.070008,-0.3600443 0,-0.044006 0.002,-0.098012 0.00401,-0.054006 0.014001,-0.1080134 0.010001,-0.056007 0.028003,-0.1080134 0.020003,-0.052007 0.050006,-0.092011 0.030004,-0.042005 0.074009,-0.066009 0.046005,-0.026004 0.1060132,-0.026004 0.1040127,0 0.1600197,0.060007 0.056007,0.060007 0.088011,0.1520188 L 1.9653731,1.6383324 Q 1.9273682,1.5083164 1.8753618,1.4283065 1.8253556,1.3462964 1.7553471,1.3042912 1.61733,1.2202809 1.4353076,1.2202809 q -0.1680207,0 -0.2840351,0.064008 -0.1160143,0.064008 -0.18802314,0.1720212 -0.0700083,0.1060131 -0.10201254,0.24403 -0.030004,0.138017 -0.030004,0.284035 0,0.1480182 0.030004,0.2860352 0.0320039,0.1360168 0.10201254,0.2440301 0.0700083,0.106013 0.18602294,0.1700209 0.1160143,0.064008 0.284035,0.064008 0.2120262,0 0.3500432,-0.1000125 z m 0.9581181,0.08001 0.3960488,-1.4881833 H 2.8174779 L 2.5654468,2.2424068 2.3254173,1.2402834 H 2.0073781 l 0.3940485,1.4881833 z"
+     id="text3"
+     aria-label="CV" />
+</svg>
