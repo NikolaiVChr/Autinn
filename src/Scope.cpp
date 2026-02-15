@@ -1657,11 +1657,12 @@ struct ScopeCanvas : TransparentWidget {
     void draw(const DrawArgs& args) override {
         nvgBeginPath(args.vg);
         nvgRect(args.vg, 0, 0, box.size.x, box.size.y);
-        nvgFillColor(args.vg, nvgRGB(20, 20, 20));
+        nvgFillColor(args.vg, nvgRGB(100, 100, 100));
         nvgFill(args.vg);
         if (module) {
             drawStats(args);
         }
+		TransparentWidget::draw(args);
     }
 
 	void drawStats(const DrawArgs& args) {
@@ -1782,7 +1783,7 @@ struct ScopeCanvas : TransparentWidget {
 	}
 };
 struct ScopeDisplay2 : FramebufferWidget {
-	Scope* module;
+	Scope* module{};
 	ScopeCanvas* canvas;
 
 	ScopeDisplay2() {
@@ -1972,7 +1973,7 @@ struct ScopeWidget : ModuleWidget {
 
 		auto* display2 = createWidget<ScopeDisplay2>(Vec(std::round(margin), displayHeight_px+margin*2.0f));
 		display2->setSize(Vec(std::round(panelWidth_px - 2 * margin), std::round(displayHeight_px*0.25f)));
-		display2->module = module;
+		display2->setModule(module);
 		addChild(display2);
 
 		// Controls
