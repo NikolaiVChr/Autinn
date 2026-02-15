@@ -124,7 +124,10 @@ struct Melody : Module {
 	bool only1step = false;
 	/// @brief Next phrase note glide bools.
 	std::vector<bool> nextPhraseGlides[16] = {};
-
+	/// @brief When true, then after generating a new phrase it will be started immediately.
+	bool immediate = false;
+	/// @brief When true, then generated new phrase this step.
+	bool generated[16] = {};
 	/// @brief Current phrase index in #phrase where we are currently playing
 	int phrase_index[16] = {};
 	/// @brief Schmitt trigger state for detecting the rising edge of the external clock input.
@@ -156,7 +159,8 @@ struct Melody : Module {
 	/// @brief State tracking for the "Generate" button/input to detect rising edges.
 	/// Prevents the generator from triggering continuously while the button is held.
 	//bool generate_prev = false;
-	dsp::SchmittTrigger generateTrigger;
+	dsp::SchmittTrigger generateTriggerCV[16] = {};
+	dsp::BooleanTrigger generateTriggerButton;
 	/// @brief Low-priority counter for throttling expensive parameter updates.
 	/// Parameter `attenuvert` calculations only run when this reaches 512.
 	long int stepCounter = 0;
@@ -246,6 +250,7 @@ struct Melody : Module {
 
 		json_object_set_new(root, "gateOnWhenGliding", json_boolean(gateOnWhenGliding));
 		json_object_set_new(root, "only1stepBeforeGlide", json_boolean(only1step));
+		json_object_set_new(root, "immediate", json_boolean(immediate));
 
 		json_t *voicesJ = json_array();
 
@@ -301,6 +306,12 @@ struct Melody : Module {
 			only1step = json_boolean_value(only1);
 		else
 			only1step = false;
+
+		json_t *imme = json_object_get(root, "immediate");
+		if (imme)
+			immediate = json_boolean_value(imme);
+		else
+			immediate = false;
 
 		if (voicesJ) {
 			for (int c = 0; c < 16; c++) {
@@ -469,6 +480,7 @@ struct Melody : Module {
 	void attenuvertFloat(int CV, int KNOB, float min_result, float max_result);
 
 	void onReset(const ResetEvent& e) override {
+		immediate = false;
 		Module::onReset(e);
 		initialize_melodies();
 	}
@@ -486,6 +498,7 @@ void Melody::switch_to_next_phrase(int c) {
 	//start = 10.0f;
 	startPulse[c].trigger(); // 1ms pulse
 	phrase_index[c] = 0;
+	bool newPhraseStarted = false;
 	if(!nextPhrase[c].empty()) {
 		//newStart = 10.0f;
 		newPhrasePulse[c].trigger(); // 1ms pulse
@@ -505,9 +518,13 @@ void Melody::switch_to_next_phrase(int c) {
 
 		nextPhrase[c].resize(0);
 		gap[c] = nextGap[c];
+		newPhraseStarted = true;
 	}
-	if (rest_amount[c] > 0) {
+	if (rest_amount[c] > 0 && !(newPhraseStarted && immediate)) {
+		// now we start the rest stage. We set the countdown:
 		resting[c] = rest_amount[c];
+	} else if (newPhraseStarted && immediate) {
+		resting[c] = 0;
 	}
 }
 
@@ -546,25 +563,45 @@ void Melody::process(const ProcessArgs &args) {
 		this->attenuvertFloat(CV_GAP_INPUT, GAP_PARAM, 0, 3);
 	}
 
-	/*
-	bool generate = params[BUTTON_GENERATE_PARAM].getValue() >= 1.0f || inputs[GENERATE_INPUT].getVoltage() >= 1.0f;
-	if (generate && !generate_prev) {
-		for(int c = 0; c < active_voices; c++) {
-			this->generateMelody(c);
+	int genInCh = inputs[GENERATE_INPUT].getChannels();
+	bool generateButton = generateTriggerButton.process(params[BUTTON_GENERATE_PARAM].getValue() > 0.5f);
+	for(int c = 0; c < active_voices; c++) {
+		bool generateCV = false;
+		if (genInCh > c) {
+			generateCV = generateTriggerCV[c].process(inputs[GENERATE_INPUT].getPolyVoltage(c));
+		} else if (c > 0) {
+			// bit of a hack..
+			generateCV = generated[0];
 		}
-	}
-	generate_prev = generate;
-	*/
-	if (generateTrigger.process(params[BUTTON_GENERATE_PARAM].getValue() + inputs[GENERATE_INPUT].getVoltage())) {
-		for(int c = 0; c < active_voices; c++) {
+		if (generateCV || generateButton) {
 			this->generateMelody(c);
+			generated[c] = true;
+		} else {
+			generated[c] = false;
 		}
 	}
 
+	bool clockPulse0 = false;
 	for (int c = 0; c < active_voices; c++) {
-		int clock_idx = (clock_channels > 1) ? c : 0;
+		bool clockPulse;
+		if (c > 0) {
+			if (clock_channels > c)
+				clockPulse = clockTrigger[c].process(inputs[CLOCK_INPUT].getPolyVoltage(c));
+			else
+				clockPulse = clockPulse0;
+		} else {
+			clockPulse = clockTrigger[c].process(inputs[CLOCK_INPUT].getPolyVoltage(0));
+			clockPulse0 = clockPulse;
+		}
 
-		if (clockTrigger[c].process(inputs[CLOCK_INPUT].getPolyVoltage(clock_idx))) {
+		if (generated[c] && immediate) {
+			// we pretend the generation was accompanied by a clock pulse
+			passedClocks[c] = 0;// reset clock index
+			resting[c] = 0;// skip resting
+			switch_to_next_phrase(c);// this will set phrase_index to 0
+			frameCount_last[c] = frameCount[c];
+			frameCount[c] = 0;
+		} else if (clockPulse) {
 			if (resting[c] == 0) {
 				// we are not in rest inbetween phrases
 				passedClocks[c]++;// increment clock index
@@ -637,8 +674,6 @@ void Melody::process(const ProcessArgs &args) {
 		} else {
 			outputs[GATE_OUTPUT].setVoltage(10.0f, c);
 		}
-
-		//clockExt_prev[c] = clockExt;
 	}
 }
 
@@ -951,6 +986,23 @@ struct MelodyWidget : ModuleWidget {
 		}
 	};
 
+	struct ImmediateItem : MenuItem {
+		Melody* _module;
+
+		ImmediateItem(Melody* module, const char* label)
+		: _module(module) {
+			this->text = label;
+		}
+
+		void onAction(const event::Action& e) override {
+			_module->immediate = !_module->immediate;
+		}
+		void step() override {
+			rightText = (_module->immediate) ? "✔" : "";
+			MenuItem::step();
+		}
+	};
+
 	void appendContextMenu(Menu* menu) override {
 		auto* a = dynamic_cast<Melody*>(module);
 		assert(a);
@@ -958,6 +1010,7 @@ struct MelodyWidget : ModuleWidget {
 		menu->addChild(new MenuLabel());
 		menu->addChild(new GlideGateItem(a, "Glides keeps gate open"));
 		menu->addChild(new GlideOldItem(a, "Only 1-step before glides"));
+		menu->addChild(new ImmediateItem(a, "Generate is immediately"));
 	}
 };
 
