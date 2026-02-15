@@ -1341,9 +1341,9 @@ struct ScopeDisplay : TransparentWidget {
 
 			statsLabels[ch]->text = text;
 			statsLabels[ch]->color = getColor(ch);
-			statsLabels[ch]->box.pos = Vec(0.0f, getTextY(done, textBoxHeight, 0.0f));
-			statsLabels[ch]->box.size = Vec(box.getWidth(), textBoxHeight);
-			statsLabels[ch]->visible = true;
+			statsLabels[ch]->setPosition(Vec(0.0f, getTextY(done, textBoxHeight, 0.0f)));
+			statsLabels[ch]->setSize(Vec(box.getWidth(), textBoxHeight));
+			statsLabels[ch]->show();
 			done++;
 		}
 	}
