@@ -805,7 +805,7 @@ struct ScopeDisplay : OpaqueWidget {
 		nvgBeginPath(args.vg);
 		nvgFillColor(args.vg, color);
 
-		for (int i = 0; i < x.size() ; i++) {
+		for (int i = 0; i < text.size() ; i++) {
 			nvgText(args.vg, x[i], y, text[i].c_str(), nullptr);
 		}
 	}
@@ -1317,6 +1317,7 @@ struct ScopeDisplay : OpaqueWidget {
 			std::string t4 = string::f("AVG: %+6.2f RMS: %5.2f", avg, rms);
 			text.push_back(t4);
 
+			std::vector<float> x;
 			if (ch == module->trigSource) {
 				std::string triggerStatus = module->frozen?"FROZEN"
 						:(module->trigFoundTimer > 0.0f?"TRIGGER"
@@ -1331,9 +1332,12 @@ struct ScopeDisplay : OpaqueWidget {
 				} else {
 					text.emplace_back("");
 				}
+				x = {0.0f, box.size.x*1.0f/6.0f, box.size.x*2.0f/6.0f, box.size.x*2.8f/6.0f, box.size.x*4.4f/6.0f, box.size.x*5.0f/6.0f};
+			} else {
+				x = {0.0f, box.size.x*1.0f/6.0f, box.size.x*2.0f/6.0f, box.size.x*2.8f/6.0f};
 			}
 			float y = getTextY(done, textBoxHeight, textBoxHeight*0.5f);
-			std::vector<float> x = {0.0f, box.size.x*1.0f/6.0f, box.size.x*2.0f/6.0f, box.size.x*3.0f/6.0f, box.size.x*4.0f/6.0f, box.size.x*5.0f/6.0f};
+
 			drawText(args,text,12.0f,y,x,getColor(ch));
 
 			done++;
