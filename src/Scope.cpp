@@ -44,7 +44,11 @@ static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 1600
 static constexpr float STROKE_WAVE = 1.0f;
 static constexpr float STROKE_SCANLINE = 1.0f;
 static constexpr float STROKE_XY = 1.0f;
+static constexpr float STROKE_TRIGGER = 0.8f;
+static constexpr float STROKE_TRIGGER_ALPHA = 0.75f;
 static constexpr float FONTSIZE_STATS = 12.0f;
+static constexpr float FONTSIZE_TRIGGER = 12.0f;
+static const NVGcolor colorLabels = nvgRGBA(0, 0, 0, 128);  // black, transparent
 static const NVGcolor color0 = nvgRGBA(255, 230, 50, 230);  // Yellow
 static const NVGcolor color1 = nvgRGBA(255, 50, 50, 230);   // Red
 static const NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
@@ -1215,9 +1219,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 	void draw(const DrawArgs& args) override {
 		drawGrid(args);
-		drawStats(args);
-		drawTrigger(args);
-		Widget::draw(args); //to make label appear by drawing children
+		//Widget::draw(args); // draw children
 	}
 
 	void drawLayer(const DrawArgs& args, const int layer) override {
@@ -1232,6 +1234,8 @@ struct ScopeDisplay : OpaqueWidget {
 						drawWaveform(args, c);
 					}
 				}
+				drawStats(args);
+				drawTrigger(args);
 				nvgRestore(args.vg);
 			} else {
 				drawStaticWaveform(args);
@@ -1299,7 +1303,7 @@ struct ScopeDisplay : OpaqueWidget {
 			float textY = getTextY(done, textBoxHeight, 0.0f);
 			nvgBeginPath(args.vg);
 			nvgRoundedRect(args.vg, 0, textY, box.size.x, textBoxHeight, 0.0f);
-			nvgFillColor(args.vg, nvgRGBA(0, 0, 0, 128));
+			nvgFillColor(args.vg, colorLabels);
 			nvgFill(args.vg);
 
 			// Text
@@ -1332,9 +1336,9 @@ struct ScopeDisplay : OpaqueWidget {
 				} else {
 					text.emplace_back("");
 				}
-				x = {0.0f, box.size.x*1.0f/6.0f, box.size.x*2.0f/6.0f, box.size.x*2.8f/6.0f, box.size.x*4.4f/6.0f, box.size.x*5.0f/6.0f};
+				x = {0.0f, box.size.x*1.025f*1.0f/6.0f, box.size.x*1.025f*2.0f/6.0f, box.size.x*1.025f*2.8f/6.0f, box.size.x*1.025f*4.4f/6.0f, box.size.x*1.025f*5.0f/6.0f};
 			} else {
-				x = {0.0f, box.size.x*1.0f/6.0f, box.size.x*2.0f/6.0f, box.size.x*2.8f/6.0f};
+				x = {0.0f, box.size.x*1.025f*1.0f/6.0f, box.size.x*1.025f*2.0f/6.0f, box.size.x*1.025f*2.8f/6.0f};
 			}
 			float y = getTextY(done, textBoxHeight, textBoxHeight*0.5f);
 
@@ -1393,8 +1397,8 @@ struct ScopeDisplay : OpaqueWidget {
 
 		// Line
 		auto color = getColor(ch);
-		color.a *= 0.5f;
-		drawDashedLine(args.vg, 0, y, box.size.x, y, 0.8f, color);
+		color.a *= STROKE_TRIGGER_ALPHA;
+		drawDashedLine(args.vg, 0, y, box.size.x, y, STROKE_TRIGGER, color);
 		/*
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, getColor(ch)); // Match Source Color
@@ -1405,7 +1409,7 @@ struct ScopeDisplay : OpaqueWidget {
 		*/
 
 		// Label
-		nvgFontSize(args.vg, 12.0f);
+		nvgFontSize(args.vg, FONTSIZE_TRIGGER);
 		nvgFillColor(args.vg, color);
 		nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_BOTTOM);
 
