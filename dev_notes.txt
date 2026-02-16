@@ -3,7 +3,7 @@ SVG artwork
 Autinn logo: font:Calligraph421 BT   color:ffd700
 Other text: font:oldsans color: ffffff size: 9pt
 Heading: font:oldsans color: ffffff size: 14pt
-Stripe: 16px wide. color #5e110a.
+Stripe: 16px/5.4mm wide. color #5e110a.
 Panel: color #202020. 128.5 mm height and HP x 5.08 mm width.
 Old panels use px unit. With 3.779527px per user unit.
 
@@ -11,7 +11,6 @@ Old panels use px unit. With 3.779527px per user unit.
 TODO
 ====
 Bass: Be able to trigger accent in middle of envelope.
-Fluencerator: Be able to trigger new phrase in middle of phrase playback.
 Apply oversampling only at lower sample-rates (like 44.1KHz) and auto reduce oversampling at higher rates.
 
 

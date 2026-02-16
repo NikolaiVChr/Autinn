@@ -27,9 +27,9 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      labelstyle="default"
-     inkscape:zoom="2.8756734"
-     inkscape:cx="430.50786"
-     inkscape:cy="346.52753"
+     inkscape:zoom="1.0167041"
+     inkscape:cx="402.28028"
+     inkscape:cy="186.38658"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
      inkscape:window-x="-8"
@@ -397,6 +397,11 @@
        id="text1338"
        style="font-weight:500;font-size:2.11667px;font-family:OldSansBlack;-inkscape-font-specification:'OldSansBlack, Medium';fill:#ffffff;stroke-width:0.4"
        aria-label="OFF" />
+    <path
+       style="display:inline;fill:none;fill-opacity:1;stroke:#5e110a;stroke-width:5.4;stroke-linecap:butt;stroke-dasharray:none;stroke-opacity:1"
+       d="m 153.4684,-16.561338 c 19.73503,69.648493 5.2015,57.1733 10.30484,85.382898 0.74155,4.099051 2.98783,7.979622 2.94423,12.144981 -0.0452,4.314422 -1.9719,8.411826 -3.31226,12.513011 -1.88248,5.759961 -5.99594,10.902278 -6.62454,16.929368 -0.77407,7.42187 3.6803,22.08178 3.6803,22.08178"
+       id="path1338"
+       sodipodi:nodetypes="caaaac" />
   </g>
   <g
      inkscape:groupmode="layer"
