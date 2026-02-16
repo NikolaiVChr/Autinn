@@ -39,8 +39,7 @@ static constexpr float TRIG_FOUND_TIMER = 0.1f;
 static constexpr float WAVEFORM_SAMPLES_PER_PX = 64.0f;
 static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
-static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable average/RMS, but we allow
-static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
+static constexpr int STATS_DECIMATION_THRESHOLD = 24000;//   scanning up to 16000 before we bother optimizing.
 static constexpr float STROKE_WAVE = 0.8f;
 static constexpr float PX_WAVE = 0.5f;
 static constexpr float STROKE_SCANLINE = 1.0f;
@@ -1454,7 +1453,7 @@ struct ScopeDisplay : OpaqueWidget {
 			int count = 0;
 
 			int step = 1;
-			if (samplesToScan > STATS_DECIMATION_THRESHOLD) step = samplesToScan / STATS_SAMPLE_DECIMATION_COUNT;
+			if (samplesToScan > STATS_DECIMATION_THRESHOLD) step = (int)std::ceil(float(samplesToScan) / STATS_DECIMATION_THRESHOLD);
 
 			for (int i = 0; i < samplesToScan; i += step) {
 				const int idx = (startIndex + i) & BUFFER_MASK;
