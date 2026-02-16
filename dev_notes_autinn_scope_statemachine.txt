@@ -1,0 +1,128 @@
+Autinn Scope State-machine
+==========================
+
+This overview is to prevent that I lose track of how fields behave in states.
+It also prevent me from forgetting how each state is expected to behave.
+It does not cover: some fields that govern how to switch between states, freezePending, auto-time fields,
+                   buffer fields, light states, control states, triggering fields.
+
+AUTO SCANNING (LIVE ROLLING)
+Visuals = live rolling waveforms
+frozen = false
+samplesSinceTrigger = garbage
+recording = false
+holdoffTime_s = 0.0f
+autoTrigTimer_s = time since last fake trigger
+triggerValid = false
+prev_triggerValid = false
+
+AUTO RECORDING
+Visuals = waveforms since trigger (left) | waveforms since prev_trigger (right)
+frozen = false
+samplesSinceTrigger = useful
+recording = true
+holdoffTime_s = 0.0f
+autoTrigTimer_s = garbage
+triggerValid = true
+prev_triggerValid = maybe
+
+AUTO HOLDOFF
+Visuals = waveforms since trigger
+frozen = false
+samplesSinceTrigger = garbage
+recording = false
+holdoffTime_s > 0.0f
+autoTrigTimer_s = garbage
+triggerValid = true
+prev_triggerValid = maybe
+
+NORM RECORDING
+Visuals = waveforms since trigger (left) | empty (right)
+frozen = false
+samplesSinceTrigger = useful
+recording = true
+holdoffTime_s = 0.0f
+autoTrigTimer_s = garbage
+triggerValid = true
+prev_triggerValid = maybe
+
+NORM HOLDOFF
+Visuals = waveforms since trigger
+frozen = false
+samplesSinceTrigger = garbage
+recording = false
+holdoffTime_s > 0.0f
+autoTrigTimer_s = garbage
+triggerValid = true
+prev_triggerValid = maybe
+
+NORM SCANNING
+Visuals = waveforms since trigger (but old)
+frozen = false
+samplesSinceTrigger = garbage
+recording = false
+holdoffTime_s = 0.0f
+autoTrigTimer_s = garbage
+triggerValid = maybe
+prev_triggerValid = maybe
+
+SINGLE RECORDING
+Visuals = waveforms since trigger (left) | empty (right)
+frozen = false
+samplesSinceTrigger = useful
+recording = true
+holdoffTime_s = 0.0f
+autoTrigTimer_s = garbage
+triggerValid = true
+prev_triggerValid = maybe
+
+SINGLE SCANNING
+Visuals = waveforms since trigger (but old)
+frozen = false
+samplesSinceTrigger = garbage
+recording = false
+holdoffTime_s = 0.0f
+autoTrigTimer_s = garbage
+triggerValid = maybe
+prev_triggerValid = maybe
+
+X-Y ROLLING
+Visuals = live rolling waveforms
+frozen = false
+samplesSinceTrigger = garbage
+recording = false
+holdoffTime_s = 0.0f
+autoTrigTimer_s = time since last fake trigger
+triggerValid = false
+prev_triggerValid = false
+
+X-Y RECORDING
+Visuals = waveforms since between prev_trigger and trigger
+frozen = false
+samplesSinceTrigger = useful
+recording = true
+holdoffTime_s = 0.0f
+autoTrigTimer_s = garbage
+triggerValid = true
+prev_triggerValid = maybe
+
+X-Y HOLDOFF
+Visuals = waveforms since trigger
+frozen = false
+samplesSinceTrigger = garbage
+recording = false
+holdoffTime_s > 0.0f
+autoTrigTimer_s = garbage
+triggerValid = true
+prev_triggerValid = maybe
+
+FROZEN
+Visuals = waveforms since last trigger or last fake trigger. Or in X_Y, whatever was drawn before freeze.
+frozen = true
+samplesSinceTrigger = garbage
+recording = garbage
+holdoffTime_s = garbage
+autoTrigTimer_s = garbage
+triggerValid = maybe
+prev_triggerValid = maybe
+holdoffTime_s = garbage
