@@ -49,10 +49,10 @@ static constexpr float STROKE_TRIGGER_ALPHA = 0.75f;
 static constexpr float FONTSIZE_STATS = 12.0f;
 static constexpr float FONTSIZE_TRIGGER = 12.0f;
 static const NVGcolor colorLabels = nvgRGBA(0, 0, 0, 160);  // black, transparent
-static const NVGcolor color0 = nvgRGBA(255, 230, 50, 230);  // Yellow
-static const NVGcolor color1 = nvgRGBA(255, 50, 50, 230);   // Red
-static const NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
-static const NVGcolor color3 = nvgRGBA(50, 150, 255, 230);  // Blue
+static const NVGcolor color0 = nvgRGBA(255, 230, 50, 128);  // Yellow
+static const NVGcolor color1 = nvgRGBA(255, 50, 50, 128);   // Red
+static const NVGcolor color2 = nvgRGBA(50, 255, 50, 128);    // Green
+static const NVGcolor color3 = nvgRGBA(50, 150, 255, 128);  // Blue
 static const NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
 static const NVGcolor colorScanLine = nvgRGBA(255, 255, 255, 90);// faint white
 static const NVGcolor colorXY1 = nvgRGBA(100, 255, 200, 200);//cyan
@@ -895,8 +895,6 @@ struct ScopeDisplay : OpaqueWidget {
 		float offset = module->offset[ch];
 		float timePerDiv_s = module->getTimeDiv();
 
-		const NVGcolor color = getColor(ch);
-
 
 		const float width_px = box.size.x;
 		const float totalTime_s = DIVS_HORIZ * timePerDiv_s;
@@ -925,6 +923,7 @@ struct ScopeDisplay : OpaqueWidget {
 		bool zoomedOut = samplesPerPixel > aliasingThreshold && !module->cvMode[ch];
 
 		nvgBeginPath(args.vg);
+		const NVGcolor color = getColor(ch);
 		nvgStrokeColor(args.vg, color);
 
 		int iteratorStep = 1;
@@ -981,8 +980,9 @@ struct ScopeDisplay : OpaqueWidget {
 
 		if (zoomedOut) {
 			nvgLineCap(args.vg, NVG_BUTT);
-			nvgLineJoin(args.vg, NVG_MITER);// NVG_ROUND, NVG_BEVEL, NVG_MITER
-			nvgStrokeWidth(args.vg, STROKE_WAVE);
+			nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND, NVG_BEVEL, NVG_MITER
+			nvgStrokeWidth(args.vg, STROKE_WAVE*1.1f);
+			nvgGlobalCompositeOperation(args.vg, NVG_LIGHTER);
 			bool wasNewData = true;
 			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
