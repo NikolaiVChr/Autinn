@@ -41,18 +41,22 @@ static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
 static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable average/RMS, but we allow
 static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
-static constexpr float STROKE_WAVE = 1.0f;
+static constexpr float STROKE_WAVE = 0.8f;
+static constexpr float PX_WAVE = 0.5f;
 static constexpr float STROKE_SCANLINE = 1.0f;
 static constexpr float STROKE_XY = 1.0f;
 static constexpr float STROKE_TRIGGER = 0.8f;
 static constexpr float STROKE_TRIGGER_ALPHA = 0.75f;
 static constexpr float FONTSIZE_STATS = 12.0f;
 static constexpr float FONTSIZE_TRIGGER = 12.0f;
+static constexpr NVGlineCap LINEJOIN_WAVE_ZOOM_OUT = NVG_BEVEL;// NVG_ROUND, NVG_BEVEL, NVG_MITER
+static constexpr NVGlineCap LINECAP_WAVE_ZOOM_OUT = NVG_BUTT;// NVG_BUTT, NVG_SQUARE, NVG_ROUND
+static constexpr int ALPHA_WAVE = 220;
 static const NVGcolor colorLabels = nvgRGBA(0, 0, 0, 160);  // black, transparent
-static const NVGcolor color0 = nvgRGBA(255, 230, 50, 128);  // Yellow
-static const NVGcolor color1 = nvgRGBA(255, 50, 50, 128);   // Red
-static const NVGcolor color2 = nvgRGBA(50, 255, 50, 128);    // Green
-static const NVGcolor color3 = nvgRGBA(50, 150, 255, 128);  // Blue
+static const NVGcolor color0 = nvgRGBA(255, 230, 50, ALPHA_WAVE);  // Yellow
+static const NVGcolor color1 = nvgRGBA(255, 50, 50, ALPHA_WAVE);   // Red
+static const NVGcolor color2 = nvgRGBA(50, 255, 50, ALPHA_WAVE);    // Green
+static const NVGcolor color3 = nvgRGBA(50, 150, 255, ALPHA_WAVE);  // Blue
 static const NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
 static const NVGcolor colorScanLine = nvgRGBA(255, 255, 255, 90);// faint white
 static const NVGcolor colorXY1 = nvgRGBA(100, 255, 200, 200);//cyan
@@ -896,7 +900,7 @@ struct ScopeDisplay : OpaqueWidget {
 		float timePerDiv_s = module->getTimeDiv();
 
 
-		const float width_px = box.size.x;
+		const float width_px = box.size.x/PX_WAVE;
 		const float totalTime_s = DIVS_HORIZ * timePerDiv_s;
 		const float samplesToDraw = totalTime_s * module->sampleRate;
 
@@ -979,10 +983,9 @@ struct ScopeDisplay : OpaqueWidget {
 		float lastY = 0.0f;
 
 		if (zoomedOut) {
-			nvgLineCap(args.vg, NVG_BUTT);
-			nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND, NVG_BEVEL, NVG_MITER
-			nvgStrokeWidth(args.vg, STROKE_WAVE*1.1f);
-			nvgGlobalCompositeOperation(args.vg, NVG_LIGHTER);
+			nvgLineCap(args.vg, LINECAP_WAVE_ZOOM_OUT);
+			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_OUT);
+			nvgStrokeWidth(args.vg, STROKE_WAVE);
 			bool wasNewData = true;
 			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
@@ -1067,7 +1070,7 @@ struct ScopeDisplay : OpaqueWidget {
 					yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
 					yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
-					auto px = float(curr_px);
+					auto px = float(curr_px)*PX_WAVE;
 					if (first|| (wasNewData && !isNewData)) {
 						nvgMoveTo(args.vg, px, yTop);
 						nvgLineTo(args.vg, px, yBottom);
@@ -1181,15 +1184,16 @@ struct ScopeDisplay : OpaqueWidget {
 				// clamp unseen.
 				y = clamp(y, -10000.0f, box.size.y+10000.0f);
 
+				float px = float(curr_px)*PX_WAVE;
 				if (first) {
-					nvgMoveTo(args.vg, curr_px, y);
+					nvgMoveTo(args.vg, px, y);
 					first = false;
 				} else {
 					if (wasNewData && !isNewData) {
 						// transition from new to old data
-						nvgMoveTo(args.vg, curr_px, y);
+						nvgMoveTo(args.vg, px, y);
 					} else {
-						nvgLineTo(args.vg, curr_px, y);
+						nvgLineTo(args.vg, px, y);
 					}
 				}
 				wasNewData = isNewData;
@@ -1201,8 +1205,8 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, colorScanLine); // Faint white
 			nvgStrokeWidth(args.vg, STROKE_SCANLINE);
-			nvgMoveTo(args.vg, (float)drawLimit_px, 0);
-			nvgLineTo(args.vg, (float)drawLimit_px, box.size.y);
+			nvgMoveTo(args.vg, (float)drawLimit_px*PX_WAVE, 0);
+			nvgLineTo(args.vg, (float)drawLimit_px*PX_WAVE, box.size.y);
 			nvgStroke(args.vg);
 		}
 	}
