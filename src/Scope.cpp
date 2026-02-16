@@ -1887,12 +1887,12 @@ struct ScopeWidget : ModuleWidget {
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTime, yRow2), module, Scope::AUTO_TIME_PARAM));
 		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTime - 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
 
-		// Stats
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec((xHoldoff+xTime)*0.5f, yRow2), module, Scope::DEBUG_1));
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec((xHoldoff+xTrigLevel)*0.5f, yRow2), module, Scope::DEBUG_2));
-
 		// Debug
-		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xHoldoff, yRow2), module, Scope::STATS_PARAM));
+		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec((xHoldoff+xTime)*0.5f, yRow2), module, Scope::DEBUG_1));
+		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec((xHoldoff+xTrigLevel)*0.5f, yRow2), module, Scope::DEBUG_2));
+
+		// Stats
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xHoldoff, yRow2), module, Scope::STATS_PARAM));
 
 		// Trig buttons (grid layout)
 		// source, mode
