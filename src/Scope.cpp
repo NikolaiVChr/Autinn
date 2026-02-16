@@ -1360,7 +1360,7 @@ struct ScopeDisplay : OpaqueWidget {
 			double spp = (totalTime * module->sampleRate) / width;
 
 			// Use %.10f to see tiny microscopic drifts
-			INFO("Width: %.10f | Knob: %.10f | SPP: %.10f", width, timeKnob, spp);
+			INFO("ID: %lld | Width: %.10f | Knob: %.10f | SPP: %.10f | Time/div: %.10f", module->getId(), width, timeKnob, spp, timePerDiv);
 		}
 	}
 
