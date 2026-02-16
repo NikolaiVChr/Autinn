@@ -800,6 +800,9 @@ struct ScopeDisplay : OpaqueWidget {
 	float lastTrigLevel = -999.0f;
 	float trigVisibilityTimer = 0.0f;
 
+	mutable int cachedIteratorStep = 1;
+	mutable float lastSamplesPerPixel = 0.0f;
+
 	const float column0 = 0.0f;
 	const float column1 = 0.975f*1.0f/6.0f;
 	const float column2 = 0.975f*2.0f/6.0f;
@@ -901,6 +904,17 @@ struct ScopeDisplay : OpaqueWidget {
 
 		if (samplesToDraw < 2.0f) return;
 
+		int idxWrite = module->writeIndex.load();
+		int idxTrigger = module->triggerIndex.load();
+		int idxLastTrig = module->lastTriggerIndex.load();
+		int sSinceTrig = module->samplesSinceTrigger.load();
+		bool idxValid = module->triggerValid.load();
+		bool idxLastValid = module->prev_triggerValid.load();
+		bool recording = module->recording.load();
+		//float hz = module->autoTimeFrequency_hz.load();
+		bool frozen = module->frozen.load();
+		int trigMode = module->trigMode.load();
+
 		const double samplesPerPixel = samplesToDraw / width_px;
 
 		// We calculate the number of samples in a single cycle of 20kHz (limit of human hearing).
@@ -922,17 +936,6 @@ struct ScopeDisplay : OpaqueWidget {
 			if (iteratorStep < 1) iteratorStep = 1;
 		}
 
-		int idxWrite = module->writeIndex.load();
-		int idxTrigger = module->triggerIndex.load();
-		int idxLastTrig = module->lastTriggerIndex.load();
-		int sSinceTrig = module->samplesSinceTrigger.load();
-		bool idxValid = module->triggerValid.load();
-		bool idxLastValid = module->prev_triggerValid.load();
-		bool recording = module->recording.load();
-		//float hz = module->autoTimeFrequency_hz.load();
-		bool frozen = module->frozen.load();
-		int trigMode = module->trigMode.load();
-
 		int idxAnchor = idxTrigger;
 
 		int drawLimit_px = int(width_px)+1;
@@ -948,6 +951,25 @@ struct ScopeDisplay : OpaqueWidget {
 			// Calculate where the screen starts relative to the write head
 			idxAnchor = (idxWrite - int(samplesToDraw)) & BUFFER_MASK;
 		}
+
+		// update the quality setting?
+		// If we are not recording (rolling/Scanning), we update continuously so the UI is responsive.
+		// If we are recording, we only update at the very start of the sweep (first ~2 pixels).
+		// This guarantees the entire scanline uses the same decimation factor.
+		bool startOfScan = sSinceTrig < (samplesPerPixel * 2.0);
+		bool shouldUpdate = !recording || startOfScan;
+
+		// Only update the cached step if the zoom changed by > 1%
+		// This filters out floating point jitter and keeps the peaks from flickering due to varying decimation.
+		float changeRatio = std::abs((float)samplesPerPixel - lastSamplesPerPixel) / (lastSamplesPerPixel + 0.001f);
+		if (shouldUpdate || changeRatio > 0.01f || iteratorStep == 1) {
+			// User moved the knob significantly, update decimation amount
+			cachedIteratorStep = iteratorStep;
+			lastSamplesPerPixel = (float)samplesPerPixel;
+		}
+
+		// Use the stable cached value, to avoid varying decimation from display frame to frame make peaks flicker.
+		iteratorStep = cachedIteratorStep;
 
 		bool first = true;
 		float lastY = 0.0f;
@@ -1107,6 +1129,10 @@ struct ScopeDisplay : OpaqueWidget {
 				int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
 
 				if (!isNewData) {
+					// We are drawing the old waveform (history).
+					// However, the new waveform is actively writing into the buffer at 'idxTrigger'.
+					// We must check if our read pointer has wrapped around and collided with the new data.
+
 					// Distance from new trigger to this readIndex
 					int distFromNew = (readIndex - idxTrigger) & BUFFER_MASK;
 
@@ -1115,6 +1141,9 @@ struct ScopeDisplay : OpaqueWidget {
 						// distFromNew is small and positive, it means this old pixel
 						// is wrapped in the buffer. As in, we have drawn the entire buffer
 						// and if we continue, we will be repeating data.
+
+						// in other words: this memory no longer holds old data. It holds new data.
+						// Stop drawing the old trace so we don't display the new trace twice.
 						break;
 					}
 				}
