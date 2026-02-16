@@ -981,7 +981,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 		if (zoomedOut) {
 			nvgLineCap(args.vg, NVG_BUTT);
-			nvgLineJoin(args.vg, NVG_ROUND);
+			nvgLineJoin(args.vg, NVG_MITER);// NVG_ROUND, NVG_BEVEL, NVG_MITER
 			nvgStrokeWidth(args.vg, STROKE_WAVE);
 			bool wasNewData = true;
 			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
