@@ -801,7 +801,7 @@ struct ScopeDisplay : OpaqueWidget {
 	float trigVisibilityTimer = 0.0f;
 
 	mutable int cachedIteratorStep = 1;
-	mutable float lastSamplesPerPixel = 0.0f;
+	mutable double lastSamplesPerPixel = 0.0f;
 
 	const float column0 = 0.0f;
 	const float column1 = 0.975f*1.0f/6.0f;
@@ -915,7 +915,7 @@ struct ScopeDisplay : OpaqueWidget {
 		bool frozen = module->frozen.load();
 		int trigMode = module->trigMode.load();
 
-		const double samplesPerPixel = samplesToDraw / width_px;
+		double samplesPerPixel = samplesToDraw / width_px;
 
 		// We calculate the number of samples in a single cycle of 20kHz (limit of human hearing).
 		// If a pixel covers less time than this, we draw smooth vector lines (preserves shape).
@@ -961,14 +961,21 @@ struct ScopeDisplay : OpaqueWidget {
 
 		// Only update the cached step if the zoom changed by > 1%
 		// This filters out floating point jitter and keeps the peaks from flickering due to varying decimation.
-		float changeRatio = std::abs((float)samplesPerPixel - lastSamplesPerPixel) / (lastSamplesPerPixel + 0.001f);
-		if (shouldUpdate || changeRatio > 0.01f || iteratorStep == 1) {
+		auto changeRatio = 1.0f;
+		if (lastSamplesPerPixel > 0.0) {
+			changeRatio = static_cast<float>(std::abs(samplesPerPixel - lastSamplesPerPixel) / lastSamplesPerPixel);
+		}
+		if (shouldUpdate || changeRatio > 0.001f || iteratorStep == 1) {
 			// User moved the knob significantly, update decimation amount
 			cachedIteratorStep = iteratorStep;
-			lastSamplesPerPixel = (float)samplesPerPixel;
+			lastSamplesPerPixel = samplesPerPixel;
 		}
 
 		// Use the stable cached value, to avoid varying decimation from display frame to frame make peaks flicker.
+		// If we use samplesPerPixel here, the signal jitters. We must use the cached value.
+		if (lastSamplesPerPixel > 0.0f) {
+			samplesPerPixel = lastSamplesPerPixel;
+		}
 		iteratorStep = cachedIteratorStep;
 
 		bool first = true;
@@ -1351,6 +1358,9 @@ struct ScopeDisplay : OpaqueWidget {
 		frame++;
 		if (frame > 60) frame = 0;
 
+		/*
+		 debug code for jitter of waveforms. Turns out autotime was the reason, it micro adjusted the freq
+		 during recording.
 		if (frame == 0 && module) {
 			float width = box.size.x;
 			float timeKnob = module->params[Scope::TIME_PARAM].getValue();
@@ -1362,6 +1372,7 @@ struct ScopeDisplay : OpaqueWidget {
 			// Use %.10f to see tiny microscopic drifts
 			INFO("ID: %lld | Width: %.10f | Knob: %.10f | SPP: %.10f | Time/div: %.10f", module->getId(), width, timeKnob, spp, timePerDiv);
 		}
+		*/
 	}
 
 	void drawStats(const DrawArgs& args) const {
