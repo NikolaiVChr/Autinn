@@ -41,7 +41,7 @@ static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
 static constexpr int STATS_SAMPLE_DECIMATION_COUNT = 4000;// 4000 checks is enough to get a stable average/RMS, but we allow
 static constexpr int STATS_DECIMATION_THRESHOLD = 16000;//   scanning up to 16000 before we bother optimizing.
-static constexpr float STROKE_WAVE = 0.5f;
+static constexpr float STROKE_WAVE = 0.8f;
 static constexpr float PX_WAVE = 0.5f;
 static constexpr float STROKE_SCANLINE = 1.0f;
 static constexpr float STROKE_XY = 1.0f;
@@ -271,8 +271,8 @@ struct Scope : Module {
 			configLight(CV_OR_AUDIO_LIGHT+i, "Input is CV");
 		}
 
-		configParam(DEBUG_1, 0.1f, 2.0f, 1.0f, "DEBUG STROKE", " px");
-		configParam(DEBUG_2, 0.1f, 2.0f, 1.0f, "DEBUG STEP", " px");
+		configParam(DEBUG_1, 0.1f, 2.0f, STROKE_WAVE, "DEBUG STROKE", " px");
+		configParam(DEBUG_2, 100.0f, 255.0f, ALPHA_WAVE, "DEBUG ALPHA", " ");
 
 		readControls();
 	}
@@ -904,8 +904,11 @@ struct ScopeDisplay : OpaqueWidget {
 		float offset = module->offset[ch];
 		float timePerDiv_s = module->getTimeDiv();
 
+		float STROKE_WAVE_ = module->params[Scope::DEBUG_1].getValue();
+		float PX_WAVE_ = PX_WAVE;
+		float ALPHA_ = module->params[Scope::DEBUG_2].getValue();
 
-		const float width_px = box.size.x/PX_WAVE;
+		const float width_px = box.size.x/PX_WAVE_;
 		const float totalTime_s = DIVS_HORIZ * timePerDiv_s;
 		const float samplesToDraw = totalTime_s * module->sampleRate;
 
@@ -922,8 +925,6 @@ struct ScopeDisplay : OpaqueWidget {
 		bool frozen = module->frozen.load();
 		int trigMode = module->trigMode.load();
 
-		float STROKE_WAVE_ = module->params[Scope::DEBUG_1].getValue();
-		float PX_WAVE_ = module->params[Scope::DEBUG_2].getValue();
 
 		double samplesPerPixel = samplesToDraw / width_px;
 
@@ -936,6 +937,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 		nvgBeginPath(args.vg);
 		const NVGcolor color = getColor(ch);
+		const NVGcolor colorDebug = nvgRGBAf(color.r,color.g,color.b,ALPHA_/255.0f);
 		nvgStrokeColor(args.vg, color);
 
 		int iteratorStep = 1;
