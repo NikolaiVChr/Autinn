@@ -48,7 +48,7 @@ static constexpr float STROKE_TRIGGER = 0.8f;
 static constexpr float STROKE_TRIGGER_ALPHA = 0.75f;
 static constexpr float FONTSIZE_STATS = 12.0f;
 static constexpr float FONTSIZE_TRIGGER = 12.0f;
-static const NVGcolor colorLabels = nvgRGBA(0, 0, 0, 128);  // black, transparent
+static const NVGcolor colorLabels = nvgRGBA(0, 0, 0, 160);  // black, transparent
 static const NVGcolor color0 = nvgRGBA(255, 230, 50, 230);  // Yellow
 static const NVGcolor color1 = nvgRGBA(255, 50, 50, 230);   // Red
 static const NVGcolor color2 = nvgRGBA(50, 255, 50, 230);    // Green
@@ -186,7 +186,7 @@ struct Scope : Module {
 	// persisted
 	bool autoTimeMode = false;
 	int trigSource = 0; // 0-3: Channel, 4: Ext
-	int trigMode = TRIG_MODE_AUTO;
+	std::atomic<int> trigMode = {TRIG_MODE_AUTO};
 	bool trigEdge = TRIG_EDGE_RISE;
 	bool showBaselines = false;
 	bool showCenterline = false;
@@ -906,7 +906,7 @@ struct ScopeDisplay : OpaqueWidget {
 		// We calculate the number of samples in a single cycle of 20kHz (limit of human hearing).
 		// If a pixel covers less time than this, we draw smooth vector lines (preserves shape).
 		// If a pixel covers more time, we switch to min/max bars.
-		float aliasingThreshold = module->sampleRate / 20000.0f;
+		float aliasingThreshold = 0.5f * module->sampleRate / 20000.0f;
 
 		bool zoomedOut = samplesPerPixel > aliasingThreshold && !module->cvMode[ch];
 
@@ -927,8 +927,13 @@ struct ScopeDisplay : OpaqueWidget {
 		int idxLastTrig = module->lastTriggerIndex.load();
 		int sSinceTrig = module->samplesSinceTrigger.load();
 		bool idxValid = module->triggerValid.load();
-		bool idxLastValid = module->prev_triggerValid.load();
+		//bool idxLastValid = module->prev_triggerValid.load();
 		bool recording = module->recording.load();
+		//float hz = module->autoTimeFrequency_hz.load();
+		bool frozen = module->frozen.load();
+		int trigMode = module->trigMode.load();
+
+		int idxAnchor = idxTrigger;
 
 		int drawLimit_px = int(width_px)+1;
 		const bool holdoffActive = module->holdoffTime_s > 0.0f;
@@ -939,6 +944,9 @@ struct ScopeDisplay : OpaqueWidget {
 
 			if (drawLimit_px > int(width_px)+1) drawLimit_px = int(width_px)+1;
 			if (drawLimit_px < 0) drawLimit_px = 0;
+		} else if (!idxValid && !frozen && trigMode == TRIG_MODE_AUTO) {
+			// Calculate where the screen starts relative to the write head
+			idxAnchor = (idxWrite - int(samplesToDraw)) & BUFFER_MASK;
 		}
 
 		bool first = true;
@@ -957,7 +965,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 				// If we drawing past writeIndex, then we draw old data from previous trigger.
 				// else we draw from current trigger.
-				const int startIdx = isNewData ? idxTrigger : idxLastTrig;
+				const int startIdx = isNewData ? idxAnchor : idxLastTrig;
 
 				int sampleOffset = (int)(curr_px * samplesPerPixel);
 				if (sampleOffset >= BUFFER_SIZE) {
@@ -969,6 +977,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 				if (!isNewData) {
 					// Distance from new trigger to this readIndex
+					// we can use idxTrigger here as its same as idxAnchor
 					int distFromNew = (readIndex - idxTrigger) & BUFFER_MASK;
 
 					if (distFromNew >= 0 && distFromNew < sSinceTrig) {
@@ -984,11 +993,30 @@ struct ScopeDisplay : OpaqueWidget {
 				int iterEnd = (int)((curr_px + 1) * samplesPerPixel);
 				if (iterEnd <= iterStart) iterEnd = iterStart + 1;
 
+				if (!recording && trigMode == TRIG_MODE_AUTO) {
+					// rolling in AUTO
+					int readIdx = (startIdx + iterEnd) & BUFFER_MASK;
+
+					// Calculate distance from Read Head to Write Head
+					int distToHead = (idxWrite - readIdx) & BUFFER_MASK;
+
+					// If the distance is huge
+					// it means readIdx is actually ahead of writeIndex.
+					// If the distance is tiny, we are catching up to the head.
+
+					// If we are too close to the write head from the wrong side
+					// stop drawing.
+					if (distToHead > BUFFER_SIZE - 4000) {
+						break;
+					}
+				}
+
 				float minV = 100.0f;
 				float maxV = -100.0f;
 				bool found = false;
 				for (int readIndexOffset = iterStart; readIndexOffset < iterEnd; readIndexOffset += iteratorStep) {
-					if (recording && isNewData && readIndexOffset >= sSinceTrig) {//test2
+					if (recording && isNewData && readIndexOffset >= sSinceTrig) {
+						// we bumped into old data
 						continue;
 					}
 					int readIndexRaw = (startIdx + readIndexOffset) & BUFFER_MASK;
@@ -1063,7 +1091,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 				// If we drawing past writeIndex, then we draw old data from previous trigger.
 				// else we draw from current trigger.
-				const int startIdx = isNewData ? idxTrigger : idxLastTrig;
+				const int startIdx = isNewData ? idxAnchor : idxLastTrig;
 				int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
 
 				if (!isNewData) {
@@ -1075,6 +1103,23 @@ struct ScopeDisplay : OpaqueWidget {
 						// distFromNew is small and positive, it means this old pixel
 						// is wrapped in the buffer. As in, we have drawn the entire buffer
 						// and if we continue, we will be repeating data.
+						break;
+					}
+				}
+
+				if (!recording && trigMode == TRIG_MODE_AUTO) {
+					// rolling in AUTO
+
+					// Calculate distance from Read Head to Write Head
+					int distToHead = (idxWrite - readIndex) & BUFFER_MASK;
+
+					// If the distance is huge
+					// it means readIdx is actually ahead of writeIndex.
+					// If the distance is tiny, we are catching up to the head.
+
+					// If we are too close to the write head from the wrong side
+					// stop drawing.
+					if (distToHead > BUFFER_SIZE - 4000) {
 						break;
 					}
 				}
@@ -1125,7 +1170,6 @@ struct ScopeDisplay : OpaqueWidget {
 		int idxWrite = module->writeIndex.load();
 		int idxTrigger = module->triggerIndex.load();
 		int idxLastTrig = module->lastTriggerIndex.load();
-		int sSinceTrig = module->samplesSinceTrigger.load();
 		bool idxValid = module->triggerValid.load();
 		bool idxLastValid = module->prev_triggerValid.load();
 
