@@ -927,7 +927,7 @@ struct ScopeDisplay : OpaqueWidget {
 		int idxLastTrig = module->lastTriggerIndex.load();
 		int sSinceTrig = module->samplesSinceTrigger.load();
 		bool idxValid = module->triggerValid.load();
-		//bool idxLastValid = module->prev_triggerValid.load();
+		bool idxLastValid = module->prev_triggerValid.load();
 		bool recording = module->recording.load();
 		//float hz = module->autoTimeFrequency_hz.load();
 		bool frozen = module->frozen.load();
@@ -967,6 +967,12 @@ struct ScopeDisplay : OpaqueWidget {
 				// else we draw from current trigger.
 				const int startIdx = isNewData ? idxAnchor : idxLastTrig;
 
+				if (!isNewData && !idxLastValid) {
+					// We are asked to draw history, but we have no history yet.
+					// Stop drawing.
+					break;
+				}
+
 				int sampleOffset = (int)(curr_px * samplesPerPixel);
 				if (sampleOffset >= BUFFER_SIZE) {
 					// whole buffer does not fit on screen
@@ -977,7 +983,6 @@ struct ScopeDisplay : OpaqueWidget {
 
 				if (!isNewData) {
 					// Distance from new trigger to this readIndex
-					// we can use idxTrigger here as its same as idxAnchor
 					int distFromNew = (readIndex - idxTrigger) & BUFFER_MASK;
 
 					if (distFromNew >= 0 && distFromNew < sSinceTrig) {
@@ -1017,7 +1022,7 @@ struct ScopeDisplay : OpaqueWidget {
 				for (int readIndexOffset = iterStart; readIndexOffset < iterEnd; readIndexOffset += iteratorStep) {
 					if (recording && isNewData && readIndexOffset >= sSinceTrig) {
 						// we bumped into old data
-						continue;
+						break;
 					}
 					int readIndexRaw = (startIdx + readIndexOffset) & BUFFER_MASK;
 					const float v = module->buffer[ch][readIndexRaw];
@@ -1092,6 +1097,13 @@ struct ScopeDisplay : OpaqueWidget {
 				// If we drawing past writeIndex, then we draw old data from previous trigger.
 				// else we draw from current trigger.
 				const int startIdx = isNewData ? idxAnchor : idxLastTrig;
+
+				if (!isNewData && !idxLastValid) {
+					// We are asked to draw history, but we have no history yet.
+					// Stop drawing.
+					break;
+				}
+
 				int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
 
 				if (!isNewData) {
@@ -1337,14 +1349,32 @@ struct ScopeDisplay : OpaqueWidget {
 			int idxLastTrig = module->lastTriggerIndex.load();
 			bool idxValid = module->triggerValid.load();
 			bool idxLastValid = module->prev_triggerValid.load();
+			bool bufferFilled = module->bufferFilled.load();
 
 			// start index
 			// Calc how many samples exist between trigger and write index
 			int samplesRecorded = (idxWrite - idxTrigger) & BUFFER_MASK;
-			bool enough = (samplesRecorded >= samplesToScan);
-			const int startIndex = idxValid && enough?idxTrigger
-										:(idxLastValid?idxLastTrig
-										:((idxWrite - samplesToScan) & BUFFER_MASK));
+			bool enough = idxValid && (samplesRecorded >= samplesToScan);
+			// And between last trigger and write index
+			int samplesRecordedOld = (idxWrite - idxLastTrig) & BUFFER_MASK;
+			bool enoughOld = idxLastValid && (samplesRecordedOld >= samplesToScan);
+
+			int startIndex;
+			if (enough) {
+				startIndex = idxTrigger;
+			} else if (enoughOld) {
+				startIndex = idxLastTrig;
+			} else {
+				// Scanning / Rolling
+				int available = bufferFilled ? BUFFER_SIZE : idxWrite;
+
+				if (samplesToScan > available) samplesToScan = available;
+
+				if (samplesToScan <= 0) continue;
+
+				startIndex = (idxWrite - samplesToScan) & BUFFER_MASK;
+			}
+
 
 			float minV = 100.0f;
 			float maxV = -100.0f;
