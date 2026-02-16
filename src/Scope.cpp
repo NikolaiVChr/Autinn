@@ -938,7 +938,7 @@ struct ScopeDisplay : OpaqueWidget {
 		nvgBeginPath(args.vg);
 		const NVGcolor color = getColor(ch);
 		const NVGcolor colorDebug = nvgRGBAf(color.r,color.g,color.b,ALPHA_/255.0f);
-		nvgStrokeColor(args.vg, color);
+		nvgStrokeColor(args.vg, colorDebug);
 
 		int iteratorStep = 1;
 		aliasingThreshold = std::min(aliasingThreshold * 8.0f, WAVEFORM_SAMPLES_PER_PX);
