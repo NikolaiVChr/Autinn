@@ -926,8 +926,6 @@ struct ScopeDisplay : OpaqueWidget {
 
 		nvgBeginPath(args.vg);
 		nvgStrokeColor(args.vg, color);
-		nvgStrokeWidth(args.vg, STROKE_WAVE); // Slightly thicker line
-		nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
 		int iteratorStep = 1;
 		aliasingThreshold = std::min(aliasingThreshold * 8.0f, WAVEFORM_SAMPLES_PER_PX);
@@ -982,6 +980,9 @@ struct ScopeDisplay : OpaqueWidget {
 		float lastY = 0.0f;
 
 		if (zoomedOut) {
+			nvgLineCap(args.vg, NVG_BUTT);
+			nvgLineJoin(args.vg, NVG_ROUND);
+			nvgStrokeWidth(args.vg, STROKE_WAVE);
 			bool wasNewData = true;
 			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
@@ -1022,7 +1023,6 @@ struct ScopeDisplay : OpaqueWidget {
 					}
 				}
 
-				nvgLineCap(args.vg, NVG_BUTT);
 				const int iterStart = (int)(curr_px * samplesPerPixel);
 				int iterEnd = (int)((curr_px + 1) * samplesPerPixel);
 				if (iterEnd <= iterStart) iterEnd = iterStart + 1;
@@ -1094,6 +1094,9 @@ struct ScopeDisplay : OpaqueWidget {
 			}
 		} else {
 			// zoomed in
+			nvgLineCap(args.vg, NVG_BUTT);
+			nvgStrokeWidth(args.vg, STROKE_WAVE);
+			nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
 			float stepWidth = 1.0f;
 			if (samplesPerPixel < 1.0f) {
