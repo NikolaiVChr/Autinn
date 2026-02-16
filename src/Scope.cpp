@@ -51,7 +51,12 @@ static constexpr float FONTSIZE_STATS = 12.0f;
 static constexpr float FONTSIZE_TRIGGER = 12.0f;
 static constexpr NVGlineCap LINEJOIN_WAVE_ZOOM_OUT = NVG_BEVEL;// NVG_ROUND, NVG_BEVEL, NVG_MITER
 static constexpr NVGlineCap LINECAP_WAVE_ZOOM_OUT = NVG_BUTT;// NVG_BUTT, NVG_SQUARE, NVG_ROUND
-static constexpr int ALPHA_WAVE = 220;
+static constexpr NVGlineCap LINEJOIN_WAVE_ZOOM_IN = NVG_BEVEL;// NVG_ROUND, NVG_BEVEL, NVG_MITER
+static constexpr NVGlineCap LINECAP_WAVE_ZOOM_IN = NVG_BUTT;// NVG_BUTT, NVG_SQUARE, NVG_ROUND
+static constexpr NVGlineCap LINEJOIN_XY = NVG_ROUND;// NVG_ROUND, NVG_BEVEL, NVG_MITER
+static constexpr NVGlineCap LINECAP_XY = NVG_ROUND;// NVG_BUTT, NVG_SQUARE, NVG_ROUND
+static constexpr int ALPHA_WAVE = 255;
+static constexpr int ALPHA_XY = 200;
 static const NVGcolor colorLabels = nvgRGBA(0, 0, 0, 160);  // black, transparent
 static const NVGcolor color0 = nvgRGBA(255, 230, 50, ALPHA_WAVE);  // Yellow
 static const NVGcolor color1 = nvgRGBA(255, 50, 50, ALPHA_WAVE);   // Red
@@ -59,8 +64,8 @@ static const NVGcolor color2 = nvgRGBA(50, 255, 50, ALPHA_WAVE);    // Green
 static const NVGcolor color3 = nvgRGBA(50, 150, 255, ALPHA_WAVE);  // Blue
 static const NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
 static const NVGcolor colorScanLine = nvgRGBA(255, 255, 255, 90);// faint white
-static const NVGcolor colorXY1 = nvgRGBA(100, 255, 200, 200);//cyan
-static const NVGcolor colorXY2 = nvgRGBA(255, 100, 255, 200);//magenta
+static const NVGcolor colorXY1 = nvgRGBA(100, 255, 200, ALPHA_XY);//cyan
+static const NVGcolor colorXY2 = nvgRGBA(255, 100, 255, ALPHA_XY);//magenta
 static const NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
 static const NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
 
@@ -271,8 +276,8 @@ struct Scope : Module {
 			configLight(CV_OR_AUDIO_LIGHT+i, "Input is CV");
 		}
 
-		configParam(DEBUG_1, 0.1f, 2.0f, STROKE_WAVE, "DEBUG STROKE", " px");
-		configParam(DEBUG_2, 100.0f, 255.0f, ALPHA_WAVE, "DEBUG ALPHA", " ");
+		//configParam(DEBUG_1, 0.1f, 2.0f, STROKE_WAVE, "DEBUG STROKE", " px");
+		//configParam(DEBUG_2, 100.0f, 255.0f, ALPHA_WAVE, "DEBUG ALPHA", " ");
 
 		readControls();
 	}
@@ -904,11 +909,7 @@ struct ScopeDisplay : OpaqueWidget {
 		float offset = module->offset[ch];
 		float timePerDiv_s = module->getTimeDiv();
 
-		float STROKE_WAVE_ = module->params[Scope::DEBUG_1].getValue();
-		float PX_WAVE_ = PX_WAVE;
-		float ALPHA_ = module->params[Scope::DEBUG_2].getValue();
-
-		const float width_px = box.size.x/PX_WAVE_;
+		const float width_px = box.size.x/PX_WAVE;
 		const float totalTime_s = DIVS_HORIZ * timePerDiv_s;
 		const float samplesToDraw = totalTime_s * module->sampleRate;
 
@@ -937,8 +938,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 		nvgBeginPath(args.vg);
 		const NVGcolor color = getColor(ch);
-		const NVGcolor colorDebug = nvgRGBAf(color.r,color.g,color.b,ALPHA_/255.0f);
-		nvgStrokeColor(args.vg, colorDebug);
+		nvgStrokeColor(args.vg, color);
 
 		int iteratorStep = 1;
 		aliasingThreshold = std::min(aliasingThreshold * 8.0f, WAVEFORM_SAMPLES_PER_PX);
@@ -995,7 +995,7 @@ struct ScopeDisplay : OpaqueWidget {
 		if (zoomedOut) {
 			nvgLineCap(args.vg, LINECAP_WAVE_ZOOM_OUT);
 			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_OUT);
-			nvgStrokeWidth(args.vg, STROKE_WAVE_);
+			nvgStrokeWidth(args.vg, STROKE_WAVE);
 			bool wasNewData = true;
 			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
@@ -1080,7 +1080,7 @@ struct ScopeDisplay : OpaqueWidget {
 					yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
 					yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
-					auto px = float(curr_px)*PX_WAVE_;
+					auto px = float(curr_px)*PX_WAVE;
 					if (first|| (wasNewData && !isNewData)) {
 						nvgMoveTo(args.vg, px, yTop);
 						nvgLineTo(args.vg, px, yBottom);
@@ -1107,9 +1107,9 @@ struct ScopeDisplay : OpaqueWidget {
 			}
 		} else {
 			// zoomed in
-			nvgLineCap(args.vg, NVG_BUTT);
-			nvgStrokeWidth(args.vg, STROKE_WAVE_);
-			nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
+			nvgStrokeWidth(args.vg, STROKE_WAVE);
+			nvgLineCap(args.vg, LINECAP_WAVE_ZOOM_IN);
+			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_IN);
 
 			float stepWidth = 1.0f;
 			if (samplesPerPixel < 1.0f) {
@@ -1194,7 +1194,7 @@ struct ScopeDisplay : OpaqueWidget {
 				// clamp unseen.
 				y = clamp(y, -10000.0f, box.size.y+10000.0f);
 
-				float px = float(curr_px)*PX_WAVE_;
+				float px = float(curr_px)*PX_WAVE;
 				if (first) {
 					nvgMoveTo(args.vg, px, y);
 					first = false;
@@ -1215,8 +1215,8 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, colorScanLine); // Faint white
 			nvgStrokeWidth(args.vg, STROKE_SCANLINE);
-			nvgMoveTo(args.vg, (float)drawLimit_px*PX_WAVE_, 0);
-			nvgLineTo(args.vg, (float)drawLimit_px*PX_WAVE_, box.size.y);
+			nvgMoveTo(args.vg, (float)drawLimit_px*PX_WAVE, 0);
+			nvgLineTo(args.vg, (float)drawLimit_px*PX_WAVE, box.size.y);
 			nvgStroke(args.vg);
 		}
 	}
@@ -1305,6 +1305,8 @@ struct ScopeDisplay : OpaqueWidget {
 			bool first = true;
 			nvgBeginPath(args.vg);
 			nvgStrokeWidth(args.vg, STROKE_XY);
+			nvgLineCap(args.vg, LINECAP_XY);
+			nvgLineJoin(args.vg, LINEJOIN_XY);
 			nvgStrokeColor(args.vg, color);
 			for (int i = 0; i < countMax; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
@@ -1890,8 +1892,8 @@ struct ScopeWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTime - 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
 
 		// Debug
-		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec((xHoldoff+xTime)*0.5f, yRow2), module, Scope::DEBUG_1));
-		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec((xHoldoff+xTrigLevel)*0.5f, yRow2), module, Scope::DEBUG_2));
+		//addParam(createParamCentered<RoundSmallAutinnKnob>(Vec((xHoldoff+xTime)*0.5f, yRow2), module, Scope::DEBUG_1));
+		//addParam(createParamCentered<RoundSmallAutinnKnob>(Vec((xHoldoff+xTrigLevel)*0.5f, yRow2), module, Scope::DEBUG_2));
 
 		// Stats
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xHoldoff, yRow2), module, Scope::STATS_PARAM));
