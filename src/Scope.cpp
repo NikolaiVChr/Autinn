@@ -1350,6 +1350,18 @@ struct ScopeDisplay : OpaqueWidget {
 		}
 		frame++;
 		if (frame > 60) frame = 0;
+
+		if (frame == 0 && module) {
+			float width = box.size.x;
+			float timeKnob = module->params[Scope::TIME_PARAM].getValue();
+
+			float timePerDiv = module->getTimeDiv();
+			float totalTime = 20.0f * timePerDiv;
+			double spp = (totalTime * module->sampleRate) / width;
+
+			// Use %.10f to see tiny microscopic drifts
+			INFO("Width: %.10f | Knob: %.10f | SPP: %.10f", width, timeKnob, spp);
+		}
 	}
 
 	void drawStats(const DrawArgs& args) const {
