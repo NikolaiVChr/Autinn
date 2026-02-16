@@ -108,6 +108,8 @@ struct Scope : Module {
 		SCALE_C_PARAM,
 		SCALE_D_PARAM,
 		ENUMS(CV_OR_AUDIO_PARAM, 4),
+		DEBUG_1,
+		DEBUG_2,
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -268,6 +270,9 @@ struct Scope : Module {
 		for (int i = 0; i < 4; i++) {
 			configLight(CV_OR_AUDIO_LIGHT+i, "Input is CV");
 		}
+
+		configParam(DEBUG_1, 0.1f, 2.0f, 1.0f, "DEBUG STROKE", " px");
+		configParam(DEBUG_2, 0.1f, 2.0f, 1.0f, "DEBUG STEP", " px");
 
 		readControls();
 	}
@@ -917,6 +922,9 @@ struct ScopeDisplay : OpaqueWidget {
 		bool frozen = module->frozen.load();
 		int trigMode = module->trigMode.load();
 
+		float STROKE_WAVE_ = module->params[Scope::DEBUG_1].getValue();
+		float PX_WAVE_ = module->params[Scope::DEBUG_2].getValue();
+
 		double samplesPerPixel = samplesToDraw / width_px;
 
 		// We calculate the number of samples in a single cycle of 20kHz (limit of human hearing).
@@ -985,7 +993,7 @@ struct ScopeDisplay : OpaqueWidget {
 		if (zoomedOut) {
 			nvgLineCap(args.vg, LINECAP_WAVE_ZOOM_OUT);
 			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_OUT);
-			nvgStrokeWidth(args.vg, STROKE_WAVE);
+			nvgStrokeWidth(args.vg, STROKE_WAVE_);
 			bool wasNewData = true;
 			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
@@ -1070,7 +1078,7 @@ struct ScopeDisplay : OpaqueWidget {
 					yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
 					yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
-					auto px = float(curr_px)*PX_WAVE;
+					auto px = float(curr_px)*PX_WAVE_;
 					if (first|| (wasNewData && !isNewData)) {
 						nvgMoveTo(args.vg, px, yTop);
 						nvgLineTo(args.vg, px, yBottom);
@@ -1098,7 +1106,7 @@ struct ScopeDisplay : OpaqueWidget {
 		} else {
 			// zoomed in
 			nvgLineCap(args.vg, NVG_BUTT);
-			nvgStrokeWidth(args.vg, STROKE_WAVE);
+			nvgStrokeWidth(args.vg, STROKE_WAVE_);
 			nvgLineJoin(args.vg, NVG_BEVEL);// NVG_ROUND
 
 			float stepWidth = 1.0f;
@@ -1184,7 +1192,7 @@ struct ScopeDisplay : OpaqueWidget {
 				// clamp unseen.
 				y = clamp(y, -10000.0f, box.size.y+10000.0f);
 
-				float px = float(curr_px)*PX_WAVE;
+				float px = float(curr_px)*PX_WAVE_;
 				if (first) {
 					nvgMoveTo(args.vg, px, y);
 					first = false;
@@ -1205,8 +1213,8 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, colorScanLine); // Faint white
 			nvgStrokeWidth(args.vg, STROKE_SCANLINE);
-			nvgMoveTo(args.vg, (float)drawLimit_px*PX_WAVE, 0);
-			nvgLineTo(args.vg, (float)drawLimit_px*PX_WAVE, box.size.y);
+			nvgMoveTo(args.vg, (float)drawLimit_px*PX_WAVE_, 0);
+			nvgLineTo(args.vg, (float)drawLimit_px*PX_WAVE_, box.size.y);
 			nvgStroke(args.vg);
 		}
 	}
@@ -1880,7 +1888,11 @@ struct ScopeWidget : ModuleWidget {
 		addChild(createLightCentered<SmallLight<GreenLight>>(Vec(xTime - 12, yRow2 + 12), module, Scope::AUTO_TIME_LIGHT));
 
 		// Stats
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xHoldoff, yRow2), module, Scope::STATS_PARAM));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec((xHoldoff+xTime)*0.5f, yRow2), module, Scope::DEBUG_1));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec((xHoldoff+xTrigLevel)*0.5f, yRow2), module, Scope::DEBUG_2));
+
+		// Debug
+		addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xHoldoff, yRow2), module, Scope::STATS_PARAM));
 
 		// Trig buttons (grid layout)
 		// source, mode
