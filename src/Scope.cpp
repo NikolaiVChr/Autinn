@@ -1,4 +1,5 @@
 #include "Autinn.hpp"
+#include "Autinn-dsp.hpp"
 #include <cmath>
 #include <cstdio>
 
@@ -60,7 +61,7 @@ static constexpr int ALPHA_WAVE = 255;
 static constexpr int ALPHA_XY = 200;
 static const NVGcolor colorLabels = nvgRGBA(0, 0, 0, 160);  // black, transparent
 static const NVGcolor color0 = nvgRGBA(255, 230, 50, ALPHA_WAVE);  // Yellow
-static const NVGcolor color1 = nvgRGBA(255, 65, 55, ALPHA_WAVE);   // Red
+static const NVGcolor color1 = nvgRGBA(255, 55, 55, ALPHA_WAVE);   // Red
 static const NVGcolor color2 = nvgRGBA(50, 255, 50, ALPHA_WAVE);    // Green
 static const NVGcolor color3 = nvgRGBA(50, 150, 255, ALPHA_WAVE);  // Blue
 static const NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
@@ -145,21 +146,6 @@ struct Scope : Module {
 		NUM_LIGHTS
 	};
 
-	struct DCBlocker {
-		float x1 = 0.0f;
-		float y1 = 0.0f;
-		// Standard 1-pole hp at approx 10Hz
-		static constexpr float R = 0.995f;
-
-		float process(float x) {
-			float y = x - x1 + R * y1;
-			x1 = x;
-			y1 = y;
-			return y;
-		}
-		void reset() { x1 = 0.0f; y1 = 0.0f; }
-	};
-
 	dsp::SchmittTrigger trigSchmitt;
 	dsp::BooleanTrigger trigPulse;
 	dsp::BooleanTrigger srcBtnTrig;
@@ -193,6 +179,7 @@ struct Scope : Module {
 	float trigFoundTimer = 0.0f; // Remaining time for trigger light and stats TRIGGER to be shown.
 	std::atomic<bool> bufferFilled = {false}; // We wrapped the buffers at least once, so they has no garbage.
 	DCBlocker dcBlockers[4];
+	float lastSampleTime = 1.0f/44100.0f;
 
 
 	// persisted
@@ -281,6 +268,10 @@ struct Scope : Module {
 		//configParam(DEBUG_2, 100.0f, 255.0f, ALPHA_WAVE, "DEBUG ALPHA", " ");
 
 		readControls();
+		for (auto & chDcBlocker : dcBlockers) {
+			chDcBlocker.cutoff_hz = 1.0f;
+			chDcBlocker.setSampleTime(lastSampleTime);
+		}
 	}
 
 	void onReset(const ResetEvent& e) override {
@@ -418,6 +409,13 @@ struct Scope : Module {
 		if (!inputs[A_INPUT].isConnected() && !inputs[B_INPUT].isConnected() && !inputs[C_INPUT].isConnected() && !inputs[D_INPUT].isConnected()) {
 			return;
 		}
+
+		if (lastSampleTime != args.sampleTime) {
+			for (auto & chDcBlocker : dcBlockers) {
+				chDcBlocker.setSampleTime(args.sampleTime);
+			}
+		}
+		lastSampleTime = args.sampleTime;
 
 		sampleRate = args.sampleRate;
 

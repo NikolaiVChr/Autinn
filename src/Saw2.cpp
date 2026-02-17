@@ -1,5 +1,6 @@
 #include "Autinn.hpp"
 #include <cmath>
+#include "Autinn-dsp.hpp"
 
 /*
 
@@ -21,7 +22,7 @@
 
 **/
 
-static const int OVERSAMPLE = 4;
+static constexpr int OVERSAMPLE = 4;
 
 struct Saw2 : Module {
 	enum ParamIds {
@@ -66,24 +67,6 @@ struct Saw2 : Module {
 		configInput(CV_TYPE_INPUT, "Type trigger");
 		configOutput(BUZZ_OUTPUT, "Audio");
 		decimators.resize(16);
-	}
-
-	// PolyBLEP: Polynomial Band-Limited Step
-	// Smooths the sharp discontinuity of the sawtooth to remove aliasing.
-	// t = phase (0..1)
-	// dt = phase increment per sample
-	static float poly_blep(float t, float dt) {
-		if (t < dt) {
-			// 0 < t < dt: Beginning of cycle (the rise)
-			t /= dt;
-			return t+t - t*t - 1.0f;
-		} else if (t > 1.0f - dt) {
-			// 1 - dt < t < 1: End of cycle (the drop)
-			t = (t - 1.0f) / dt;
-			return t*t + t+t + 1.0f;
-		}
-		// Middle of cycle: No correction needed
-		return 0.0f;
 	}
 
 	void onReset(const ResetEvent& e) override {
@@ -179,7 +162,7 @@ struct Saw2 : Module {
 				float saw = 2.0f * phase[c] - 1.0f;
 
 				// Apply PolyBLEP
-				saw -= poly_blep(phase[c], dt);
+				saw -= polyBLEP(phase[c], dt);
 
 				if (square) {
 					// Subtract a DC-offset saw from the original saw
@@ -192,7 +175,7 @@ struct Saw2 : Module {
 					// Generate the Naive Shifted Saw
 					float saw_shifted = 2.0f * phase_shifted - 1.0f;
 
-					saw_shifted -= poly_blep(phase_shifted, dt);
+					saw_shifted -= polyBLEP(phase_shifted, dt);
 
 					// Subtract to create the pulse
 					// Saw - InvertedSaw = Square
@@ -264,7 +247,7 @@ struct Saw2Widget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM));
+		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25f, 125.0f+HALF_KNOB_MED), module, Saw2::PITCH_PARAM));
 		/*
 		auto pitchKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM);
 		pitchKnob->setModulation(Saw2::CV_PITCH_INPUT, [](float cv, float val, float att) {
@@ -273,7 +256,7 @@ struct Saw2Widget : ModuleWidget {
 		addParam(pitchKnob);
 		*/
 
-		auto ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM);
+		auto ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25f, 75.0f+HALF_KNOB_MED), module, Saw2::AGE_PARAM);
 
 		// Link modulation:
 		// 1. Source: CV_AGE_INPUT
@@ -286,17 +269,17 @@ struct Saw2Widget : ModuleWidget {
 		addParam(ageKnob);
 		//addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM));
 
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 75+HALF_KNOB_MED), module, Saw2::CV_AGE_INPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 75.0f+HALF_KNOB_MED), module, Saw2::CV_AGE_INPUT));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75, 5.0f + (75+HALF_KNOB_MED+162)/2.0f), module, Saw2::TYPE_PARAM));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75f, 5.0f + (75.0f+HALF_KNOB_MED+162.0f)/2.0f), module, Saw2::TYPE_PARAM));
 
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25, 200+HALF_PORT), module, Saw2::CV_PITCH_INPUT));
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75, 200+HALF_PORT), module, Saw2::CV_TYPE_INPUT));
-		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25, 300+HALF_PORT), module, Saw2::BUZZ_OUTPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25f, 200.0f+HALF_PORT), module, Saw2::CV_PITCH_INPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 200.0f+HALF_PORT), module, Saw2::CV_TYPE_INPUT));
+		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25f, 300.0f+HALF_PORT), module, Saw2::BUZZ_OUTPUT));
 
-		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5, 50), module, Saw2::BLINK_LIGHT));
-		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6, 162), module, Saw2::SAW_LIGHT));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6, 177), module, Saw2::SQUARE_LIGHT));
+		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5f, 50.0f), module, Saw2::BLINK_LIGHT));
+		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6f, 162.0f), module, Saw2::SAW_LIGHT));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6f, 177.0f), module, Saw2::SQUARE_LIGHT));
 	}
 };
 

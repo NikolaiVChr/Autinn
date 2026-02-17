@@ -1,4 +1,5 @@
 #include "Autinn.hpp"
+#include "Autinn-dsp.hpp"
 #include <cmath>
 
 /*
@@ -43,7 +44,9 @@ struct Oxcart : Module {
 	float phase[16] = {};
 	float blinkTime = 0.0f;
 	dsp::MinBlepGenerator<16,32,float> oxMinBLEP[16];// 16 zero crossings, x32 oversample
+	DCBlocker dcBlocker[16];
 	float discontinuity = non_lin_func(4.0f);
+	float lastSampleTime = 1.0f/44100.0f;
 
 	Oxcart() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -51,6 +54,18 @@ struct Oxcart : Module {
 		configParam(Oxcart::PITCH_PARAM, -3.0f, 3.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
 		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
+
+		for (int ch = 0; ch < 16; ch++) {
+			minBlepImpulseFixed(16, 32, oxMinBLEP[ch].impulse);
+			dcBlocker[ch].cutoff_hz = 7.0f;
+			dcBlocker[ch].setSampleTime(lastSampleTime);
+		}
+	}
+
+	void onReset(const ResetEvent& e) override {
+		for (auto & filter : dcBlocker) {
+			filter.reset();
+		}
 	}
 
 	void process(const ProcessArgs &args) override;
@@ -64,6 +79,13 @@ void Oxcart::process(const ProcessArgs &args) {
 		lights[BLINK_LIGHT].value = 0.0f;
 		return;
 	}
+
+	if (lastSampleTime != args.sampleTime) {
+		for (auto & chDcBlocker : dcBlocker) {
+			chDcBlocker.setSampleTime(args.sampleTime);
+		}
+	}
+	lastSampleTime = args.sampleTime;
 
 	int channels = std::max(1, inputs[PITCH_INPUT].getChannels());
     outputs[BUZZ_OUTPUT].setChannels(channels);
@@ -89,7 +111,8 @@ void Oxcart::process(const ProcessArgs &args) {
 			oxMinBLEP[ch].insertDiscontinuity(crossing, discontinuity);
 		}
 		
-	    float buzz = -non_lin_func(phase[ch])+oxMinBLEP[ch].process()+0.826795f;
+	    float buzz = -non_lin_func(phase[ch])+oxMinBLEP[ch].process();
+		buzz = dcBlocker[ch].process(buzz);
 		outputs[BUZZ_OUTPUT].setVoltage(6.0f * buzz, ch);// keep its peaks within approx 5V.
 
 		if (ch == 0) {

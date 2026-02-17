@@ -1,4 +1,5 @@
 #include "Autinn.hpp"
+#include "Autinn-dsp.hpp"
 #include <cmath>
 
 /*
@@ -21,32 +22,12 @@
 
 **/
 
-static const int oversample2 = 2;
-static const int oversample4 = 4;
-static const int oversample8 = 8;
+static constexpr int oversample2 = 2;
+static constexpr int oversample4 = 4;
+static constexpr int oversample8 = 8;
 
 #define DRIVE_MAX 25.0f
 #define DRIVE_MIN 0.0f
-
-struct SimpleDCBlocker {
-	float x1 = 0.0f;
-	float y1 = 0.0f;
-	// 0.999 creates a cutoff around 10Hz-20Hz, perfect for DC blocking
-	const float R = 0.999f;
-
-	float process(float x) {
-		// Standard DC Block formula: y[n] = x[n] - x[n-1] + R * y[n-1]
-		float y = x - x1 + R * y1;
-		x1 = x;
-		y1 = y;
-		return y;
-	}
-
-	void reset() {
-		x1 = 0.0f;
-		y1 = 0.0f;
-	}
-};
 
 struct Fil : Module {
 	enum ParamIds {
@@ -78,12 +59,18 @@ struct Fil : Module {
 		configLight(HIGH_LIGHT, "Serious grinding going on.. ");
 		configLight(MID_LIGHT, "Moderate filing.. ");
 		configLight(LOW_LIGHT, "Hungry, feed me!  ");
+
+		for (int ch = 0; ch < 16; ch++) {
+			dcBlocker[ch].cutoff_hz = 7.0f;
+			dcBlocker[ch].setSampleTime(lastSampleTime);
+		}
 	}
 
 	int current_oversample = 4;
 	float th=1.0f/3.0f;
 
-	SimpleDCBlocker dcBlocker[16];
+	DCBlocker dcBlocker[16];
+	float lastSampleTime = 1.0f/44100.0f;
 
 	dsp::Upsampler<oversample2, 10> upsampler2[16];
 	dsp::Decimator<oversample2, 10> decimator2[16];
@@ -110,6 +97,9 @@ struct Fil : Module {
 
 	void onReset(const ResetEvent& e) override {
 		current_oversample = 4;
+		for (int ch = 0; ch < 16; ch++) {
+			dcBlocker[ch].reset();
+		}
 		Module::onReset(e);
 	}
 
@@ -123,6 +113,13 @@ void Fil::process(const ProcessArgs &args) {
 	if (!outputs[FIL_OUTPUT].isConnected()) {
 		return;
 	}
+
+	if (lastSampleTime != args.sampleTime) {
+		for (auto & chDcBlocker : dcBlocker) {
+			chDcBlocker.setSampleTime(args.sampleTime);
+		}
+	}
+	lastSampleTime = args.sampleTime;
 
 	int channels = std::max(1, inputs[FIL_INPUT].getChannels());
 	outputs[FIL_OUTPUT].setChannels(channels);
