@@ -572,7 +572,8 @@ struct Scope : Module {
 
 					// 25Hz = 0.04s
 					// TRIG_AUTO_MIN_TIMEOUT prevents the CPU from going hot on extremely fast time
-					float timeout = std::max(TRIG_AUTO_MIN_TIMEOUT, totalScreenTime);
+					// TRIG_AUTO_MAX_TIMEOUT prevents user on very slow time to think the scope got stuck doing nothing.
+					float timeout = clamp(totalScreenTime, TRIG_AUTO_MIN_TIMEOUT, TRIG_AUTO_MAX_TIMEOUT);
 
 					if (autoTimeFrequency_hz > 0.01f) {
 						float knownPeriod = 1.0f / autoTimeFrequency_hz;
@@ -583,7 +584,7 @@ struct Scope : Module {
 					}
 
 					// tiny buffer so we don't preempt a valid trigger that is just beyond the screen
-					timeout *= 1.1f;
+					timeout *= 1.05f;
 
 					//timeout = std::min(TRIG_AUTO_MAX_TIMEOUT, timeout);
 
