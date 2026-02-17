@@ -57,7 +57,7 @@ struct Oxcart : Module {
 
 		for (int ch = 0; ch < 16; ch++) {
 			minBlepImpulseFixed(16, 32, oxMinBLEP[ch].impulse);
-			dcBlocker[ch].cutoff_hz = 7.0f;
+			dcBlocker[ch].cutoff_hz = 1.0f;
 			dcBlocker[ch].setSampleTime(lastSampleTime);
 		}
 	}
@@ -113,7 +113,14 @@ void Oxcart::process(const ProcessArgs &args) {
 		
 	    float buzz = -non_lin_func(phase[ch])+oxMinBLEP[ch].process();
 		buzz = dcBlocker[ch].process(buzz);
-		outputs[BUZZ_OUTPUT].setVoltage(6.0f * buzz, ch);// keep its peaks within approx 5V.
+
+		// x4.5 to keep its peak within approx 5V
+		// minBLEP will increase peak (x1.15 approx)
+		// dcBlocker will reduce it.
+		// Used to be x6.0 in pre-v2.6.28, when used offset instead of dcBlocker,
+		// so I know this will mess up some patches slightly.
+		// Actually, for now I will keep the x6, backward compatibility is important.
+		outputs[BUZZ_OUTPUT].setVoltage(6.0f * buzz, ch);
 
 		if (ch == 0) {
             blinkTime += deltaTime;
