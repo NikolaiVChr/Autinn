@@ -36,7 +36,8 @@ static constexpr float HOLDOFF_KNOB_MAX = 1.0f; //   to  10s
 static constexpr float TRIG_FOUND_TIMER = 0.1f;
 
 // display
-static constexpr float WAVE_START_PX = -2;
+static constexpr float WAVE_PX_OFFSET = 0.5f;
+static constexpr float WAVE_START_PX = -1.0;
 static constexpr float WAVEFORM_SAMPLES_PER_PX = 64.0f;
 static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
@@ -996,7 +997,7 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_OUT);
 			nvgStrokeWidth(args.vg, STROKE_WAVE);
 			bool wasNewData = true;
-			for (int curr_px = WAVE_START_PX; curr_px <= int(width_px)+1; curr_px += 1) {
+			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
 				// right: old
 				// extreme right: ahead of bufferhead
@@ -1079,7 +1080,7 @@ struct ScopeDisplay : OpaqueWidget {
 					yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
 					yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
-					auto px = float(curr_px)*PX_WAVE;
+					auto px = float(curr_px)*PX_WAVE+WAVE_PX_OFFSET;
 					if (first|| (wasNewData && !isNewData)) {
 						nvgMoveTo(args.vg, px, yTop);
 						nvgLineTo(args.vg, px, yBottom);
@@ -1118,7 +1119,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 			bool wasNewData = true;
 
-			for (float curr_px = float(WAVE_START_PX); curr_px <= width_px; curr_px += stepWidth) {
+			for (float curr_px = 0.0f; curr_px <= width_px; curr_px += stepWidth) {
 
 				int sampleOffset = (int)std::round(curr_px * samplesPerPixel);
 				if (sampleOffset >= BUFFER_SIZE) {
@@ -1193,7 +1194,7 @@ struct ScopeDisplay : OpaqueWidget {
 				// clamp unseen.
 				y = clamp(y, -10000.0f, box.size.y+10000.0f);
 
-				float px = float(curr_px)*PX_WAVE;
+				float px = float(curr_px)*PX_WAVE+WAVE_PX_OFFSET;
 				if (first) {
 					nvgMoveTo(args.vg, px, y);
 					first = false;
@@ -1214,8 +1215,8 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, colorScanLine); // Faint white
 			nvgStrokeWidth(args.vg, STROKE_SCANLINE);
-			nvgMoveTo(args.vg, (float)drawLimit_px*PX_WAVE, 0);
-			nvgLineTo(args.vg, (float)drawLimit_px*PX_WAVE, box.size.y);
+			nvgMoveTo(args.vg, (float)drawLimit_px*PX_WAVE+WAVE_PX_OFFSET, 0);
+			nvgLineTo(args.vg, (float)drawLimit_px*PX_WAVE+WAVE_PX_OFFSET, box.size.y);
 			nvgStroke(args.vg);
 		}
 	}
