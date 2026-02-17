@@ -461,8 +461,6 @@ struct Scope : Module {
 	/*
 	 * TODO:
 	 *		Stats: Duty cycle %, period, pulse width, crest factor, rise time, fall time, overshoot, compare phase.
-	 *		Randomize. [not needed]
-	 *		trigger line more discrete
 	 *
 	 */
 

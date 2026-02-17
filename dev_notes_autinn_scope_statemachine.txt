@@ -2,7 +2,7 @@ Autinn Scope State-machine
 ==========================
 
 This overview is to prevent that I lose track of how fields behave in states.
-It also prevent me from forgetting how each state is expected to behave.
+It also prevents me from forgetting how each state is expected to behave.
 It does not cover: some fields that govern how to switch between states, freezePending, auto-time fields,
                    buffer fields, light states, control states, triggering fields.
 
