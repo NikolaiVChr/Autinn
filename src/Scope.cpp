@@ -1119,7 +1119,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 			bool wasNewData = true;
 
-			for (float curr_px = WAVE_START_PX; curr_px <= width_px; curr_px += stepWidth) {
+			for (float curr_px = WAVE_START_PX*stepWidth; curr_px <= width_px + stepWidth; curr_px += stepWidth) {
 
 				int sampleOffset = (int)std::round(curr_px * samplesPerPixel);
 				if (sampleOffset >= BUFFER_SIZE) {
