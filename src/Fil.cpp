@@ -61,7 +61,7 @@ struct Fil : Module {
 		configLight(LOW_LIGHT, "Hungry, feed me!  ");
 
 		for (int ch = 0; ch < 16; ch++) {
-			dcBlocker[ch].cutoff_hz = 7.0f;
+			dcBlocker[ch].cutoff_hz = 2.5f;
 			dcBlocker[ch].setSampleTime(lastSampleTime);
 		}
 	}
