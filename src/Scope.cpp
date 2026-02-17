@@ -9,7 +9,7 @@ static constexpr float DIVS_HORIZ = 20.0f;// total horiz divs (approx effective 
 static constexpr float DIVS_VERT_INV = 1.0f/DIVS_VERT;
 static constexpr float DIVS_HORIZ_INV = 1.0f/DIVS_HORIZ;
 static constexpr float TRIG_AUTO_MIN_TIMEOUT = 0.04f;    // seconds
-static constexpr float TRIG_AUTO_MAX_TIMEOUT = 0.1f;    // seconds
+static constexpr float TRIG_AUTO_MAX_TIMEOUT = 0.2f;    // seconds
 static constexpr double AUTO_TIME_PERIOD_MAX = 10.0; // seconds
 static constexpr double AUTO_TIME_PERIOD_MIN = 0.000025; // seconds, 40kHz
 constexpr int TRIG_SOURCE_EXT = 4;
@@ -36,6 +36,7 @@ static constexpr float HOLDOFF_KNOB_MAX = 1.0f; //   to  10s
 static constexpr float TRIG_FOUND_TIMER = 0.1f;
 
 // display
+static constexpr float WAVE_START_PX = -2;
 static constexpr float WAVEFORM_SAMPLES_PER_PX = 64.0f;
 static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
@@ -591,7 +592,7 @@ struct Scope : Module {
 					if (autoTrigTimer_s > timeout) {
 						// Force rolling trigger
 						lastTriggerIndex.store(triggerIndex);
-						triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;
+						triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;//only used for freezing.
 						recording = false;
 						triggerValid = false;
 						prev_triggerValid = false;
@@ -995,7 +996,7 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_OUT);
 			nvgStrokeWidth(args.vg, STROKE_WAVE);
 			bool wasNewData = true;
-			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
+			for (int curr_px = WAVE_START_PX; curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
 				// right: old
 				// extreme right: ahead of bufferhead
@@ -1117,7 +1118,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 			bool wasNewData = true;
 
-			for (float curr_px = 0; curr_px <= width_px; curr_px += stepWidth) {
+			for (float curr_px = float(WAVE_START_PX); curr_px <= width_px; curr_px += stepWidth) {
 
 				int sampleOffset = (int)std::round(curr_px * samplesPerPixel);
 				if (sampleOffset >= BUFFER_SIZE) {
