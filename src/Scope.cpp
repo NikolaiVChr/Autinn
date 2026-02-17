@@ -997,7 +997,7 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_OUT);
 			nvgStrokeWidth(args.vg, STROKE_WAVE);
 			bool wasNewData = true;
-			for (int curr_px = 0; curr_px <= int(width_px)+1; curr_px += 1) {
+			for (int curr_px = int(WAVE_START_PX); curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
 				// right: old
 				// extreme right: ahead of bufferhead
@@ -1119,7 +1119,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 			bool wasNewData = true;
 
-			for (float curr_px = 0.0f; curr_px <= width_px; curr_px += stepWidth) {
+			for (float curr_px = WAVE_START_PX; curr_px <= width_px; curr_px += stepWidth) {
 
 				int sampleOffset = (int)std::round(curr_px * samplesPerPixel);
 				if (sampleOffset >= BUFFER_SIZE) {
