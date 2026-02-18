@@ -1,4 +1,5 @@
 #include "Autinn.hpp"
+#include "Autinn-dsp.hpp"
 #include <cmath>
 #include <string>
 
@@ -167,6 +168,8 @@ struct Bass : Module {
 
 	dsp::SchmittTrigger schmittGate;
 	dsp::SchmittTrigger schmittButton;
+	DCBlocker dcBlocker;
+	float lastSampleTime = 1.0f/44100.0f;
 	bool gate_prev = false;
 
 	int lightDivider = 256;
@@ -236,6 +239,9 @@ struct Bass : Module {
 		configLight(Bass::GATE_LIGHT, "Input function as gate");
 		configLight(Bass::TRIG_LIGHT, "Input function as trigger");
 		configLight(Bass::GAIN_LIGHT, "Warning that oscillator input has too big magnitude (7+ Voltage)");
+
+		dcBlocker.cutoff_hz = 5.0f;// TODO: could maybe be up to 15.0f for analog authenticity.
+		dcBlocker.setSampleTime(lastSampleTime);
 	}
 
 	float vca_env(bool gateRising, float resonance,float knob_accent, float dt);
@@ -290,6 +296,7 @@ struct Bass : Module {
 		setEnvMod(true);
 		schmittGate.reset();
 		schmittButton.reset();
+		dcBlocker.reset();
 		Module::onReset(e);
 	}
 
@@ -445,7 +452,13 @@ void Bass::process(const ProcessArgs &args) {
 
 	float out = this->acid_filter(osc, resonance, cutoff_hz, oversample_protected, dt);
 
+	if (lastSampleTime != args.sampleTime) {
+		dcBlocker.setSampleTime(args.sampleTime);
+	}
+	lastSampleTime = args.sampleTime;
+
 	float final_out = vca_env * out;
+	final_out = dcBlocker.process(final_out);// this emulates that 303 has a large output capacitor (1µF) followed by a volume potentiometer and output buffer
 	final_out = clamp(final_out, -12.0f, 12.0f); // safety hard clip
 	outputs[BASS_OUTPUT].setVoltage(final_out, 0);//Audio output    //this->non_lin_func(vca*out/SATURATION_VOLT)*SATURATION_VOLT;
 	//outputs[BASS_OUTPUT].setVoltage(vca_env, 1);//VCA Envelope output (0V to 1.6V)
@@ -693,6 +706,7 @@ float Bass::vca_env_acc(bool gateRising, float resonance, float knob_accent, flo
 		mode_vca = VCA_ENV_1_PEAK;// peak phase
 		number_vca = 1;// we wont get it too high
 		target_vca = unsigned(PEAK_ACCENT_SUSTAIN/dt);//holding peak time
+		// be careful, we skip calculating inv_target_vca here as it's not used, so its value is invalid
 	} else if (mode_vca == VCA_ENV_1_PEAK && number_vca > target_vca) {
 		// We were in peak phase, now lets switch to decay
 		mode_vca = VCA_ENV_2_DECAY;// decay phase

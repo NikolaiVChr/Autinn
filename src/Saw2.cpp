@@ -69,10 +69,10 @@ struct Saw2 : Module {
 		configOutput(BUZZ_OUTPUT, "Audio");
 		decimators.resize(16);
 
-		for (int c = 0; c < 16; c++) {
+		for (auto & filter : dcBlocker) {
 			// extremely slow. It corrects the DC drift without touching the bass.
-			dcBlocker[c].cutoff_hz = 2.0f;
-			dcBlocker[c].setSampleTime(lastSampleTime);
+			filter.cutoff_hz = 2.0f;
+			filter.setSampleTime(lastSampleTime);
 		}
 	}
 
