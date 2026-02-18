@@ -34,6 +34,14 @@ inline float polyBLEP(float t, float dt) {
 
 /**
  * minBLEP table generation function from Rack, but with some fixes.
+ * Same license as Autinn (gpl 3.0 or later).
+ *
+ * Orig author: Andrew Belt
+ *
+ * Fixes:
+ *        DC offset that came from unconditionally normalizing in the end,
+ *        if x[n-1] already were very close to zero, norm could be large and dc offset it all.
+ *        Stop using n*2 array when rfft only have touched n, not a bug, just more tidy.
  *
  * @param z zero-crossings
  * @param o oversamplings
@@ -146,9 +154,5 @@ struct DCBlocker {
 private:
 	float x_1 = 0.f;
 	float y_1 = 0.f;
-
-	// R = 1 - (2 * pi * freq / sampleRate).
-	// 0.999 ~7Hz at 44.1kHz.
-	// 0.995 ~35Hz (too high for bass).
 	float R = 0.999f;
 };
