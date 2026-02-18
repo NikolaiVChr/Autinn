@@ -51,7 +51,8 @@ struct Saw2 : Module {
 	float phase[16] = {};
 	float hp_state[16] = {}; // Capacitor state for the Acid curve
 	float hp_state2[16] = {};
-	float dc_integrator[16] = {};
+	DCBlocker dcBlocker[16] = {};
+	float lastSampleTime = 1.0f/44100.0f;
 	float blinkTime = 0.0f;
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
@@ -67,6 +68,12 @@ struct Saw2 : Module {
 		configInput(CV_TYPE_INPUT, "Type trigger");
 		configOutput(BUZZ_OUTPUT, "Audio");
 		decimators.resize(16);
+
+		for (int c = 0; c < 16; c++) {
+			// extremely slow. It corrects the DC drift without touching the bass.
+			dcBlocker[c].cutoff_hz = 2.0f;
+			dcBlocker[c].setSampleTime(lastSampleTime);
+		}
 	}
 
 	void onReset(const ResetEvent& e) override {
@@ -75,7 +82,7 @@ struct Saw2 : Module {
 			hp_state[c] = 0.0f;
 			hp_state2[c] = 0.0f;
 			phase[c] = 0.0f;
-			dc_integrator[c] = 0.0f;
+			dcBlocker[c].reset();
 		}
 		blinkTime = 0.0f;
 		schmittButton.reset();
@@ -116,10 +123,12 @@ struct Saw2 : Module {
 		float pitchBase = params[PITCH_PARAM].getValue();
 		int pitchInputChannels = inputs[CV_PITCH_INPUT].getChannels();
 
-		// extremely slow. It corrects the DC drift without touching the bass.
-		constexpr float servo_hz = 2.0f;
-		constexpr float servo_rc = 1.0f / (2.0f * M_PI * servo_hz);
-		const float servo_alpha = args.sampleTime / (servo_rc + args.sampleTime);
+		if (lastSampleTime != args.sampleTime) {
+			for (auto & chDcBlocker : dcBlocker) {
+				chDcBlocker.setSampleTime(args.sampleTime);
+			}
+		}
+		lastSampleTime = args.sampleTime;
 
 		for (int c = 0; c < channels; c++) {
 			float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
@@ -194,7 +203,7 @@ struct Saw2 : Module {
 				// High Pass Logic: output = input - low_passed_state
 				// We use a simple leaky integrator to track the DC offset
 				// Stage 1: The Curve (Shark Fin)
-				hp_state[c] = (hp_state[c] * alpha) + (saw * (1.0f - alpha));
+				hp_state[c] = (hp_state[c] * alpha) + (saw * (1.0f - alpha)) + 1e-18f;// + 1e-18f to prevent denormals
 				if (!std::isfinite(hp_state[c])) {
 					hp_state[c] = 0.0f;
 				}
@@ -202,7 +211,7 @@ struct Saw2 : Module {
 
 				// Stage 2: Creates the Overshoot
 				// We apply the high pass logic again to the output of Stage 1.
-				hp_state2[c] = (hp_state2[c] * alpha2) + (stage1 * (1.0f - alpha2));
+				hp_state2[c] = (hp_state2[c] * alpha2) + (stage1 * (1.0f - alpha2)) + 1e-18f;
 				if (!std::isfinite(hp_state2[c])) {
 					hp_state2[c] = 0.0f;
 				}
@@ -216,11 +225,7 @@ struct Saw2 : Module {
 
 			// remove DC offset
 			// Measure the current offset (Accumulate average)
-			dc_integrator[c] += (out - dc_integrator[c]) * servo_alpha;
-
-			// Subtract the measured offset from the signal
-			// This gently moves the whole wave up or down to center it.
-			out -= dc_integrator[c];
+			out = dcBlocker[c].process(out);
 
 			// Output Gain Staging
 			// Bass will gain it a bit, so we keep the voltage down.

@@ -70,7 +70,7 @@ void Disee::process(const ProcessArgs &args) {
 	float lambda = 2.0f * M_PI * cutoffFreq * args.sampleTime;
 
 	for (int c = 0; c < channels; c++) {
-		// One-Pole Filter
+		// One-Pole LP Filter
 		dcFilter[c] += (inputs[AC_INPUT].getPolyVoltage(c) - dcFilter[c]) * lambda;
 
 		outputs[DC_OUTPUT].setVoltage(clamp(dcFilter[c], -10.0f, 10.0f));
