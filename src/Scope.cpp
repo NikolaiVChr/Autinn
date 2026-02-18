@@ -269,7 +269,7 @@ struct Scope : Module {
 
 		readControls();
 		for (auto & chDcBlocker : dcBlockers) {
-			chDcBlocker.cutoff_hz = 1.0f;
+			chDcBlocker.cutoff_hz = 0.1f;
 			chDcBlocker.setSampleTime(lastSampleTime);
 		}
 	}
