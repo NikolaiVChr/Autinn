@@ -164,7 +164,7 @@ void Snare::process(const ProcessArgs &args) {
         pitchEnv[c] *= pitchDecayCoeff;
 
         // If all envelopes are effectively zero, go to sleep.
-        if (ampEnv[c] <= 0.001f && pitchEnv[c] <= 0.001f && noiseEnv[c] <= 0.001f) {
+        if (ampEnv[c] <= 0.001f && pitchEnv[c] <= 0.001f) { // TODO:  && noiseEnv[c] <= 0.001f, cannot decide if it sounds better to also let the noise env. ring out.
             // Also prevents denormals
             ampEnv[c] = 0.0f;
             pitchEnv[c] = 0.0f;
