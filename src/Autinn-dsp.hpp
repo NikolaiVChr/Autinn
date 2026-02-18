@@ -209,6 +209,12 @@ static void generateCleanMinBLEP(const int zeroCrossings, const int oversample, 
     // the next item (essentially outputBuffer[n]), will become 1.0f also.
 }
 
+/**
+ * 1-pole HP filter, 6db/oct (20db/decade)
+ * Should not be used for greater than 200 hz cutoff,
+ * it will distort the cutoff, and at even higher it will become
+ * unstable.
+ */
 struct DCBlocker {
 private:
     float x_1 = 0.f;
