@@ -1,5 +1,5 @@
 #include "Autinn.hpp"
-
+#include "Autinn-dsp.hpp"
 
 /*
 
@@ -28,35 +28,6 @@
 
 const float LOG2_FREQ_RANGE = float(std::log2(FREQ_MAX/FREQ_MIN));
 
-// 1st Order All-Pass Filter for Dispersion
-struct AllPassFilter {
-    float x1 = 0.f; // Previous input
-    float y1 = 0.f; // Previous output
-    float c = 0.f;  // Coefficient (tension)
-
-    void setTension(float tension) {
-        // Map tension to a useful coefficient range (-0.9 to 0.9)
-        // For springs, 0.1 to 0.8 is usually the sweet spot.
-        c = tension;
-    }
-
-    void reset() {
-        x1 = 0.f;
-        y1 = 0.f;
-    }
-
-    float process(float x) {
-        // y[n] = -c * x[n] + x[n-1] - c * y[n-1]
-        float y = -c * x + x1 + c * y1;
-        // Denormal protection
-        if (std::abs(y) < 1e-15f) y = 0.f;
-        
-        x1 = x;
-        y1 = y;
-        return y;
-    }
-};
-
 // models a physical spring
 struct SpringTank {
     // 2^17. Holds ~2.7s at 48kHz, or ~170ms at 768kHz.
@@ -73,13 +44,13 @@ struct SpringTank {
 
     int curr_coils = 6;
 
-    void init(float t_off, float l_off, int coils) {
+    void init(const float t_off, const float l_off, const int coils) {
         tensionOffset = t_off;
         lengthOffset = l_off;
         curr_coils = coils;
     }
 
-    void setCoils(int c) {
+    void setCoils(const int c) {
         curr_coils = c;
     }
 

@@ -135,7 +135,7 @@ void Jette::process(const ProcessArgs &args) {
 	};
 
 	float nyquist = args.sampleRate * 0.5f;
-	float period = 2.0f*M_PI;
+	float period = 2.0f*float(M_PI);
 
 	for (int ch = 0; ch < channels; ch++) {
 		float pitch = pitchBase + inputs[PITCH_INPUT].getPolyVoltage(ch);
@@ -182,7 +182,7 @@ void Jette::process(const ProcessArgs &args) {
 					buzz += amp * sliders[sliderIdx] * val_curr / (float)k;
 				}
 			}
-			buzz *= 20.0f / M_PI;
+			buzz *= 20.0f / float(M_PI);
 		} else if (shape == 1) { // TRIANGLE
 			float c1 = cos(p);
 
@@ -213,11 +213,11 @@ void Jette::process(const ProcessArgs &args) {
 					buzz += amp * sliders[sliderIdx] * val_curr / div;
 				}
 			}
-			buzz *= 40.0f / (M_PI * M_PI);
+			buzz *= 40.0f / float(M_PI * M_PI);
 
 		} else { // SAW
-			float s1 = sin(p);
-			float c1 = cos(p);
+			float s1 = std::sin(p);
+			float c1 = std::cos(p);
 
 			float val_curr = s1;
 			float val_prev = 0.0f;
@@ -243,15 +243,15 @@ void Jette::process(const ProcessArgs &args) {
 				float sign = (k % 2 == 0) ? -1.0f : 1.0f; // Alternating signs
 				buzz += amp * sign * sliders[k-1] * val_curr / (float)k;
 			}
-			buzz *= 10.0f / M_PI;
+			buzz *= 10.0f / float(M_PI);
 		}
 		outputs[BUZZ_OUTPUT].setVoltage(buzz, ch);//approx 10V PP
 
 		if (ch == 0) {
 			blinkTime += dt;
 			float blinkPeriod = 1.0f/(freq*0.01f);
-			blinkTime = fmod(blinkTime, blinkPeriod);
-			lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod*0.5f) ? 1.0 : 0.0;
+			blinkTime = std::fmod(blinkTime, blinkPeriod);
+			lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod*0.5f) ? 1.0f : 0.0f;
 		}
 	}
 }

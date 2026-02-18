@@ -43,7 +43,9 @@ struct Oxcart : Module {
 
 	float phase[16] = {};
 	float blinkTime = 0.0f;
-	dsp::MinBlepGenerator<16,32,float> oxMinBLEP[16];// 16 zero crossings, x32 oversample
+	static constexpr int zeroCrossings = 16;
+	static constexpr int overSample = 32;
+	dsp::MinBlepGenerator<zeroCrossings,overSample,float> oxMinBLEP[16];// 16 zero crossings, x32 oversample
 	DCBlocker dcBlocker[16];
 	float discontinuity = non_lin_func(4.0f);
 	float lastSampleTime = 1.0f/44100.0f;
@@ -55,8 +57,12 @@ struct Oxcart : Module {
 		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
 
+		constexpr int blepSize = 2 * zeroCrossings * overSample;
+		float table[blepSize];
+		generateCleanMinBLEP(zeroCrossings, overSample, table);
 		for (int ch = 0; ch < 16; ch++) {
-			minBlepImpulseFixed(16, 32, oxMinBLEP[ch].impulse);
+			std::memcpy(oxMinBLEP[ch].impulse, table, sizeof(table));
+			oxMinBLEP[ch].impulse[blepSize] = 1.0f;
 			dcBlocker[ch].cutoff_hz = 1.0f;
 			dcBlocker[ch].setSampleTime(lastSampleTime);
 		}

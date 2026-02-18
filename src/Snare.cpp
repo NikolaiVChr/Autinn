@@ -163,8 +163,8 @@ void Snare::process(const ProcessArgs &args) {
         noiseEnv[c] *= noiseCoeff;
         pitchEnv[c] *= pitchDecayCoeff;
 
-        // If both envelopes are effectively zero, go to sleep.
-        if (ampEnv[c] <= 0.001f && pitchEnv[c] <= 0.001f) {
+        // If all envelopes are effectively zero, go to sleep.
+        if (ampEnv[c] <= 0.001f && pitchEnv[c] <= 0.001f && noiseEnv[c] <= 0.001f) {
             // Also prevents denormals
             ampEnv[c] = 0.0f;
             pitchEnv[c] = 0.0f;
@@ -196,7 +196,7 @@ void Snare::process(const ProcessArgs &args) {
         white *= noiseGain;
 
         // Process the noise through the filter
-        float hpfNoise = wireFilter[c].process(white);
+        float hpfNoise = wireFilter[c].process(white + 1e-16f);
 
         if (!std::isfinite(hpfNoise)) {
             hpfNoise = white;

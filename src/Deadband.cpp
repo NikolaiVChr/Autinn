@@ -21,7 +21,7 @@
 
 **/
 
-static const int oversample = 2;
+static constexpr int oversample = 2;
 
 struct Deadband : Module {
 	enum ParamIds {

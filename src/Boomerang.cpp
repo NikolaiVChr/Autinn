@@ -59,16 +59,16 @@ void Boomerang::process(const ProcessArgs &args) {
 	// VCV Rack audio rate is +-5V
 	// VCV Rack CV is +-5V or 0V-10V
 
+	const float level = clamp(params[DIAL_PARAM].getValue()+inputs[CV_INPUT].getVoltage()*0.2f,0.001f,2.0f);
+
 	if (outputs[PRE_OUTPUT].isConnected()) {
 		float in = inputs[PRE_INPUT].getVoltage();
-		float level = clamp(params[DIAL_PARAM].getValue()+inputs[CV_INPUT].getVoltage()*0.2f,0.001f,2.0f);;
 		float out = in*level;
 	    outputs[PRE_OUTPUT].setVoltage(out);
 	}
 
 	if (outputs[POST_OUTPUT].isConnected()) {
 		float in = inputs[POST_INPUT].getVoltage();
-		float level = clamp(params[DIAL_PARAM].getValue()+inputs[CV_INPUT].getVoltage()*0.2f,0.001f,2.0f);;
 		float out = in/level;
 	    outputs[POST_OUTPUT].setVoltage(out);
 	}
