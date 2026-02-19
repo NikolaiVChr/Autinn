@@ -205,6 +205,7 @@ struct Scope : Module {
 	float offset[4]{};
 	float scale[4]{};
 	float thresholdKnob = 0.0f;
+	float threshold2 = 0.1f;
 	float holdoffKnob = -3.0f;
 
 
@@ -512,7 +513,10 @@ struct Scope : Module {
 		if (trigEdge == TRIG_EDGE_FALL) {
 			signal = -signal;
 			//hysteresis = -hysteresis;
+			threshold2 = threshold-hysteresis;
 			threshold = -threshold;
+		} else {
+			threshold2 = threshold+hysteresis;
 		}
 		bool schmittState = trigSchmitt.process(signal, threshold, threshold+hysteresis);
 
@@ -1546,75 +1550,7 @@ struct ScopeDisplay : OpaqueWidget {
 		if (!module) return;
 
 		const float currentLevel = module->thresholdKnob;
-
-		if (std::abs(currentLevel - lastTrigLevel) > 0.001f) {
-			trigVisibilityTimer = 0.5f;
-			lastTrigLevel = currentLevel;
-		}
-
-		if (trigVisibilityTimer > 0.0f) {
-			trigVisibilityTimer -= 0.016f;
-		} else {
-			return;
-		}
-
-		const int ch = module->trigSource;
-
-		float scale = SCALE_DEFAULT;
-		float offset = 0.0f;
-
-		if (ch < TRIG_SOURCE_EXT) {
-			scale = module->scale[ch];
-			if (scale < -0.5f) return;
-			offset = module->offset[ch];
-		} else {
-			return;
-		}
-
-		float hysteresis = TRIG_HYSTERESIS;
-		if (scale > -0.5f && scale < 1.0f) {
-			hysteresis *= scale;
-		}
-
-		float resetVolts = currentLevel;
-		float fireVolts = module->trigEdge == TRIG_EDGE_RISE ? currentLevel + hysteresis : currentLevel - hysteresis;
-
-		float yReset = volt2PxVert(resetVolts, offset, scale);
-		float yFire = volt2PxVert(fireVolts, offset, scale);
-
-		yReset = clamp(yReset, 0.0f, box.size.y);
-		yFire = clamp(yFire, 0.0f, box.size.y);
-
-		auto color = getColor(ch);
-
-		nvgBeginPath(args.vg);
-		float topY = std::min(yReset, yFire);
-		float height = std::abs(yFire - yReset);
-
-		if (height < 0.8f) height = 0.8f;
-
-		nvgRect(args.vg, 0, topY, box.size.x, height);
-		auto bandColor = color;
-		bandColor.a = 0.15f; // Faint glow
-		nvgFillColor(args.vg, bandColor);
-		nvgFill(args.vg);
-
-		color.a *= STROKE_TRIGGER_ALPHA;
-		drawDashedLine(args.vg, 0, yFire, box.size.x, yFire, STROKE_TRIGGER, color);
-
-		nvgFontSize(args.vg, FONTSIZE_TRIGGER);
-		nvgFillColor(args.vg, color);
-		nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_BOTTOM);
-
-		char text[32];
-		snprintf(text, sizeof(text), "Trig: %.2fV", fireVolts);
-		nvgText(args.vg, box.size.x - 5, yFire - 2, text, nullptr);
-	}
-
-	void drawTrigger2(const DrawArgs& args) {
-		if (!module) return;
-
-		const float currentLevel = module->thresholdKnob;
+		const float currentLevel2 = module->threshold2;
 
 		if (std::abs(currentLevel - lastTrigLevel) > 0.001f) {
 			// user is turning knob
@@ -1644,12 +1580,15 @@ struct ScopeDisplay : OpaqueWidget {
 		}
 
 		float y = volt2PxVert(currentLevel, offset, scale);
+		float y2 = volt2PxVert(currentLevel2, offset, scale);
 		if (y < 0) y = 0;
 		if (y > box.size.y) y = box.size.y;
 
 		// Line
 		auto color = getColor(ch);
 		color.a *= STROKE_TRIGGER_ALPHA;
+		float stroke = std::max(STROKE_TRIGGER, std::abs(y-y2));
+		y = (y+y2) * 0.5f;
 		drawDashedLine(args.vg, 0, y, box.size.x, y, STROKE_TRIGGER, color);
 		/*
 		nvgBeginPath(args.vg);
