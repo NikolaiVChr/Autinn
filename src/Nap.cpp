@@ -172,7 +172,7 @@ float Nap::fwdEuler(float out_prv, float in, int oversample) {
 }
 
 float Nap::distort(float out_prv, float in) {
-    return (in - out_prv) / 22.0f - 0.504f * non_lin_func2(out_prv / 45.3f);
+    return (in - out_prv) / 22.0f - 0.504f * sinh_fast_low(out_prv / 45.3f);
 }
 
 struct OversampleNapMenuItem : MenuItem {

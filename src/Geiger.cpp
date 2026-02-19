@@ -163,7 +163,7 @@ struct Geiger : Module {
 
             // Output Transformer/Speaker Saturation
             // This compresses the loud click, making it sound solid rather than spikey.
-            out = non_lin_func(out);
+            out = tanh_fast_high(out);
 
             // Hard clamp for safety
             out = clamp(out * 2.0f, -5.0f, 5.0f);

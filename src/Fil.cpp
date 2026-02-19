@@ -155,7 +155,7 @@ void Fil::process(const ProcessArgs &args) {
 
 			// Soft saturation (The tube limit)
 			// non_lin handles the clipping smoothly like a vacuum tube.
-			float saturated = non_lin_func(drive_amount);
+			float saturated = tanh_fast_high(drive_amount);
 
 			// Safety Check
 			if (!std::isfinite(saturated)) {

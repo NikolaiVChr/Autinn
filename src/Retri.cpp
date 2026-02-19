@@ -241,7 +241,7 @@ void Flora::process(const ProcessArgs &args) {
 		double w_c = double(2.0f*M_PI*F_c/F_s);// cutoff in radians per sample.
 		//g = V_t * ( 0.9892f*w_c-0.4342f*w_c*w_c+0.1381f*w_c*w_c*w_c-0.0202f*w_c*w_c*w_c*w_c); // old auto tuned g for cutoff
 		g = V_t * (0.0008116984 + 0.9724111*w_c - 0.5077766*w_c*w_c + 0.1534058*w_c*w_c*w_c);// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
-		//g = V_t * 2.0f * non_lin_func(w_c * 0.5f);//newest auto tuned g for cutoff
+		//g = V_t * 2.0f * tanh_fast_high(w_c * 0.5f);//newest auto tuned g for cutoff
 		//g = V_t * (1.0f - exp(-2.0f*M_PI*F_c/F_s));// old naive
 		//Gres = 1.0029f+0.0526f*w_c-0.0926f*w_c*w_c+0.0218f*w_c*w_c*w_c;// old auto tuned resonance power for resonance <= 1.0 (0.0218->0.218)
 		Gres = 1.037174 + 3.606925*w_c + 7.074555*w_c*w_c - 18.14674*w_c*w_c*w_c + 9.364587*w_c*w_c*w_c*w_c;
@@ -277,16 +277,16 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
-		y_a = y_a_prev+g*(non_lin_func( x*inv_Vt )-W_a_prev);
-		W_a = non_lin_func( y_a*inv_Vt );
+		y_a = y_a_prev+g*(tanh_fast_high( x*inv_Vt )-W_a_prev);
+		W_a = tanh_fast_high( y_a*inv_Vt );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
-		W_b = non_lin_func( y_b*inv_Vt );
+		W_b = tanh_fast_high( y_b*inv_Vt );
 		// 3rd transistor stage:
 		y_c = y_c_prev+g*(W_b-W_c_prev);
-		W_c = non_lin_func( y_c*inv_Vt );
+		W_c = tanh_fast_high( y_c*inv_Vt );
 		// 4th transistor stage:
-		y_d = y_d_prev+g*(W_c-non_lin_func( y_d_prev*inv_Vt ));
+		y_d = y_d_prev+g*(W_c-tanh_fast_high( y_d_prev*inv_Vt ));
 
 		// record stuff for next step
 		y_d_prev_prev = y_d_prev;
@@ -338,16 +338,16 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
-		y_a_right = y_a_prev_right+g*(non_lin_func( x*inv_Vt )-W_a_prev_right);
-		W_a_right = non_lin_func( y_a_right*inv_Vt );
+		y_a_right = y_a_prev_right+g*(tanh_fast_high( x*inv_Vt )-W_a_prev_right);
+		W_a_right = tanh_fast_high( y_a_right*inv_Vt );
 		// 2nd transistor stage:
 		y_b_right = y_b_prev_right+g*(W_a_right-W_b_prev_right);
-		W_b_right = non_lin_func( y_b_right*inv_Vt );
+		W_b_right = tanh_fast_high( y_b_right*inv_Vt );
 		// 3rd transistor stage:
 		y_c_right = y_c_prev_right+g*(W_b_right-W_c_prev_right);
-		W_c_right = non_lin_func( y_c_right*inv_Vt );
+		W_c_right = tanh_fast_high( y_c_right*inv_Vt );
 		// 4th transistor stage:
-		y_d_right = y_d_prev_right+g*(W_c_right-non_lin_func( y_d_prev_right*inv_Vt ));
+		y_d_right = y_d_prev_right+g*(W_c_right-tanh_fast_high( y_d_prev_right*inv_Vt ));
 
 		// record stuff for next step
 		y_d_prev_prev_right = y_d_prev_right;

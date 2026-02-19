@@ -460,7 +460,7 @@ void Bass::process(const ProcessArgs &args) {
 	float final_out = vca_env * out;
 	final_out = dcBlocker.process(final_out);// this emulates that 303 has a large output capacitor (1µF) followed by a volume potentiometer and output buffer
 	final_out = clamp(final_out, -12.0f, 12.0f); // safety hard clip
-	outputs[BASS_OUTPUT].setVoltage(final_out, 0);//Audio output    //this->non_lin_func(vca*out/SATURATION_VOLT)*SATURATION_VOLT;
+	outputs[BASS_OUTPUT].setVoltage(final_out, 0);//Audio output    //this->tanh_fast_high(vca*out/SATURATION_VOLT)*SATURATION_VOLT;
 	//outputs[BASS_OUTPUT].setVoltage(vca_env, 1);//VCA Envelope output (0V to 1.6V)
 	//outputs[BASS_OUTPUT].setVoltage(cutoff_env_norm-CUTOFF_ENVELOPE_BIAS, 2);//Normalized VCF cutoff envelope output (-0.31 to 3V)
 	//float ext_cutoff_voltage = log2(cutoff_hz/dsp::FREQ_C4);
@@ -901,16 +901,16 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected, 
 		x   = inInter[i] - 2.0f*Gres*r*(y_d_prev+y_d_prev_prev-priority*inInter[i]);//unit and a half feedback delay. -inInter[i] is Gcomp, to make passband gain not decrease too much when turning up resonance.
 
 		// 1st transistor stage:
-		y_a = y_a_prev+g2*(non_lin_fast_func( x*inv_Vt )-W_a_prev);
-		W_a = non_lin_fast_func( y_a*inv_Vt );
+		y_a = y_a_prev+g2*(tanh_fast_low( x*inv_Vt )-W_a_prev);
+		W_a = tanh_fast_low( y_a*inv_Vt );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
-		W_b = non_lin_fast_func( y_b*inv_Vt );
+		W_b = tanh_fast_low( y_b*inv_Vt );
 		// 3rd transistor stage:
 		y_c = y_c_prev+g*(W_b-W_c_prev);
-		W_c = non_lin_fast_func( y_c*inv_Vt );
+		W_c = tanh_fast_low( y_c*inv_Vt );
 		// 4th transistor stage:
-		y_d = y_d_prev+g*(W_c-non_lin_fast_func( y_d_prev*inv_Vt ));
+		y_d = y_d_prev+g*(W_c-tanh_fast_low( y_d_prev*inv_Vt ));
 
 		// record stuff for next step
 		y_d_prev_prev = y_d_prev;

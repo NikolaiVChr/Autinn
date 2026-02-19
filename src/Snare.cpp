@@ -210,7 +210,7 @@ void Snare::process(const ProcessArgs &args) {
         float signal = mix * drive;
 
         // Saturation
-        float x = non_lin_fast_func(signal);
+        float x = tanh_fast_low(signal);
 
         outputs[AUDIO_OUTPUT].setVoltage(x * 5.0f, c);
     }

@@ -202,7 +202,7 @@ struct Saw2 : Module {
 				// We apply the high pass logic again to the output of Stage 1.
 				const float stage2 = hp2[c].process(stage1);
 
-				outBuf[i] = non_lin_func(stage2 * makeupGain);
+				outBuf[i] = tanh_fast_high(stage2 * makeupGain);
 			}
 
 			float out = decimators[c].process(outBuf);

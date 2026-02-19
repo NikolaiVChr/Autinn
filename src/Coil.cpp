@@ -89,7 +89,7 @@ struct SpringTank {
         // Feedback Loop
         // Soft saturate the loop to allow self-oscillation without digital clipping
         float loopSignal = filtered * feedbackAmt;
-        loopSignal = non_lin_func(loopSignal);
+        loopSignal = tanh_fast_high(loopSignal);
 
         // Write to Buffer
         // Add new input + feedback

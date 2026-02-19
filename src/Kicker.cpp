@@ -215,7 +215,7 @@ void Kicker::process(const ProcessArgs &args) {
 
         // Mix & Saturate
         float signal = (body * finalVcaEnv + click) * drive;
-        float x = non_lin_fast_func(signal);
+        float x = tanh_fast_low(signal);
 
         outputs[AUDIO_OUTPUT].setVoltage(x * 5.0f, c);
     }

@@ -48,7 +48,7 @@ struct Oxcart : Module {
 	static constexpr int overSample = 32;
 	dsp::MinBlepGenerator<zeroCrossings,overSample,float> oxMinBLEP[16];// 16 zero crossings, x32 oversample
 	DCBlocker dcBlocker[16];
-	float discontinuity = non_lin_func(4.0f);
+	float discontinuity = tanh_fast_high(4.0f);
 	float lastSampleTime = 1.0f/44100.0f;
 	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimators;
 
@@ -107,16 +107,17 @@ void Oxcart::process(const ProcessArgs &args) {
 		float deltaPhase = freq * deltaTime * period / float(OVERSAMPLE);
 		float outBuf  [OVERSAMPLE];
 
-		for (float & i : outBuf) {
+		for (float & buf : outBuf) {
 			phase[ch] += deltaPhase;
 
 			if (phase[ch] >= period) {
 				phase[ch] -= period;
 				float crossing = -phase[ch] / deltaPhase;
+				// since we oversample we don't need to apply a polyBLAMP table (minBLAMP) also.
 				oxMinBLEP[ch].insertDiscontinuity(crossing, discontinuity);
 			}
 
-			i = -non_lin_func(phase[ch])+oxMinBLEP[ch].process();
+			buf = -tanh_fast_high(phase[ch])+oxMinBLEP[ch].process();
 		}
 
 		const float out = decimators[ch].process(outBuf);
@@ -144,17 +145,17 @@ struct OxcartWidget : ModuleWidget {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/OxcartModule.svg")));
 
-		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0.0f)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2.0f * RACK_GRID_WIDTH, 0.0f)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2.0f * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 150), module, Oxcart::PITCH_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(5.0f * RACK_GRID_WIDTH*0.5f-HALF_KNOB_MED, 150.0f), module, Oxcart::PITCH_PARAM));
 
-		addInput(createInput<InPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 200), module, Oxcart::PITCH_INPUT));
-		addOutput(createOutput<OutPortAutinn>(Vec(5 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Oxcart::BUZZ_OUTPUT));
+		addInput(createInput<InPortAutinn>(Vec(5.0f * RACK_GRID_WIDTH*0.5f-HALF_PORT, 200.0f), module, Oxcart::PITCH_INPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(5.0f * RACK_GRID_WIDTH*0.5f-HALF_PORT, 300.0f), module, Oxcart::BUZZ_OUTPUT));
 
-		addChild(createLight<MediumLight<GreenLight>>(Vec(5 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Oxcart::BLINK_LIGHT));
+		addChild(createLight<MediumLight<GreenLight>>(Vec(5.0f * RACK_GRID_WIDTH*0.5f-9.378f*0.5f, 75.0f), module, Oxcart::BLINK_LIGHT));
 	}
 };
 
