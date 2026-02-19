@@ -408,7 +408,7 @@ struct Scope : Module {
 
 		/*
 		// We need the scope to flatline when no signal is connected,
-		// and we need the lights to not be stuck.
+		// and we need the lights to not be stuck. And trigger CV out to work if ext. trigger is hooked up.
 		if (!inputs[A_INPUT].isConnected() && !inputs[B_INPUT].isConnected() && !inputs[C_INPUT].isConnected() && !inputs[D_INPUT].isConnected()) {
 			return;
 		}
