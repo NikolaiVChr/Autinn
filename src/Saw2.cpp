@@ -49,11 +49,13 @@ struct Saw2 : Module {
 	};
 
 	float phase[16] = {};
-	float hp_state[16] = {}; // Capacitor state for the Acid curve
-	float hp_state2[16] = {};
+	PredictiveBLEP blep[16];
 	DCBlocker dcBlocker[16] = {};
+	DCBlocker hp1[16] = {};
+	DCBlocker hp2[16] = {};
 	float lastSampleTime = 1.0f/44100.0f;
 	float blinkTime = 0.0f;
+	float squareGain = 0.7f;// attenuate square to match the perceived loudness of the saw.
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
 	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimators;
@@ -79,8 +81,8 @@ struct Saw2 : Module {
 	void onReset(const ResetEvent& e) override {
 		square = false;
 		for (int c = 0; c < 16; c++) {
-			hp_state[c] = 0.0f;
-			hp_state2[c] = 0.0f;
+			hp1[c].reset();
+			hp2[c].reset();
 			phase[c] = 0.0f;
 			dcBlocker[c].reset();
 		}
@@ -117,11 +119,11 @@ struct Saw2 : Module {
 		lights[SAW_LIGHT].setBrightness(square ? 0.0f : 1.0f);
 		lights[SQUARE_LIGHT].setBrightness(square ? 1.0f : 0.0f);
 
-		int channels = std::max(1, inputs[CV_PITCH_INPUT].getChannels());
+		const int channels = std::max(1, inputs[CV_PITCH_INPUT].getChannels());
 		outputs[BUZZ_OUTPUT].setChannels(channels);
 
-		float pitchBase = params[PITCH_PARAM].getValue();
-		int pitchInputChannels = inputs[CV_PITCH_INPUT].getChannels();
+		const float pitchBase = params[PITCH_PARAM].getValue();
+		const int pitchInputChannels = inputs[CV_PITCH_INPUT].getChannels();
 
 		if (lastSampleTime != args.sampleTime) {
 			for (auto & chDcBlocker : dcBlocker) {
@@ -134,18 +136,17 @@ struct Saw2 : Module {
 			float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
 			cv_age *= 4.0f;
 
-			// 30Hz is the magic number for a new TB-303 capacitor droop
+			// 30Hz is the magic number for a new capacitor droop
 			const float age = clamp(cv_age+params[AGE_PARAM].getValue(), 0.0f, 60.0f);
-			const float cutoff_hz = 30.0f + age*9.0f;
-			const float rc = 1.0f / (2.0f * M_PI * cutoff_hz);
-			const float alpha = rc / (rc + args.sampleTime/(float)OVERSAMPLE);
+			hp1[c].cutoff_hz = 30.0f + age*9.0f;
+			hp1[c].setSampleTime(args.sampleTime/float(OVERSAMPLE));
 
-			const float cutoff_hz2 = 0.5f + age*4.0f;
-			const float rc2 = 1.0f / (2.0f * M_PI * cutoff_hz2);
-			const float alpha2 = rc2 / (rc2 + args.sampleTime/(float)OVERSAMPLE);
+			hp2[c].cutoff_hz = 0.5f + age*4.0f;
+			hp2[c].setSampleTime(args.sampleTime/float(OVERSAMPLE));
+
 			// As the capacitor dries out (age increases), bass is lost and the signal thins out.
-			// We add gain to compensate, making the Bulge even bigger.
-			float makeupGain = 1.0f + (age * 0.1f); // Up to 5x boost at max age
+			// We add gain to compensate, making the bulge even bigger.
+			const float makeupGain = 1.0f + (age * 0.1f); // Up to 5x boost at max age
 
 			// Calculate Frequency
 			float pitch = pitchBase + (pitchInputChannels > c ? inputs[CV_PITCH_INPUT].getPolyVoltage(c) : inputs[CV_PITCH_INPUT].getVoltage());
@@ -155,68 +156,51 @@ struct Saw2 : Module {
 			// Clamp to prevent explosions near Nyquist
 			freq = clamp(freq, 1.0f, args.sampleRate / 2.0f - 1.0f);
 
-			//float inBuf   [OVERSAMPLE];
 			float outBuf  [OVERSAMPLE];
-			//upsamplers[c].process(stage2, inBuf);
 
 			for (int i = 0; i < OVERSAMPLE; i++) {
-				// Increment Phase
-				float dt = freq * args.sampleTime;
-				dt = dt / (float)OVERSAMPLE;
-				phase[c] += dt;
-				if (phase[c] >= 1.0f) phase[c] -= 1.0f;
+				const float dt = freq * args.sampleTime / (float)OVERSAMPLE;
+				const float nextPhase = phase[c] + dt;
 
-				// Generate Naive Saw (-1 to 1)
-				// A simple ramp: 2 * phase - 1
-				float saw = 2.0f * phase[c] - 1.0f;
+				const float magDown = square ? squareGain * -2.0f : -2.0f;
+				const float magUp   = square ? squareGain *  2.0f :  0.0f;
 
-				// Apply PolyBLEP
-				saw -= polyBLEP(phase[c], dt);
+				if (nextPhase >= 1.0f) {
+					const float overshoot = nextPhase - 1.0f;
+					const float fraction = overshoot / dt;
 
-				if (square) {
-					// Subtract a DC-offset saw from the original saw
-					// This creates a pulse wave without needing a separate oscillator
-					// 0.5f is the phase shift (50% pulse width)
-					// Calculate the shifted phase (180 degrees / 0.5 offset)
-					float phase_shifted = phase[c] + 0.5f;
-					if (phase_shifted >= 1.0f) phase_shifted -= 1.0f;
+					blep[c].jump(fraction, magDown);
+					phase[c] = overshoot;
+				} else if (square && phase[c] < 0.5f && nextPhase >= 0.5f) {
+					const float overshoot = nextPhase - 0.5f;
+					const float fraction = overshoot / dt;
 
-					// Generate the Naive Shifted Saw
-					float saw_shifted = 2.0f * phase_shifted - 1.0f;
-
-					saw_shifted -= polyBLEP(phase_shifted, dt);
-
-					// Subtract to create the pulse
-					// Saw - InvertedSaw = Square
-					saw -= saw_shifted;
-
-					// The subtraction results in a slightly denser signal.
-					// We attenuate slightly to match the perceived loudness of the saw.
-					saw *= 0.7f;
+					blep[c].jump(fraction, magUp);
+					phase[c] = nextPhase;
+				} else {
+					phase[c] = nextPhase;
 				}
 
-				// Apply Acid High Pass Filter (The 303 Shape)
-				// This mimics the AC coupling capacitor that bends the saw into a shark fin.
-				// 30-40Hz is the sweet spot for that hardware sound.
-				// Simple 1-pole High Pass: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
+				float naive = 0.0f;
+				if (!square) {
+					naive = 2.0f * phase[c] - 1.0f;
+				} else {
+					naive = (phase[c] < 0.5f) ? -1.0f : 1.0f;
+					naive *= squareGain;
+				}
 
-				// High Pass Logic: output = input - low_passed_state
+				const float out = blep[c].process(naive);
+
+				// Apply HP Filter
+				// This mimics the AC coupling capacitor that bends the saw into a shark fin.
+
 				// We use a simple leaky integrator to track the DC offset
 				// Stage 1: The Curve (Shark Fin)
-				hp_state[c] = (hp_state[c] * alpha) + (saw * (1.0f - alpha)) + 1e-18f;// + 1e-18f to prevent denormals
-				if (!std::isfinite(hp_state[c])) {
-					hp_state[c] = 0.0f;
-				}
-				float stage1 = saw - hp_state[c];
+				const float stage1 = hp1[c].process(out);
 
 				// Stage 2: Creates the Overshoot
 				// We apply the high pass logic again to the output of Stage 1.
-				hp_state2[c] = (hp_state2[c] * alpha2) + (stage1 * (1.0f - alpha2)) + 1e-18f;
-				if (!std::isfinite(hp_state2[c])) {
-					hp_state2[c] = 0.0f;
-				}
-				float stage2 = stage1 - hp_state2[c];
-
+				const float stage2 = hp2[c].process(stage1);
 
 				outBuf[i] = non_lin_func(stage2 * makeupGain);
 			}
