@@ -22,7 +22,7 @@ Oscillators & Generators
 Module  Oversampling  Anti-Aliasing      Notes
 ---------------------------------------------------------------------------------
 Axe     4x (Fixed)    PolyBLEP           For square waveforms polyBLEP is applied twice
-Oxcart  No            MinBLEP
+Oxcart  4x            MinBLEP
 Jette   No            Harmonic Limiting  Chebyshev recursion stops at Nyquist
 Sjip    No            Harmonic Limiting  Fades out harmonics near Nyquist
 Square  4x (Fixed)    Wavetable          Interpolated band-limited LUTs

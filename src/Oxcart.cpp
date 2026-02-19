@@ -22,6 +22,7 @@
 
 **/
 
+#define OVERSAMPLE 4
 
 struct Oxcart : Module {
 	enum ParamIds {
@@ -49,6 +50,7 @@ struct Oxcart : Module {
 	DCBlocker dcBlocker[16];
 	float discontinuity = non_lin_func(4.0f);
 	float lastSampleTime = 1.0f/44100.0f;
+	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimators;
 
 	Oxcart() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -56,7 +58,7 @@ struct Oxcart : Module {
 		configParam(Oxcart::PITCH_PARAM, -3.0f, 3.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
 		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
-
+		decimators.resize(16);
 		for (int ch = 0; ch < 16; ch++) {
 			dcBlocker[ch].cutoff_hz = 1.0f;
 			dcBlocker[ch].setSampleTime(lastSampleTime);
@@ -97,23 +99,28 @@ void Oxcart::process(const ProcessArgs &args) {
 
 	for (int ch = 0; ch < channels; ch++) {
 		float pitch = pitchBase + (pitchInputChannels>ch?inputs[PITCH_INPUT].getPolyVoltage(ch):inputs[PITCH_INPUT].getVoltage());
-		pitch = clamp(pitch, -4.0f, 4.0f);
+		pitch = clamp(pitch, -4.0f, 6.0f);
 		//float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
 		float freq = dsp::FREQ_C4 * std::exp2f(pitch);//faster
 	
 		float period = 4.0f;
-		float deltaPhase = freq * deltaTime * period;
-		
-		phase[ch] += deltaPhase;
-	
-		if (phase[ch] >= period) {
-			phase[ch] -= period;
-			float crossing = -phase[ch] / deltaPhase;
-			oxMinBLEP[ch].insertDiscontinuity(crossing, discontinuity);
+		float deltaPhase = freq * deltaTime * period / float(OVERSAMPLE);
+		float outBuf  [OVERSAMPLE];
+
+		for (float & i : outBuf) {
+			phase[ch] += deltaPhase;
+
+			if (phase[ch] >= period) {
+				phase[ch] -= period;
+				float crossing = -phase[ch] / deltaPhase;
+				oxMinBLEP[ch].insertDiscontinuity(crossing, discontinuity);
+			}
+
+			i = -non_lin_func(phase[ch])+oxMinBLEP[ch].process();
 		}
-		
-	    float buzz = -non_lin_func(phase[ch])+oxMinBLEP[ch].process();
-		buzz = dcBlocker[ch].process(buzz);
+
+		const float out = decimators[ch].process(outBuf);
+		const float buzz = dcBlocker[ch].process(out);
 
 		// x4.5 to keep its peak within approx 5V
 		// minBLEP will increase peak (x1.15 approx)
