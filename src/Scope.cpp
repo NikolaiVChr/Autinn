@@ -406,9 +406,13 @@ struct Scope : Module {
 
 	void process(const ProcessArgs& args) override {
 
+		/*
+		// We need the scope to flatline when no signal is connected,
+		// and we need the lights to not be stuck.
 		if (!inputs[A_INPUT].isConnected() && !inputs[B_INPUT].isConnected() && !inputs[C_INPUT].isConnected() && !inputs[D_INPUT].isConnected()) {
 			return;
 		}
+		*/
 
 		if (lastSampleTime != args.sampleTime) {
 			for (auto & chDcBlocker : dcBlockers) {
@@ -419,25 +423,34 @@ struct Scope : Module {
 
 		sampleRate = args.sampleRate;
 
+		float in[4] = {};
+
 		if (!frozen) {
 			period_s += args.sampleTime;
 
 
 			for (int c = 0; c < 4; c++) {
-				float in = inputs[A_INPUT + c].getVoltage();
+				in[c] = inputs[A_INPUT + c].getVoltage();
 
 				if (acCoupled[c]) {
-					in = dcBlockers[c].process(in);
+					in[c] = dcBlockers[c].process(in[c]);
 				}
 
-				buffer[c][writeIndex] = in;
+				buffer[c][writeIndex] = in[c];
 			}
 
 			writeIndex = (writeIndex + 1) & BUFFER_MASK;
 			if (writeIndex == 0) bufferFilled = true;
+		} else {
+			for (int c = 0; c < 4; c++) {
+				in[c] = inputs[A_INPUT + c].getVoltage();
+				if (acCoupled[c]) {
+					in[c] = dcBlockers[c].process(in[c]);
+				}
+			}
 		}
 
-		const bool edgeFound = triggerDetect(args);
+		const bool edgeFound = triggerDetect(args, in);
 
 		if (!frozen) {
 			triggerResponse(args, edgeFound);
@@ -464,13 +477,13 @@ struct Scope : Module {
 	 *
 	 */
 
-	bool triggerDetect(const ProcessArgs& args) {
+	bool triggerDetect(const ProcessArgs& args, const float* in) {
 		// Get trigger signal
 		float trigSig = 0.0f;
 		float hysteresis = TRIG_HYSTERESIS; // Default for Ext (100mV)
 		if (trigSource < TRIG_SOURCE_EXT) {
-			trigSig = inputs[A_INPUT + trigSource].getVoltage();
-			float vPerDiv = scale[trigSource];
+			trigSig = in[trigSource];
+			const float vPerDiv = scale[trigSource];
 			if (vPerDiv > -0.5f && vPerDiv < 1.0f) {
 				// We only scale it down. No reason it should ever get larger than 0.1V.
 				hysteresis *= vPerDiv;
