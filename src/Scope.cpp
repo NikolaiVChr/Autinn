@@ -1581,20 +1581,16 @@ struct ScopeDisplay : OpaqueWidget {
 
 		float y = volt2PxVert(currentLevel, offset, scale);
 		float y2 = volt2PxVert(currentLevel2, offset, scale);
-		if (y < box.getTop() + 5.0f) {
-			y = box.getTop() + 5.0f;
-			y2 = y;
-		} else if (y > box.getBottom()-5.0f) {
-			y = box.getBottom()-5.0f;
-			y2 = y;
-		}
+
+		y = clamp(y, 5.0f, box.size.y - 5.0f);
+		y2 = clamp(y2, 5.0f, box.size.y - 5.0f);
 
 		// Line
 		auto color = getColor(ch);
 		color.a *= STROKE_TRIGGER_ALPHA;
 		float stroke = std::max(STROKE_TRIGGER, std::abs(y-y2));
 		y = (y+y2) * 0.5f;
-		drawDashedLine(args.vg, 0, y, box.size.x, y, stroke, color);
+		drawDashedLine(args.vg, 0.0f, y, box.size.x, y, stroke, color);
 
 		// Label
 		nvgFontSize(args.vg, FONTSIZE_TRIGGER);
