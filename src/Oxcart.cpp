@@ -57,12 +57,11 @@ struct Oxcart : Module {
 		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
 
-		constexpr int blepSize = 2 * zeroCrossings * overSample;
-		float table[blepSize];
-		generateCleanMinBLEP(zeroCrossings, overSample, table);
+		constexpr int minBLEPSize = 2 * zeroCrossings * overSample;
 		for (int ch = 0; ch < 16; ch++) {
-			std::memcpy(oxMinBLEP[ch].impulse, table, sizeof(table));
-			oxMinBLEP[ch].impulse[blepSize] = 1.0f;
+			// impulse table size is minBLEPSize+1, so we set the second last to 1.0f to avoid floating point inaccuracies.
+			DEBUG( "Rack Final Value: %f", oxMinBLEP[ch].impulse[minBLEPSize-1] );
+			oxMinBLEP[ch].impulse[minBLEPSize-1] = 1.0f;
 			dcBlocker[ch].cutoff_hz = 1.0f;
 			dcBlocker[ch].setSampleTime(lastSampleTime);
 		}
