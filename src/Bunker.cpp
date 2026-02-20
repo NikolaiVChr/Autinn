@@ -55,7 +55,7 @@ struct Bunker : Module {
 	DCBlocker hp2[16] = {};
 	float lastSampleTime = 1.0f/44100.0f;
 	float blinkTime = 0.0f;
-	float squareGain = 0.7f;// attenuate square to match the perceived loudness of the saw.
+	float squareGain = 1.0f;// attenuate square to match the perceived loudness of the saw.
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
 	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimators;
@@ -227,7 +227,7 @@ struct Bunker : Module {
 struct BunkerWidget : ModuleWidget {
 	BunkerWidget(Bunker *module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/AxeModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/BunkerModule.svg")));
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -258,15 +258,15 @@ struct BunkerWidget : ModuleWidget {
 
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 75.0f+HALF_KNOB_MED), module, Bunker::CV_AGE_INPUT));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75f, 5.0f + (75.0f+HALF_KNOB_MED+162.0f)/2.0f), module, Bunker::TYPE_PARAM));
+		//addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75f, 5.0f + (75.0f+HALF_KNOB_MED+162.0f)/2.0f), module, Bunker::TYPE_PARAM));
 
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25f, 200.0f+HALF_PORT), module, Bunker::CV_PITCH_INPUT));
 		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 200.0f+HALF_PORT), module, Bunker::CV_TYPE_INPUT));
 		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25f, 300.0f+HALF_PORT), module, Bunker::BUZZ_OUTPUT));
 
 		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5f, 50.0f), module, Bunker::BLINK_LIGHT));
-		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6f, 162.0f), module, Bunker::SAW_LIGHT));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6f, 177.0f), module, Bunker::SQUARE_LIGHT));
+		//addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6f, 162.0f), module, Bunker::SAW_LIGHT));
+		//addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6f, 177.0f), module, Bunker::SQUARE_LIGHT));
 	}
 };
 
