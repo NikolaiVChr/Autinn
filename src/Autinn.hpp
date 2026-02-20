@@ -435,3 +435,4 @@ extern Model *modelCoil;
 extern Model *modelGeiger;
 extern Model *modelSaw2;
 extern Model *modelScope;
+extern Model *modelBunker;

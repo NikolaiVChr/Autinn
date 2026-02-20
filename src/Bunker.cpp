@@ -24,7 +24,7 @@
 
 static constexpr int OVERSAMPLE = 4;
 
-struct Saw2 : Module {
+struct Bunker : Module {
 	enum ParamIds {
 		PITCH_PARAM,
 		AGE_PARAM,
@@ -60,7 +60,7 @@ struct Saw2 : Module {
 	dsp::SchmittTrigger schmittButton;
 	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimators;
 
-	Saw2() {
+	Bunker() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(Saw2::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam<Param3Digits>(Saw2::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
@@ -150,9 +150,8 @@ struct Saw2 : Module {
 
 			// Calculate Frequency
 			float pitch = pitchBase + (pitchInputChannels > c ? inputs[CV_PITCH_INPUT].getPolyVoltage(c) : inputs[CV_PITCH_INPUT].getVoltage());
-			pitch = clamp(pitch, -4.0f, 6.0f); // Allow a slightly higher range
-			float freq = dsp::FREQ_C4 * std::exp2f(pitch);
-
+			pitch = clamp(pitch, -4.0f, 5.0f); // Allow a slightly higher range
+			float freq = dsp::FREQ_C4 * std::exp2f(pitch+1);
 
 			float outBuf  [OVERSAMPLE];
 
@@ -164,6 +163,7 @@ struct Saw2 : Module {
 				const float magUp   = square ? squareGain *  2.0f :  0.0f;
 
 				if (nextPhase >= 1.0f) {
+					square = !square;
 					const float overshoot = nextPhase - 1.0f;
 					const float fraction = overshoot / dt;
 
@@ -216,7 +216,7 @@ struct Saw2 : Module {
 			// Blink Light
 			if (c == 0) {
 				blinkTime += args.sampleTime;
-				float blinkPeriod = 1.0f / (freq * 0.05f);
+				const float blinkPeriod = 1.0f / (freq * 0.05f);
 				if (blinkTime >= blinkPeriod) blinkTime -= blinkPeriod;
 				lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod * 0.5f) ? 1.0f : 0.0f;
 			}
@@ -224,8 +224,8 @@ struct Saw2 : Module {
 	}
 };
 
-struct Saw2Widget : ModuleWidget {
-	Saw2Widget(Saw2 *module) {
+struct BunkerWidget : ModuleWidget {
+	BunkerWidget(Bunker *module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/AxeModule.svg")));
 
@@ -270,4 +270,4 @@ struct Saw2Widget : ModuleWidget {
 	}
 };
 
-Model *modelSaw2 = createModel<Saw2, Saw2Widget>("Saw2");
+Model *modelBunker = createModel<Bunker, BunkerWidget>("Bunker");
