@@ -367,6 +367,35 @@ inline float sinh_fast_high(const float x) {
 	return x * (1.0f + p2 * (0.16666667f + p2 * 0.00833333f));
 }
 
+inline float sin_fast_low(float phase) {
+	// Wrap phase to 0.0 - 1.0
+	phase -= std::floor(phase);
+
+	// Shift to -1.0 to +1.0
+	float x = phase * 2.0f - 1.0f;
+
+	// Fast parabolic approximation
+	float sine = -4.0f * x * (1.0f - std::abs(x));
+
+	return sine;
+}
+
+inline float sin_fast_high(float phase) {
+	// Wrap phase to 0.0 - 1.0
+	phase -= std::floor(phase);
+
+	// Shift to -1.0 to +1.0
+	float x = phase * 2.0f - 1.0f;
+
+	// Fast parabolic approximation
+	float sine = -4.0f * x * (1.0f - std::abs(x));
+
+	// Curve smoothing (drops THD from 4% to 0.2%)
+	sine = 0.225f * (sine * std::abs(sine) - sine) + sine;
+
+	return sine;
+}
+
 inline float interpolator(float mix, float a, float b) {
 	// same as: a * (1.0f - mix) + b * mix;
 	return a + mix * (b - a);

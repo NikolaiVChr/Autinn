@@ -87,21 +87,23 @@ struct Bunker : Module {
 	DCBlocker dcBlockerB[16];
 	float driftTime = 0.0f;
 	float lastSampleTime = 1.0f/44100.0f;
+	float last_age = 0.0f;
 	float blinkTime = 0.0f;
 	dsp::SchmittTrigger schmittButton;
+	dsp::SchmittTrigger syncTrigger[16];
 	bool hardSyncEnabled = false;
-	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorA;
-	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorB;
+	std::vector<dsp::Decimator<OVERSAMPLE, 16>> decimatorA;
+	std::vector<dsp::Decimator<OVERSAMPLE, 16>> decimatorB;
 
 	Bunker() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam<ShapeParamQuantity>(SHAPE_PARAM + 0, 0.0f, 3.0f, 2.0f, "Osc Master Shape");
-		configParam<ShapeParamQuantity>(SHAPE_PARAM + 1, 0.0f, 3.0f, 2.0f, "Osc Slave Shape");
+		configParam<ShapeParamQuantity>(SHAPE_PARAM + 1, 0.0f, 3.0f, 1.0f, "Osc Slave Shape");
 		configParam(PITCH_PARAM + 0, -4.0f, 6.0f, 0.0f, "Master Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam(PITCH_PARAM + 1, -4.0f, 6.0f, 0.0f, "Slave Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam<Param3Digits>(AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
-		configParam(GAIN_PARAM + 0, 0.0f, 1.0f, 0.0f, "Master gain", " dB", 10.0f, 20.f, .0f);
-		configParam(GAIN_PARAM + 1, 0.0f, 1.0f, 0.0f, "Slave gain", " dB", 10.0f, 20.f, .0f);
+		configParam(GAIN_PARAM + 0, 0.0f, 1.0f, 1.0f, "Master gain", " dB", 10.0f, 20.f, .0f);
+		configParam(GAIN_PARAM + 1, 0.0f, 1.0f, 1.0f, "Slave gain", " dB", 10.0f, 20.f, .0f);
 		configParam(CROSS_MODULATION_PARAM, -1.0f, 1.0f, 0.0f, "Cross modulation");
 		configButton(HARD_SYNC_TOGGLE_PARAM, "Toggle hard sync");
 
@@ -144,6 +146,7 @@ struct Bunker : Module {
 			dcBlockerB[c].reset();
 			phaseA[c] = 0.0f;
 			phaseB[c] = 0.0f;
+			syncTrigger[c].reset();
 		}
 		blinkTime = 0.0f;
 		schmittButton.reset();
@@ -156,13 +159,14 @@ struct Bunker : Module {
 	}
 
 	void process(const ProcessArgs &args) override {
+
         driftTime += args.sampleTime;
         if (driftTime > 10000.0f) driftTime -= 10000.0f; // Prevent float overflow
 
         // Analog pitch drift (Age knob)
-        float ageKnob = params[AGE_PARAM].getValue();
-        float cv_age = inputs[CV_AGE_INPUT].getVoltage() * 10.0f;
-        float age = clamp(ageKnob + cv_age, 0.0f, 60.0f);
+        const float ageKnob = params[AGE_PARAM].getValue();
+        const float cv_age = inputs[CV_AGE_INPUT].getVoltage() * 10.0f;
+        const float age = clamp(ageKnob + cv_age, 0.0f, 60.0f);
 
         float driftA = 0.0f;
         float driftB = 0.0f;
@@ -174,13 +178,13 @@ struct Bunker : Module {
             driftB = (std::sin(driftTime * 0.59f) + std::sin(driftTime * 0.83f)) * 0.0005f * age;
         }
 
-        float shapeA_knob = params[SHAPE_PARAM + 0].getValue();
-        float shapeB_knob = params[SHAPE_PARAM + 1].getValue();
-        float pitchA_knob = params[PITCH_PARAM + 0].getValue() + driftA;
-        float pitchB_knob = params[PITCH_PARAM + 1].getValue() + driftB;
-        float gainA_knob = params[GAIN_PARAM + 0].getValue();
-        float gainB_knob = params[GAIN_PARAM + 1].getValue();
-        float fmDepth_knob = params[CROSS_MODULATION_PARAM].getValue();
+        const float shapeA_knob = params[SHAPE_PARAM + 0].getValue();
+        const float shapeB_knob = params[SHAPE_PARAM + 1].getValue();
+        const float pitchA_knob = params[PITCH_PARAM + 0].getValue() + driftA;
+        const float pitchB_knob = params[PITCH_PARAM + 1].getValue() + driftB;
+        const float gainA_knob = params[GAIN_PARAM + 0].getValue();
+        const float gainB_knob = params[GAIN_PARAM + 1].getValue();
+        const float fmDepth_knob = params[CROSS_MODULATION_PARAM].getValue();
 
 		if (schmittButton.process(params[HARD_SYNC_TOGGLE_PARAM].getValue() + inputs[CV_HARD_SYNC_TOGGLE_INPUT].getVoltage())) {
 			hardSyncEnabled = !hardSyncEnabled;
@@ -193,7 +197,29 @@ struct Bunker : Module {
         outputs[SOLO_OUTPUT + 0].setChannels(channels);
         outputs[SOLO_OUTPUT + 1].setChannels(channels);
 
+		MorphWeights wA, wB;
+		wA.calculate(shapeA_knob);
+		wB.calculate(shapeB_knob);
+
+		const float osSampleTime = args.sampleTime / (float)OVERSAMPLE;
+		const float makeupGain = 1.0f + (age * 0.1f);
+
         for (int c = 0; c < channels; c++) {
+
+        	if (age > 0.01f) {
+        		hp1A[c].cutoff_hz = 30.0f + age * 9.0f;
+        		hp2A[c].cutoff_hz = 0.5f + age * 4.0f;
+        		hp1B[c].cutoff_hz = 30.0f + age * 9.0f;
+        		hp2B[c].cutoff_hz = 0.5f + age * 4.0f;
+
+        		hp1A[c].setSampleTime(osSampleTime);
+        		hp2A[c].setSampleTime(osSampleTime);
+        		hp1B[c].setSampleTime(osSampleTime);
+        		hp2B[c].setSampleTime(osSampleTime);
+
+        		dcBlockerA[c].setSampleTime(args.sampleTime);
+        		dcBlockerB[c].setSampleTime(args.sampleTime);
+        	}
 
             float gA = gainA_knob;
             if (inputs[CV_GAIN_INPUT + 0].isConnected()) {
@@ -205,34 +231,44 @@ struct Bunker : Module {
                 gB *= clamp(inputs[CV_GAIN_INPUT + 1].getPolyVoltage(c) * 0.1f, 0.0f, 1.0f);
             }
 
+            const float cvA = inputs[CV_PITCH_INPUT + 0].getPolyVoltage(c);
+            const float freqA = dsp::FREQ_C4 * std::exp2f(pitchA_knob + cvA);
 
-            float cvA = inputs[CV_PITCH_INPUT + 0].getPolyVoltage(c);
-            float freqA = dsp::FREQ_C4 * std::exp2(pitchA_knob + cvA);
-
-            float cvB = inputs[CV_PITCH_INPUT + 1].isConnected() ?
+            const float cvB = inputs[CV_PITCH_INPUT + 1].isConnected() ?
                         inputs[CV_PITCH_INPUT + 1].getPolyVoltage(c) : cvA;
-            float baseFreqB = dsp::FREQ_C4 * std::exp2(pitchB_knob + cvB);
+            const float baseFreqB = dsp::FREQ_C4 * std::exp2f(pitchB_knob + cvB);
 
             float fmAmount = fmDepth_knob;
             if (inputs[CV_CROSS_MODULATION_INPUT].isConnected()) {
                 fmAmount *= clamp(inputs[CV_CROSS_MODULATION_INPUT].getPolyVoltage(c) * 0.2f, -1.0f, 1.0f);
             }
 
+        	bool extSync = syncTrigger[c].process(inputs[CV_SYNC_INPUT].getPolyVoltage(c));
 
             float outBufA[OVERSAMPLE];
             float outBufB[OVERSAMPLE];
 
             for (int i = 0; i < OVERSAMPLE; i++) {
-                float osSampleTime = args.sampleTime / (float)OVERSAMPLE;
+
                 float dtA = freqA * osSampleTime;
 
                 float oldPhaseA = phaseA[c];
-                float outA = generateMorphingWaveform(shapeA_knob, phaseA[c], dtA, blepA[c]);
+            	if (extSync && i == 0) {
+            		const float naiveBefore = calculateNaiveMorph(wA, phaseA[c]);
+            		const float naiveAfter = calculateNaiveMorph(wA, 0.0f);
+            		float jumpMag = naiveAfter - naiveBefore;
+
+            		if (dtA < 0.0f) jumpMag = -jumpMag;
+
+            		blepA[c].jump(0.0f, jumpMag);
+            		phaseA[c] = 0.0f;
+            	}
+                float outA = generateMorphingWaveform(wA, phaseA[c], dtA, blepA[c]);
                 lastOutA[c] = outA; // Store for TZFM
 
                 // TZFM
-                float currentFreqB = baseFreqB + (baseFreqB * (lastOutA[c] * fmAmount));
-                float dtB = currentFreqB * osSampleTime;
+                const float currentFreqB = baseFreqB + (baseFreqB * (lastOutA[c] * fmAmount));
+                const float dtB = currentFreqB * osSampleTime;
 
                 float outB = 0.0f;
 
@@ -241,15 +277,15 @@ struct Bunker : Module {
                                      (dtA < 0.0f && oldPhaseA + dtA < 0.0f);
 
                 if (hardSyncEnabled && masterWrapped) {
-                    float overshoot = (dtA > 0.0f) ? (oldPhaseA + dtA - 1.0f) : (oldPhaseA + dtA);
-                    float fraction = overshoot / dtA; // Always +
+                    const float overshoot = (dtA > 0.0f) ? (oldPhaseA + dtA - 1.0f) : (oldPhaseA + dtA);
+                    const float fraction = overshoot / dtA; // Always +
 
                     float phaseAtSync = phaseB[c] + dtB * (1.0f - fraction);
                     phaseAtSync -= std::floor(phaseAtSync);
                     if (phaseAtSync < 0.0f) phaseAtSync += 1.0f;
 
-                    float naiveBefore = calculateNaiveMorph(shapeB_knob, phaseAtSync);
-                    float naiveAfter = calculateNaiveMorph(shapeB_knob, 0.0f);
+                	const float naiveBefore = calculateNaiveMorph(wB, phaseAtSync);
+                	const float naiveAfter = calculateNaiveMorph(wB, 0.0f);
                     float jumpMag = naiveAfter - naiveBefore;
 
                     if (dtA < 0.0f) jumpMag = -jumpMag;
@@ -259,25 +295,12 @@ struct Bunker : Module {
                     phaseB[c] -= std::floor(phaseB[c]);
                     if (phaseB[c] < 0.0f) phaseB[c] += 1.0f;
 
-                    float naiveB = calculateNaiveMorph(shapeB_knob, phaseB[c]);
-                    outB = blepB[c].process(naiveB);
+                	outB = blepB[c].process(calculateNaiveMorph(wB, phaseB[c]));
                 } else {
-                    outB = generateMorphingWaveform(shapeB_knob, phaseB[c], dtB, blepB[c]);
+                    outB = generateMorphingWaveform(wB, phaseB[c], dtB, blepB[c]);
                 }
 
                 if (age > 0.01f) {
-                    hp1A[c].cutoff_hz = 30.0f + age * 9.0f;
-                    hp2A[c].cutoff_hz = 0.5f + age * 4.0f;
-                    hp1B[c].cutoff_hz = 30.0f + age * 9.0f;
-                    hp2B[c].cutoff_hz = 0.5f + age * 4.0f;
-
-                    hp1A[c].setSampleTime(osSampleTime);
-                    hp2A[c].setSampleTime(osSampleTime);
-                    hp1B[c].setSampleTime(osSampleTime);
-                    hp2B[c].setSampleTime(osSampleTime);
-
-                    float makeupGain = 1.0f + (age * 0.1f);
-
                     outA = hp2A[c].process(hp1A[c].process(outA));
                     outA = tanh_fast_high(outA * makeupGain);
 
@@ -302,92 +325,73 @@ struct Bunker : Module {
         }
 
 		lights[HARD_SYNC_LIGHT].setBrightness(hardSyncEnabled ? 1.0f : 0.0f);
+
+		lastSampleTime = args.sampleTime;
+		last_age = age;
     }
 
-	static float calculateNaiveMorph(float shape, float phase) {
-		float wSine = 0.0f, wTri = 0.0f, wSaw = 0.0f, wSquare = 0.0f;
-		if (shape < 1.0f) {
-			wTri = shape;
-			wSine = 1.0f - wTri;
-		} else if (shape < 2.0f) {
-			wSaw = shape - 1.0f;
-			wTri = 1.0f - wSaw;
-		} else {
-			wSquare = shape - 2.0f;
-			wSaw = 1.0f - wSquare;
-		}
+	struct MorphWeights {
+	    float sine = 0.0f, tri = 0.0f, saw = 0.0f, square = 0.0f;
 
-		float naive = 0.0f;
-		if (wSine > 0.0f) naive += wSine * std::sin(phase * 2.0f * float(M_PI));
-		if (wTri > 0.0f) naive += wTri * ((phase < 0.5f) ? (-1.0f + 4.0f * phase) : (3.0f - 4.0f * phase));
-		if (wSaw > 0.0f) naive += wSaw * (2.0f * phase - 1.0f);
-		if (wSquare > 0.0f) naive += wSquare * ((phase < 0.5f) ? -1.0f : 1.0f);
+	    void calculate(float shape) {
+	        sine = tri = saw = square = 0.0f;
+	        if (shape < 1.0f) {
+		        tri = shape; sine = 1.0f - tri;
+	        } else if (shape < 2.0f) {
+		        saw = shape - 1.0f; tri = 1.0f - saw;
+	        } else {
+		        square = shape - 2.0f; saw = 1.0f - square;
+	        }
+	    }
+	};
 
-		return naive;
+	static inline float calculateNaiveMorph(const MorphWeights& w, float phase) {
+	    float naive = 0.0f;
+	    if (w.sine > 0.0f) naive += w.sine * sin_fast_high(phase * 2.0f * float(M_PI));
+	    if (w.tri > 0.0f) naive += w.tri * ((phase < 0.5f) ? (-1.0f + 4.0f * phase) : (3.0f - 4.0f * phase));
+	    if (w.saw > 0.0f) naive += w.saw * (2.0f * phase - 1.0f);
+	    if (w.square > 0.0f) naive += w.square * ((phase < 0.5f) ? -1.0f : 1.0f);
+	    return naive;
 	}
 
-	static float generateMorphingWaveform(float shape, float& phase, float dt, PredictiveBLEP& blep) {
-	    // Weights
-	    float wSine = 0.0f, wTri = 0.0f, wSaw = 0.0f, wSquare = 0.0f;
-	    if (shape < 1.0f) {
-		    wTri = shape; wSine = 1.0f - wTri;
-	    } else if (shape < 2.0f) {
-		    wSaw = shape - 1.0f; wTri = 1.0f - wSaw;
-	    } else {
-		    wSquare = shape - 2.0f; wSaw = 1.0f - wSquare;
-	    }
+	static inline float generateMorphingWaveform(const MorphWeights& w, float& phase, float dt, PredictiveBLEP& blep) {
+	    const float dir = (dt >= 0.0f) ? 1.0f : -1.0f;
+	    const float absDt = std::abs(dt);
 
-	    // Polarities based on direction (TZFM)
-	    float dir = (dt >= 0.0f) ? 1.0f : -1.0f;
-	    float absDt = std::abs(dt);
+	    const float jump0 = (w.saw * -2.0f + w.square * -2.0f) * dir;
+	    const float jump5 = (w.square * 2.0f) * dir;
+	    const float corner0 = (w.tri * 8.0f) * dir;
+	    const float corner5 = (w.tri * -8.0f) * dir;
 
-	    // Base BLEP magnitudes multiplied by direction
-	    float jump0 = (wSaw * -2.0f + wSquare * -2.0f) * dir;
-	    float jump5 = (wSquare * 2.0f) * dir;
-	    float corner0 = (wTri * 8.0f) * dir;
-	    float corner5 = (wTri * -8.0f) * dir;
+	    const float nextPhase = phase + dt;
 
-	    float nextPhase = phase + dt;
-
-	    // Forward/backward phase crossings
 	    if (dt >= 0.0f) {
-	        // Forward
 	        if (nextPhase >= 1.0f) {
-	            float overshoot = nextPhase - 1.0f;
-	            float fraction = overshoot / dt;
+	            const float fraction = (nextPhase - 1.0f) / dt;
 	            if (jump0 != 0.0f) blep.jump(fraction, jump0);
 	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);
-	            phase = overshoot;
+	            phase = nextPhase - 1.0f;
 	        } else if (phase < 0.5f && nextPhase >= 0.5f) {
-	            float overshoot = nextPhase - 0.5f;
-	            float fraction = overshoot / dt;
+	            const float fraction = (nextPhase - 0.5f) / dt;
 	            if (jump5 != 0.0f) blep.jump(fraction, jump5);
 	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);
 	            phase = nextPhase;
-	        } else {
-		        phase = nextPhase;
-	        }
+	        } else { phase = nextPhase; }
 	    } else {
-	        // Reverse (TZFM)
 	        if (nextPhase < 0.0f) {
-	            float overshoot = nextPhase; //  -0.1
-	            float fraction = overshoot / dt; // is +
+	            const float fraction = nextPhase / dt;
 	            if (jump0 != 0.0f) blep.jump(fraction, jump0);
 	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);
-	            phase = 1.0f + overshoot; // Wrap backwards
+	            phase = 1.0f + nextPhase;
 	        } else if (phase >= 0.5f && nextPhase < 0.5f) {
-	            float overshoot = nextPhase - 0.5f;
-	            float fraction = overshoot / dt;
+	            const float fraction = (nextPhase - 0.5f) / dt;
 	            if (jump5 != 0.0f) blep.jump(fraction, jump5);
 	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);
 	            phase = nextPhase;
-	        } else {
-		        phase = nextPhase;
-	        }
+	        } else { phase = nextPhase; }
 	    }
 
-	    float naive = calculateNaiveMorph(shape, phase);
-	    return blep.process(naive);
+	    return blep.process(calculateNaiveMorph(w, phase));
 	}
 
 };
@@ -409,18 +413,18 @@ struct BunkerWidget : ModuleWidget {
         addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-        const float xLeft   = 60.0f;  // Master column
-        const float xMidL   = 105.0f; // Inner left
-        const float xCenter = 150.0f; // Bunker column
-        const float xMidR   = 195.0f; // Inner right
-        const float xRight  = 240.0f; // Slave column
+        constexpr float xLeft   = 60.0f;  // Master column
+        constexpr float xMidL   = 105.0f; // Inner left
+        constexpr float xCenter = 150.0f; // Bunker column
+        constexpr float xMidR   = 195.0f; // Inner right
+        constexpr float xRight  = 240.0f; // Slave column
 
-        const float yRow1 = 70.0f;  // Shapes & FM
-        const float yRow2 = 130.0f; // Pitch & age
-        const float yRow3 = 190.0f; // Gains & sync
-        const float yRow4 = 240.0f; // Pitch/FM CV
-        const float yRow5 = 280.0f; // Gain/age CV
-        const float yRow6 = 330.0f; // Audio outputs
+        constexpr float yRow1 = 70.0f;  // Shapes & FM
+        constexpr float yRow2 = 130.0f; // Pitch & age
+        constexpr float yRow3 = 190.0f; // Gains & sync
+        constexpr float yRow4 = 240.0f; // Pitch/FM CV
+        constexpr float yRow5 = 280.0f; // Gain/age CV
+        constexpr float yRow6 = 330.0f; // Audio outputs
 
         // Row 1: Shapes & cross-modulation
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow1), module, Bunker::SHAPE_PARAM + 0));
@@ -441,7 +445,6 @@ struct BunkerWidget : ModuleWidget {
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow2), module, Bunker::PITCH_PARAM + 1));
 
         // Row 3: Gains, sync CV, & sync Button
-        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xLeft, yRow3), module, Bunker::GAIN_PARAM + 0));
     	auto gain1Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xLeft, yRow3), module, Bunker::GAIN_PARAM + 0);
     	gain1Knob->setModulation(Bunker::CV_GAIN_INPUT+0, [](float cv, float val, float att) {
 			return clamp(val * (cv * 0.1f), 0.0f, 1.0f);
