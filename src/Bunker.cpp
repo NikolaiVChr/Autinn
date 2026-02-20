@@ -62,8 +62,8 @@ struct Bunker : Module {
 
 	Bunker() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(Saw2::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
-		configParam<Param3Digits>(Saw2::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
+		configParam(Bunker::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
+		configParam<Param3Digits>(Bunker::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
 		configButton(TYPE_PARAM, "Saw or Square");
 		configInput(CV_PITCH_INPUT, "1V/Oct CV");
 		configInput(CV_AGE_INPUT, "1V/decade CV");
@@ -234,39 +234,39 @@ struct BunkerWidget : ModuleWidget {
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25f, 125.0f+HALF_KNOB_MED), module, Saw2::PITCH_PARAM));
+		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25f, 125.0f+HALF_KNOB_MED), module, Bunker::PITCH_PARAM));
 		/*
-		auto pitchKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Saw2::PITCH_PARAM);
-		pitchKnob->setModulation(Saw2::CV_PITCH_INPUT, [](float cv, float val, float att) {
+		auto pitchKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Bunker::PITCH_PARAM);
+		pitchKnob->setModulation(Bunker::CV_PITCH_INPUT, [](float cv, float val, float att) {
 					return clamp(val + cv, -4.0f, 6.0f);
 				});
 		addParam(pitchKnob);
 		*/
 
-		auto ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25f, 75.0f+HALF_KNOB_MED), module, Saw2::AGE_PARAM);
+		auto ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25f, 75.0f+HALF_KNOB_MED), module, Bunker::AGE_PARAM);
 
 		// Link modulation:
 		// 1. Source: CV_AGE_INPUT
 		// 2. Math:   Simple Linear. 5V input adds 1.0 to the parameter (Full Sweep).
 		//            (Input * 0.2 means 5V becomes 1.0)
-		ageKnob->setModulation(Saw2::CV_AGE_INPUT, [](float cv, float val, float att) {
+		ageKnob->setModulation(Bunker::CV_AGE_INPUT, [](float cv, float val, float att) {
 			return clamp(val + (cv * 4.0f), 0.0f, 60.0f);
 		});
 
 		addParam(ageKnob);
-		//addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Saw2::AGE_PARAM));
+		//addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Bunker::AGE_PARAM));
 
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 75.0f+HALF_KNOB_MED), module, Saw2::CV_AGE_INPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 75.0f+HALF_KNOB_MED), module, Bunker::CV_AGE_INPUT));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75f, 5.0f + (75.0f+HALF_KNOB_MED+162.0f)/2.0f), module, Saw2::TYPE_PARAM));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75f, 5.0f + (75.0f+HALF_KNOB_MED+162.0f)/2.0f), module, Bunker::TYPE_PARAM));
 
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25f, 200.0f+HALF_PORT), module, Saw2::CV_PITCH_INPUT));
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 200.0f+HALF_PORT), module, Saw2::CV_TYPE_INPUT));
-		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25f, 300.0f+HALF_PORT), module, Saw2::BUZZ_OUTPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25f, 200.0f+HALF_PORT), module, Bunker::CV_PITCH_INPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 200.0f+HALF_PORT), module, Bunker::CV_TYPE_INPUT));
+		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25f, 300.0f+HALF_PORT), module, Bunker::BUZZ_OUTPUT));
 
-		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5f, 50.0f), module, Saw2::BLINK_LIGHT));
-		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6f, 162.0f), module, Saw2::SAW_LIGHT));
-		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6f, 177.0f), module, Saw2::SQUARE_LIGHT));
+		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5f, 50.0f), module, Bunker::BLINK_LIGHT));
+		addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6f, 162.0f), module, Bunker::SAW_LIGHT));
+		addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6f, 177.0f), module, Bunker::SQUARE_LIGHT));
 	}
 };
 
