@@ -315,6 +315,15 @@
         "Visual",
         "Utility"
       ]
+    },
+    {
+      "slug": "Bunker",
+      "name": "Bunker",
+      "description": "Octave dividing oscillator",
+      "tags": [
+        "Oscillator",
+        "Polyphonic"
+      ]
     }
   ]
 }
