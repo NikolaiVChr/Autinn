@@ -158,6 +158,18 @@ struct Bunker : Module {
 		Module::onRandomize(e);
 	}
 
+	json_t *dataToJson() override {
+		json_t *root = json_object();
+		json_object_set_new(root, "hardSyncEnabled", json_boolean(hardSyncEnabled));
+		return root;
+	}
+
+	void dataFromJson(json_t *rootJ) override {
+		json_t *hs = json_object_get(rootJ, "hardSyncEnabled");
+		if (hs)
+			hardSyncEnabled = json_boolean_value(hs);
+	}
+
 	void process(const ProcessArgs &args) override {
 
         driftTime += args.sampleTime;
