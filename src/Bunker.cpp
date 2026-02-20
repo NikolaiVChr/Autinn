@@ -1,6 +1,6 @@
 #include "Autinn.hpp"
-#include <cmath>
 #include "Autinn-dsp.hpp"
+#include <cmath>
 
 /*
 
@@ -22,252 +22,448 @@
 
 **/
 
+struct ShapeParamQuantity : ParamQuantity {
+	std::string getDisplayValueString() override {
+		const float val = getValue();
+
+		if (val <= 0.02f) return "Sine";
+		if (val >= 0.98f && val <= 1.02f) return "Triangle";
+		if (val >= 1.98f && val <= 2.02f) return "Sawtooth";
+		if (val >= 2.98f) return "Square";
+
+		if (val < 1.0f) {
+			int pct = (int)std::round(val * 100.0f);
+			return string::f("Sine/Tri (%d%%)", pct);
+		}
+		if (val < 2.0f) {
+			int pct = (int)std::round((val - 1.0f) * 100.0f);
+			return string::f("Tri/Saw (%d%%)", pct);
+		}
+		int pct = (int)std::round((val - 2.0f) * 100.0f);
+		return string::f("Saw/Sq (%d%%)", pct);
+	}
+};
+
 static constexpr int OVERSAMPLE = 4;
 
 struct Bunker : Module {
 	enum ParamIds {
-		PITCH_PARAM,
+		ENUMS(PITCH_PARAM,2),
 		AGE_PARAM,
-		TYPE_PARAM,
+		ENUMS(GAIN_PARAM,2),
+		ENUMS(SHAPE_PARAM,2),
+		HARD_SYNC_TOGGLE_PARAM,
+		CROSS_MODULATION_PARAM,
 		NUM_PARAMS
 	};
 	enum InputIds {
-		CV_PITCH_INPUT,
-		CV_TYPE_INPUT,
+		ENUMS(CV_PITCH_INPUT,2),
+		ENUMS(CV_GAIN_INPUT,2),
+		CV_SYNC_INPUT,
 		CV_AGE_INPUT,
+		CV_HARD_SYNC_TOGGLE_INPUT,
+		CV_CROSS_MODULATION_INPUT,
 		NUM_INPUTS
 	};
 	enum OutputIds {
 		BUZZ_OUTPUT,
+		RING_MODULATION_OUTPUT,
+		ENUMS(SOLO_OUTPUT,2),
 		NUM_OUTPUTS
 	};
 	enum LightIds {
-		BLINK_LIGHT,
-		SAW_LIGHT,
-		SQUARE_LIGHT,
+		HARD_SYNC_LIGHT,
 		NUM_LIGHTS
 	};
 
-	float phase[16] = {};
-	PredictiveBLEP blep[16];
-	DCBlocker dcBlocker[16] = {};
-	DCBlocker hp1[16] = {};
-	DCBlocker hp2[16] = {};
+	float phaseA[16] = {};
+	float phaseB[16] = {};
+	PredictiveBLEP blepA[16];
+	PredictiveBLEP blepB[16];
+	float lastOutA[16] = {}; // 1-sample memory for TZFM
+	DCBlocker hp1A[16], hp2A[16];
+	DCBlocker hp1B[16], hp2B[16];
+	DCBlocker dcBlockerA[16];
+	DCBlocker dcBlockerB[16];
+	float driftTime = 0.0f;
 	float lastSampleTime = 1.0f/44100.0f;
 	float blinkTime = 0.0f;
-	float squareGain = 1.0f;// attenuate square to match the perceived loudness of the saw.
-	bool square = false;
 	dsp::SchmittTrigger schmittButton;
-	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimators;
+	bool hardSyncEnabled = false;
+	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorA;
+	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorB;
 
 	Bunker() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(Bunker::PITCH_PARAM, -4.0f, 4.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
-		configParam<Param3Digits>(Bunker::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
-		configButton(TYPE_PARAM, "Saw or Square");
-		configInput(CV_PITCH_INPUT, "1V/Oct CV");
-		configInput(CV_AGE_INPUT, "1V/decade CV");
-		configInput(CV_TYPE_INPUT, "Type trigger");
-		configOutput(BUZZ_OUTPUT, "Audio");
-		decimators.resize(16);
+		configParam<ShapeParamQuantity>(SHAPE_PARAM + 0, 0.0f, 3.0f, 2.0f, "Osc Master Shape");
+		configParam<ShapeParamQuantity>(SHAPE_PARAM + 1, 0.0f, 3.0f, 2.0f, "Osc Slave Shape");
+		configParam(PITCH_PARAM + 0, -4.0f, 6.0f, 0.0f, "Master Frequency", " Hz", 2.0f, dsp::FREQ_C4);
+		configParam(PITCH_PARAM + 1, -4.0f, 6.0f, 0.0f, "Slave Frequency", " Hz", 2.0f, dsp::FREQ_C4);
+		configParam<Param3Digits>(AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
+		configParam(GAIN_PARAM + 0, 0.0f, 1.0f, 0.0f, "Master gain", " dB", 10.0f, 20.f, .0f);
+		configParam(GAIN_PARAM + 1, 0.0f, 1.0f, 0.0f, "Slave gain", " dB", 10.0f, 20.f, .0f);
+		configParam(CROSS_MODULATION_PARAM, -1.0f, 1.0f, 0.0f, "Cross modulation");
+		configButton(HARD_SYNC_TOGGLE_PARAM, "Toggle hard sync");
 
-		for (auto & filter : dcBlocker) {
-			// extremely slow. It corrects the DC drift without touching the bass.
-			filter.cutoff_hz = 2.0f;
-			filter.setSampleTime(lastSampleTime);
+		configInput(CV_PITCH_INPUT+0, "Master 1V/Oct CV");
+		configInput(CV_PITCH_INPUT+1, "Slave 1V/Oct CV");
+		configInput(CV_GAIN_INPUT+0, "CV master gain");
+		configInput(CV_GAIN_INPUT+1, "CV slave gain");
+		configInput(CV_SYNC_INPUT, "CV sync");
+		configInput(CV_HARD_SYNC_TOGGLE_INPUT, "CV hard sync toggle");
+		configInput(CV_AGE_INPUT, "1V/decade age CV");
+		configInput(CV_CROSS_MODULATION_INPUT, "Cross modulation CV");
+
+		configOutput(BUZZ_OUTPUT, "Main audio");
+		configOutput(RING_MODULATION_OUTPUT, "Ring modulation audio");
+		configOutput(SOLO_OUTPUT+0, "Master audio");
+		configOutput(SOLO_OUTPUT+1, "Slave audio");
+
+		configLight(HARD_SYNC_LIGHT, "Flashing");
+
+		decimatorA.resize(16);
+		decimatorB.resize(16);
+
+		for (int c = 0; c < 16; c++) {
+			// Correct DC drift without killing the sub-bass.
+			dcBlockerA[c].cutoff_hz = 2.0f;
+			dcBlockerA[c].setSampleTime(lastSampleTime);
+
+			dcBlockerB[c].cutoff_hz = 2.0f;
+			dcBlockerB[c].setSampleTime(lastSampleTime);
 		}
 	}
 
 	void onReset(const ResetEvent& e) override {
-		square = false;
 		for (int c = 0; c < 16; c++) {
-			hp1[c].reset();
-			hp2[c].reset();
-			phase[c] = 0.0f;
-			dcBlocker[c].reset();
+			hp1A[c].reset();
+			hp2A[c].reset();
+			hp1B[c].reset();
+			hp2B[c].reset();
+			dcBlockerA[c].reset();
+			dcBlockerB[c].reset();
+			phaseA[c] = 0.0f;
+			phaseB[c] = 0.0f;
 		}
 		blinkTime = 0.0f;
 		schmittButton.reset();
+		hardSyncEnabled = false;
 		Module::onReset(e);
 	}
 
 	void onRandomize(const RandomizeEvent& e) override {
 		Module::onRandomize(e);
-		square = bool(random::uniform() < 0.5f);
-	}
-
-	json_t *dataToJson() override {
-		json_t *root = json_object();
-		json_object_set_new(root, "square", json_boolean(square));
-		return root;
-	}
-
-	void dataFromJson(json_t *rootJ) override {
-		json_t *ext = json_object_get(rootJ, "square");
-		if (ext)
-			square = json_boolean_value(ext);
 	}
 
 	void process(const ProcessArgs &args) override {
-		if (!outputs[BUZZ_OUTPUT].isConnected()) {
-			return;
+        driftTime += args.sampleTime;
+        if (driftTime > 10000.0f) driftTime -= 10000.0f; // Prevent float overflow
+
+        // Analog pitch drift (Age knob)
+        float ageKnob = params[AGE_PARAM].getValue();
+        float cv_age = inputs[CV_AGE_INPUT].getVoltage() * 10.0f;
+        float age = clamp(ageKnob + cv_age, 0.0f, 60.0f);
+
+        float driftA = 0.0f;
+        float driftB = 0.0f;
+
+        if (age > 0.01f) {
+            // Osc A wanders using two slow prime frequencies
+            driftA = (std::sin(driftTime * 0.43f) + std::sin(driftTime * 0.71f)) * 0.0005f * age;
+            // Osc B wanders using two different frequencies so they drift apart
+            driftB = (std::sin(driftTime * 0.59f) + std::sin(driftTime * 0.83f)) * 0.0005f * age;
+        }
+
+        float shapeA_knob = params[SHAPE_PARAM + 0].getValue();
+        float shapeB_knob = params[SHAPE_PARAM + 1].getValue();
+        float pitchA_knob = params[PITCH_PARAM + 0].getValue() + driftA;
+        float pitchB_knob = params[PITCH_PARAM + 1].getValue() + driftB;
+        float gainA_knob = params[GAIN_PARAM + 0].getValue();
+        float gainB_knob = params[GAIN_PARAM + 1].getValue();
+        float fmDepth_knob = params[CROSS_MODULATION_PARAM].getValue();
+
+		if (schmittButton.process(params[HARD_SYNC_TOGGLE_PARAM].getValue() + inputs[CV_HARD_SYNC_TOGGLE_INPUT].getVoltage())) {
+			hardSyncEnabled = !hardSyncEnabled;
 		}
 
-		if (schmittButton.process(params[TYPE_PARAM].getValue()+inputs[CV_TYPE_INPUT].getVoltage())) {
-			square = !square;
+        // Master input dictates the number of channels
+        int channels = std::max(1, inputs[CV_PITCH_INPUT + 0].getChannels());
+        outputs[BUZZ_OUTPUT].setChannels(channels);
+        outputs[RING_MODULATION_OUTPUT].setChannels(channels);
+        outputs[SOLO_OUTPUT + 0].setChannels(channels);
+        outputs[SOLO_OUTPUT + 1].setChannels(channels);
+
+        for (int c = 0; c < channels; c++) {
+
+            float gA = gainA_knob;
+            if (inputs[CV_GAIN_INPUT + 0].isConnected()) {
+                gA *= clamp(inputs[CV_GAIN_INPUT + 0].getPolyVoltage(c) / 10.0f, 0.0f, 1.0f);
+            }
+
+            float gB = gainB_knob;
+            if (inputs[CV_GAIN_INPUT + 1].isConnected()) {
+                gB *= clamp(inputs[CV_GAIN_INPUT + 1].getPolyVoltage(c) / 10.0f, 0.0f, 1.0f);
+            }
+
+
+            float cvA = inputs[CV_PITCH_INPUT + 0].getPolyVoltage(c);
+            float freqA = dsp::FREQ_C4 * std::pow(2.0f, pitchA_knob + cvA);
+
+            float cvB = inputs[CV_PITCH_INPUT + 1].isConnected() ?
+                        inputs[CV_PITCH_INPUT + 1].getPolyVoltage(c) : cvA;
+            float baseFreqB = dsp::FREQ_C4 * std::pow(2.0f, pitchB_knob + cvB);
+
+            float fmAmount = fmDepth_knob;
+            if (inputs[CV_CROSS_MODULATION_INPUT].isConnected()) {
+                fmAmount *= clamp(inputs[CV_CROSS_MODULATION_INPUT].getPolyVoltage(c) / 5.0f, -1.0f, 1.0f);
+            }
+
+
+            float outBufA[OVERSAMPLE];
+            float outBufB[OVERSAMPLE];
+
+            for (int i = 0; i < OVERSAMPLE; i++) {
+                float osSampleTime = args.sampleTime / (float)OVERSAMPLE;
+                float dtA = freqA * osSampleTime;
+
+                float oldPhaseA = phaseA[c];
+                float outA = generateMorphingWaveform(shapeA_knob, phaseA[c], dtA, blepA[c]);
+                lastOutA[c] = outA; // Store for TZFM
+
+                // TZFM
+                float currentFreqB = baseFreqB + (baseFreqB * (lastOutA[c] * fmAmount));
+                float dtB = currentFreqB * osSampleTime;
+
+                float outB = 0.0f;
+
+                // hard sync logic
+                bool masterWrapped = (dtA > 0.0f && oldPhaseA + dtA >= 1.0f) ||
+                                     (dtA < 0.0f && oldPhaseA + dtA < 0.0f);
+
+                if (hardSyncEnabled && masterWrapped) {
+                    float overshoot = (dtA > 0.0f) ? (oldPhaseA + dtA - 1.0f) : (oldPhaseA + dtA);
+                    float fraction = overshoot / dtA; // Always +
+
+                    float phaseAtSync = phaseB[c] + dtB * (1.0f - fraction);
+                    phaseAtSync -= std::floor(phaseAtSync);
+                    if (phaseAtSync < 0.0f) phaseAtSync += 1.0f;
+
+                    float naiveBefore = calculateNaiveMorph(shapeB_knob, phaseAtSync);
+                    float naiveAfter = calculateNaiveMorph(shapeB_knob, 0.0f);
+                    float jumpMag = naiveAfter - naiveBefore;
+
+                    if (dtA < 0.0f) jumpMag = -jumpMag;
+
+                    blepB[c].jump(fraction, jumpMag);
+                    phaseB[c] = dtB * fraction;
+                    phaseB[c] -= std::floor(phaseB[c]);
+                    if (phaseB[c] < 0.0f) phaseB[c] += 1.0f;
+
+                    float naiveB = calculateNaiveMorph(shapeB_knob, phaseB[c]);
+                    outB = blepB[c].process(naiveB);
+                } else {
+                    outB = generateMorphingWaveform(shapeB_knob, phaseB[c], dtB, blepB[c]);
+                }
+
+                if (age > 0.01f) {
+                    hp1A[c].cutoff_hz = 30.0f + age * 9.0f;
+                    hp2A[c].cutoff_hz = 0.5f + age * 4.0f;
+                    hp1B[c].cutoff_hz = 30.0f + age * 9.0f;
+                    hp2B[c].cutoff_hz = 0.5f + age * 4.0f;
+
+                    hp1A[c].setSampleTime(osSampleTime);
+                    hp2A[c].setSampleTime(osSampleTime);
+                    hp1B[c].setSampleTime(osSampleTime);
+                    hp2B[c].setSampleTime(osSampleTime);
+
+                    float makeupGain = 1.0f + (age * 0.1f);
+
+                    outA = hp2A[c].process(hp1A[c].process(outA));
+                    outA = tanh_fast_high(outA * makeupGain);
+
+                    outB = hp2B[c].process(hp1B[c].process(outB));
+                    outB = tanh_fast_high(outB * makeupGain);
+                }
+
+                outBufA[i] = outA;
+                outBufB[i] = outB;
+            }
+
+        	float finalOutA = decimatorA[c].process(outBufA) * gA;
+        	float finalOutB = decimatorB[c].process(outBufB) * gB;
+
+        	finalOutA = dcBlockerA[c].process(finalOutA);
+        	finalOutB = dcBlockerB[c].process(finalOutB);
+
+            outputs[SOLO_OUTPUT + 0].setVoltage(finalOutA * 5.0f, c);
+            outputs[SOLO_OUTPUT + 1].setVoltage(finalOutB * 5.0f, c);
+            outputs[RING_MODULATION_OUTPUT].setVoltage((finalOutA * finalOutB) * 5.0f, c);
+            outputs[BUZZ_OUTPUT].setVoltage((finalOutA + finalOutB) * 2.5f, c);
+        }
+
+		lights[HARD_SYNC_LIGHT].setBrightness(hardSyncEnabled ? 1.0f : 0.0f);
+    }
+
+	static float calculateNaiveMorph(float shape, float phase) {
+		float wSine = 0.0f, wTri = 0.0f, wSaw = 0.0f, wSquare = 0.0f;
+		if (shape < 1.0f) {
+			wTri = shape;
+			wSine = 1.0f - wTri;
+		} else if (shape < 2.0f) {
+			wSaw = shape - 1.0f;
+			wTri = 1.0f - wSaw;
+		} else {
+			wSquare = shape - 2.0f;
+			wSaw = 1.0f - wSquare;
 		}
-		lights[SAW_LIGHT].setBrightness(square ? 0.0f : 1.0f);
-		lights[SQUARE_LIGHT].setBrightness(square ? 1.0f : 0.0f);
 
-		const int channels = std::max(1, inputs[CV_PITCH_INPUT].getChannels());
-		outputs[BUZZ_OUTPUT].setChannels(channels);
+		float naive = 0.0f;
+		if (wSine > 0.0f) naive += wSine * std::sin(phase * 2.0f * float(M_PI));
+		if (wTri > 0.0f) naive += wTri * ((phase < 0.5f) ? (-1.0f + 4.0f * phase) : (3.0f - 4.0f * phase));
+		if (wSaw > 0.0f) naive += wSaw * (2.0f * phase - 1.0f);
+		if (wSquare > 0.0f) naive += wSquare * ((phase < 0.5f) ? -1.0f : 1.0f);
 
-		const float pitchBase = params[PITCH_PARAM].getValue();
-		const int pitchInputChannels = inputs[CV_PITCH_INPUT].getChannels();
-
-		if (lastSampleTime != args.sampleTime) {
-			for (auto & chDcBlocker : dcBlocker) {
-				chDcBlocker.setSampleTime(args.sampleTime);
-			}
-		}
-		lastSampleTime = args.sampleTime;
-
-		for (int c = 0; c < channels; c++) {
-			float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
-			cv_age *= 4.0f;
-
-			// 30Hz is the magic number for a new capacitor droop
-			const float age = clamp(cv_age+params[AGE_PARAM].getValue(), 0.0f, 60.0f);
-			hp1[c].cutoff_hz = 30.0f + age*9.0f;
-			hp1[c].setSampleTime(args.sampleTime/float(OVERSAMPLE));
-
-			hp2[c].cutoff_hz = 0.5f + age*4.0f;
-			hp2[c].setSampleTime(args.sampleTime/float(OVERSAMPLE));
-
-			// As the capacitor dries out (age increases), bass is lost and the signal thins out.
-			// We add gain to compensate, making the bulge even bigger.
-			const float makeupGain = 1.0f + (age * 0.1f); // Up to 5x boost at max age
-
-			// Calculate Frequency
-			float pitch = pitchBase + (pitchInputChannels > c ? inputs[CV_PITCH_INPUT].getPolyVoltage(c) : inputs[CV_PITCH_INPUT].getVoltage());
-			pitch = clamp(pitch, -4.0f, 5.0f); // Allow a slightly higher range
-			float freq = dsp::FREQ_C4 * std::exp2f(pitch+1);
-
-			float outBuf  [OVERSAMPLE];
-
-			for (int i = 0; i < OVERSAMPLE; i++) {
-				const float dt = freq * args.sampleTime / (float)OVERSAMPLE;
-				const float nextPhase = phase[c] + dt;
-
-				const float magDown = square ? squareGain * -2.0f : -2.0f;
-				const float magUp   = square ? squareGain *  2.0f :  0.0f;
-
-				if (nextPhase >= 1.0f) {
-					square = !square;
-					const float overshoot = nextPhase - 1.0f;
-					const float fraction = overshoot / dt;
-
-					blep[c].jump(fraction, magDown);
-					phase[c] = overshoot;
-				} else if (square && phase[c] < 0.5f && nextPhase >= 0.5f) {
-					const float overshoot = nextPhase - 0.5f;
-					const float fraction = overshoot / dt;
-
-					blep[c].jump(fraction, magUp);
-					phase[c] = nextPhase;
-				} else {
-					phase[c] = nextPhase;
-				}
-
-				float naive = 0.0f;
-				if (!square) {
-					naive = 2.0f * phase[c] - 1.0f;
-				} else {
-					naive = (phase[c] < 0.5f) ? -1.0f : 1.0f;
-					naive *= squareGain;
-				}
-
-				const float out = blep[c].process(naive);
-
-				// Apply HP Filter
-				// This mimics the AC coupling capacitor that bends the saw into a shark fin.
-
-				// We use a simple leaky integrator to track the DC offset
-				// Stage 1: The Curve (Shark Fin)
-				const float stage1 = hp1[c].process(out);
-
-				// Stage 2: Creates the Overshoot
-				// We apply the high pass logic again to the output of Stage 1.
-				const float stage2 = hp2[c].process(stage1);
-
-				outBuf[i] = tanh_fast_high(stage2 * makeupGain);
-			}
-
-			float out = decimators[c].process(outBuf);
-
-			// remove DC offset
-			// Measure the current offset (Accumulate average)
-			out = dcBlocker[c].process(out);
-
-			// Output Gain Staging
-			// Bass will gain it a bit, so we keep the voltage down.
-			outputs[BUZZ_OUTPUT].setVoltage(out * 2.75f, c);
-
-			// Blink Light
-			if (c == 0) {
-				blinkTime += args.sampleTime;
-				const float blinkPeriod = 1.0f / (freq * 0.05f);
-				if (blinkTime >= blinkPeriod) blinkTime -= blinkPeriod;
-				lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod * 0.5f) ? 1.0f : 0.0f;
-			}
-		}
+		return naive;
 	}
+
+	static float generateMorphingWaveform(float shape, float& phase, float dt, PredictiveBLEP& blep) {
+	    // Weights
+	    float wSine = 0.0f, wTri = 0.0f, wSaw = 0.0f, wSquare = 0.0f;
+	    if (shape < 1.0f) {
+		    wTri = shape; wSine = 1.0f - wTri;
+	    } else if (shape < 2.0f) {
+		    wSaw = shape - 1.0f; wTri = 1.0f - wSaw;
+	    } else {
+		    wSquare = shape - 2.0f; wSaw = 1.0f - wSquare;
+	    }
+
+	    // Polarities based on direction (TZFM)
+	    float dir = (dt >= 0.0f) ? 1.0f : -1.0f;
+	    float absDt = std::abs(dt);
+
+	    // Base BLEP magnitudes multiplied by direction
+	    float jump0 = (wSaw * -2.0f + wSquare * -2.0f) * dir;
+	    float jump5 = (wSquare * 2.0f) * dir;
+	    float corner0 = (wTri * 8.0f) * dir;
+	    float corner5 = (wTri * -8.0f) * dir;
+
+	    float nextPhase = phase + dt;
+
+	    // Forward/backward phase crossings
+	    if (dt >= 0.0f) {
+	        // Forward
+	        if (nextPhase >= 1.0f) {
+	            float overshoot = nextPhase - 1.0f;
+	            float fraction = overshoot / dt;
+	            if (jump0 != 0.0f) blep.jump(fraction, jump0);
+	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);
+	            phase = overshoot;
+	        } else if (phase < 0.5f && nextPhase >= 0.5f) {
+	            float overshoot = nextPhase - 0.5f;
+	            float fraction = overshoot / dt;
+	            if (jump5 != 0.0f) blep.jump(fraction, jump5);
+	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);
+	            phase = nextPhase;
+	        } else {
+		        phase = nextPhase;
+	        }
+	    } else {
+	        // Reverse (TZFM)
+	        if (nextPhase < 0.0f) {
+	            float overshoot = nextPhase; //  -0.1
+	            float fraction = overshoot / dt; // is +
+	            if (jump0 != 0.0f) blep.jump(fraction, jump0);
+	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);
+	            phase = 1.0f + overshoot; // Wrap backwards
+	        } else if (phase >= 0.5f && nextPhase < 0.5f) {
+	            float overshoot = nextPhase - 0.5f;
+	            float fraction = overshoot / dt;
+	            if (jump5 != 0.0f) blep.jump(fraction, jump5);
+	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);
+	            phase = nextPhase;
+	        } else {
+		        phase = nextPhase;
+	        }
+	    }
+
+	    float naive = calculateNaiveMorph(shape, phase);
+	    return blep.process(naive);
+	}
+
 };
 
 struct BunkerWidget : ModuleWidget {
-	BunkerWidget(Bunker *module) {
-		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/BunkerModule.svg")));
+    BunkerWidget(Bunker *module) {
+        setModule(module);
 
-		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+    	// 20 HP
+        setPanel(createPanel(asset::plugin(pluginInstance, "res/BunkerModule.svg")));
 
-		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25f, 125.0f+HALF_KNOB_MED), module, Bunker::PITCH_PARAM));
-		/*
-		auto pitchKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25, 125+HALF_KNOB_MED), module, Bunker::PITCH_PARAM);
-		pitchKnob->setModulation(Bunker::CV_PITCH_INPUT, [](float cv, float val, float att) {
-					return clamp(val + cv, -4.0f, 6.0f);
-				});
-		addParam(pitchKnob);
-		*/
+        // VCV standard: 15px per HP. 20 HP = 300px wide.
+        if (box.size.x == 0) {
+            box.size = Vec(20 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
+        }
 
-		auto ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(box.size.x*0.25f, 75.0f+HALF_KNOB_MED), module, Bunker::AGE_PARAM);
+        addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+        addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		// Link modulation:
-		// 1. Source: CV_AGE_INPUT
-		// 2. Math:   Simple Linear. 5V input adds 1.0 to the parameter (Full Sweep).
-		//            (Input * 0.2 means 5V becomes 1.0)
-		ageKnob->setModulation(Bunker::CV_AGE_INPUT, [](float cv, float val, float att) {
-			return clamp(val + (cv * 4.0f), 0.0f, 60.0f);
-		});
+        const float xLeft   = 60.0f;  // Master column
+        const float xMidL   = 105.0f; // Inner left
+        const float xCenter = 150.0f; // Bunker column
+        const float xMidR   = 195.0f; // Inner right
+        const float xRight  = 240.0f; // Slave column
 
-		addParam(ageKnob);
-		//addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(box.size.x*0.25, 75+HALF_KNOB_MED), module, Bunker::AGE_PARAM));
+        const float yRow1 = 60.0f;  // Shapes & FM
+        const float yRow2 = 130.0f; // Pitch & age
+        const float yRow3 = 190.0f; // Gains & sync
+        const float yRow4 = 240.0f; // Pitch/FM CV
+        const float yRow5 = 280.0f; // Gain/age CV
+        const float yRow6 = 330.0f; // Audio outputs
 
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 75.0f+HALF_KNOB_MED), module, Bunker::CV_AGE_INPUT));
+        // Row 1: Shapes & cross-modulation
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow1), module, Bunker::SHAPE_PARAM + 0));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xCenter, yRow1), module, Bunker::CROSS_MODULATION_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow1), module, Bunker::SHAPE_PARAM + 1));
 
-		//addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(box.size.x*0.75f, 5.0f + (75.0f+HALF_KNOB_MED+162.0f)/2.0f), module, Bunker::TYPE_PARAM));
+        // Row 2: Pitches & age
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow2), module, Bunker::PITCH_PARAM + 0));
+        auto ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(xCenter, yRow2), module, Bunker::AGE_PARAM);
+        ageKnob->setModulation(Bunker::CV_AGE_INPUT, [](float cv, float val, float att) {
+            return clamp(val + (cv * 10.0f), 0.0f, 60.0f);
+        });
+        addParam(ageKnob);
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow2), module, Bunker::PITCH_PARAM + 1));
 
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.25f, 200.0f+HALF_PORT), module, Bunker::CV_PITCH_INPUT));
-		addInput(createInputCentered<InPortAutinn>(Vec(box.size.x*0.75f, 200.0f+HALF_PORT), module, Bunker::CV_TYPE_INPUT));
-		addOutput(createOutputCentered<OutPortAutinn>(Vec(box.size.x*0.25f, 300.0f+HALF_PORT), module, Bunker::BUZZ_OUTPUT));
+        // Row 3: Gains, sync CV, & sync Button
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xLeft, yRow3), module, Bunker::GAIN_PARAM + 0));
 
-		addChild(createLightCentered<MediumLight<GreenLight>>(Vec(box.size.x*0.5f, 50.0f), module, Bunker::BLINK_LIGHT));
-		//addChild(createLightCentered<SmallLight<RedLight>>(Vec(box.size.x*0.6f, 162.0f), module, Bunker::SAW_LIGHT));
-		//addChild(createLightCentered<SmallLight<BlueLight>>(Vec(box.size.x*0.6f, 177.0f), module, Bunker::SQUARE_LIGHT));
-	}
+        // Packed tightly around the center sync button
+        addInput(createInputCentered<InPortAutinn>(Vec(xMidL, yRow3), module, Bunker::CV_SYNC_INPUT));
+        addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xCenter, yRow3), module, Bunker::HARD_SYNC_TOGGLE_PARAM));
+        addInput(createInputCentered<InPortAutinn>(Vec(xMidR, yRow3), module, Bunker::CV_HARD_SYNC_TOGGLE_INPUT));
+
+        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xRight, yRow3), module, Bunker::GAIN_PARAM + 1));
+
+        addChild(createLightCentered<MediumLight<GreenLight>>(Vec(xCenter, yRow3 + 20.0f), module, Bunker::HARD_SYNC_LIGHT));
+
+        // Row 4: Pitch CV & cross-mod CV
+        addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow4), module, Bunker::CV_PITCH_INPUT + 0));
+        addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow4), module, Bunker::CV_CROSS_MODULATION_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(xRight, yRow4), module, Bunker::CV_PITCH_INPUT + 1));
+
+        // Row 5: Gain CV & age CV
+        addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow5), module, Bunker::CV_GAIN_INPUT + 0));
+        addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow5), module, Bunker::CV_AGE_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(xRight, yRow5), module, Bunker::CV_GAIN_INPUT + 1));
+
+        // Row 6: Outputs
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(xLeft, yRow6), module, Bunker::SOLO_OUTPUT + 0));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(xMidL, yRow6), module, Bunker::RING_MODULATION_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(xMidR, yRow6), module, Bunker::BUZZ_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(xRight, yRow6), module, Bunker::SOLO_OUTPUT + 1));
+    }
 };
 
 Model *modelBunker = createModel<Bunker, BunkerWidget>("Bunker");

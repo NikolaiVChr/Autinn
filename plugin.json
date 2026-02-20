@@ -319,10 +319,12 @@
     {
       "slug": "Bunker",
       "name": "Bunker",
-      "description": "Octave dividing oscillator",
+      "description": "A polyphonic complex oscillator featuring morphing waveforms, true Through-Zero FM, screaming hard sync, and vintage analog degradation",
+      "keywords": "complex oscillator, through-zero fm, TZFM, hard sync, ring mod, analog drift, morphing",
       "tags": [
         "Oscillator",
-        "Polyphonic"
+        "Polyphonic",
+        "Dual oscillator"
       ]
     }
   ]
