@@ -66,7 +66,7 @@ struct Saw2 : Module {
 		configParam<Param3Digits>(Saw2::AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
 		configButton(TYPE_PARAM, "Saw or Square");
 		configInput(CV_PITCH_INPUT, "1V/Oct CV");
-		configInput(CV_AGE_INPUT, "1V/decade CV");
+		configInput(CV_AGE_INPUT, "4 Years/V CV");
 		configInput(CV_TYPE_INPUT, "Type trigger");
 		configOutput(BUZZ_OUTPUT, "Audio");
 		decimators.resize(16);
