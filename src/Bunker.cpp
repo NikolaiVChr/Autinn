@@ -197,25 +197,25 @@ struct Bunker : Module {
 
             float gA = gainA_knob;
             if (inputs[CV_GAIN_INPUT + 0].isConnected()) {
-                gA *= clamp(inputs[CV_GAIN_INPUT + 0].getPolyVoltage(c) / 10.0f, 0.0f, 1.0f);
+                gA *= clamp(inputs[CV_GAIN_INPUT + 0].getPolyVoltage(c) * 0.1f, 0.0f, 1.0f);
             }
 
             float gB = gainB_knob;
             if (inputs[CV_GAIN_INPUT + 1].isConnected()) {
-                gB *= clamp(inputs[CV_GAIN_INPUT + 1].getPolyVoltage(c) / 10.0f, 0.0f, 1.0f);
+                gB *= clamp(inputs[CV_GAIN_INPUT + 1].getPolyVoltage(c) * 0.1f, 0.0f, 1.0f);
             }
 
 
             float cvA = inputs[CV_PITCH_INPUT + 0].getPolyVoltage(c);
-            float freqA = dsp::FREQ_C4 * std::pow(2.0f, pitchA_knob + cvA);
+            float freqA = dsp::FREQ_C4 * std::exp2(pitchA_knob + cvA);
 
             float cvB = inputs[CV_PITCH_INPUT + 1].isConnected() ?
                         inputs[CV_PITCH_INPUT + 1].getPolyVoltage(c) : cvA;
-            float baseFreqB = dsp::FREQ_C4 * std::pow(2.0f, pitchB_knob + cvB);
+            float baseFreqB = dsp::FREQ_C4 * std::exp2(pitchB_knob + cvB);
 
             float fmAmount = fmDepth_knob;
             if (inputs[CV_CROSS_MODULATION_INPUT].isConnected()) {
-                fmAmount *= clamp(inputs[CV_CROSS_MODULATION_INPUT].getPolyVoltage(c) / 5.0f, -1.0f, 1.0f);
+                fmAmount *= clamp(inputs[CV_CROSS_MODULATION_INPUT].getPolyVoltage(c) * 0.2f, -1.0f, 1.0f);
             }
 
 
@@ -415,7 +415,7 @@ struct BunkerWidget : ModuleWidget {
         const float xMidR   = 195.0f; // Inner right
         const float xRight  = 240.0f; // Slave column
 
-        const float yRow1 = 60.0f;  // Shapes & FM
+        const float yRow1 = 70.0f;  // Shapes & FM
         const float yRow2 = 130.0f; // Pitch & age
         const float yRow3 = 190.0f; // Gains & sync
         const float yRow4 = 240.0f; // Pitch/FM CV
@@ -424,7 +424,11 @@ struct BunkerWidget : ModuleWidget {
 
         // Row 1: Shapes & cross-modulation
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow1), module, Bunker::SHAPE_PARAM + 0));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xCenter, yRow1), module, Bunker::CROSS_MODULATION_PARAM));
+    	auto modKnob = createParamCentered<AutinnArcMidKnob>(Vec(xCenter, yRow1), module, Bunker::CROSS_MODULATION_PARAM);
+    	modKnob->setModulation(Bunker::CV_CROSS_MODULATION_INPUT, [](float cv, float val, float att) {
+			return clamp(val * (cv * 0.2f), -1.0f, 1.0f);
+		});
+    	addParam(modKnob);
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow1), module, Bunker::SHAPE_PARAM + 1));
 
         // Row 2: Pitches & age
@@ -438,13 +442,20 @@ struct BunkerWidget : ModuleWidget {
 
         // Row 3: Gains, sync CV, & sync Button
         addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xLeft, yRow3), module, Bunker::GAIN_PARAM + 0));
-
-        // Packed tightly around the center sync button
+    	auto gain1Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xLeft, yRow3), module, Bunker::GAIN_PARAM + 0);
+    	gain1Knob->setModulation(Bunker::CV_GAIN_INPUT+0, [](float cv, float val, float att) {
+			return clamp(val * (cv * 0.1f), 0.0f, 1.0f);
+		});
+    	addParam(gain1Knob);
         addInput(createInputCentered<InPortAutinn>(Vec(xMidL, yRow3), module, Bunker::CV_SYNC_INPUT));
         addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xCenter, yRow3), module, Bunker::HARD_SYNC_TOGGLE_PARAM));
         addInput(createInputCentered<InPortAutinn>(Vec(xMidR, yRow3), module, Bunker::CV_HARD_SYNC_TOGGLE_INPUT));
 
-        addParam(createParamCentered<RoundSmallAutinnKnob>(Vec(xRight, yRow3), module, Bunker::GAIN_PARAM + 1));
+    	auto gain2Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xRight, yRow3), module, Bunker::GAIN_PARAM + 1);
+    	gain2Knob->setModulation(Bunker::CV_GAIN_INPUT+1, [](float cv, float val, float att) {
+			return clamp(val * (cv * 0.1f), 0.0f, 1.0f);
+		});
+    	addParam(gain2Knob);
 
         addChild(createLightCentered<MediumLight<GreenLight>>(Vec(xCenter, yRow3 + 20.0f), module, Bunker::HARD_SYNC_LIGHT));
 
