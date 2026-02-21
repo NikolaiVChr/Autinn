@@ -183,6 +183,18 @@ struct Excavi : Module {
 
 	void process(const ProcessArgs &args) override {
 
+		if (schmittButton.process(params[HARD_SYNC_TOGGLE_PARAM].getValue() + inputs[CV_HARD_SYNC_TOGGLE_INPUT].getVoltage())) {
+			hardSyncEnabled = !hardSyncEnabled;
+		}
+
+		if (!outputs[BUZZ_OUTPUT].isConnected() &&
+			!outputs[RING_MODULATION_OUTPUT].isConnected() &&
+			!outputs[SOLO_OUTPUT + 0].isConnected() &&
+			!outputs[SOLO_OUTPUT + 1].isConnected()) {
+			lights[HARD_SYNC_LIGHT].setBrightness(hardSyncEnabled ? 1.0f : 0.0f);
+			return;
+		}
+
 		// age
         const float ageKnob = params[AGE_PARAM].getValue();
         const float cv_age = inputs[CV_AGE_INPUT].getVoltage() * 10.0f;
@@ -221,11 +233,7 @@ struct Excavi : Module {
         const float gainB_knob = params[GAIN_PARAM + 1].getValue();
         const float fmDepth_knob = params[CROSS_MODULATION_PARAM].getValue();
 
-		if (schmittButton.process(params[HARD_SYNC_TOGGLE_PARAM].getValue() + inputs[CV_HARD_SYNC_TOGGLE_INPUT].getVoltage())) {
-			hardSyncEnabled = !hardSyncEnabled;
-		}
-
-        // Master input dictates the number of channels
+		// Master input dictates the number of channels
         int channels = std::max(1, inputs[CV_PITCH_INPUT + 0].getChannels());
         outputs[BUZZ_OUTPUT].setChannels(channels);
         outputs[RING_MODULATION_OUTPUT].setChannels(channels);
