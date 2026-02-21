@@ -21,7 +21,7 @@ Oscillators & Generators
 
 Module  Oversampling  Anti-Aliasing        Notes
 ---------------------------------------------------------------------------------
-Excavi  4x (Fixed)    PolyBLAMP & PolyBLEP
+Excavi  4x (Dynamic)  PolyBLAMP & PolyBLEP
 Axe     4x (Fixed)    PolyBLEP             For square waveforms polyBLEP is applied twice
 Oxcart  4x            MinBLEP
 Jette   No            Harmonic Limiting    Chebyshev recursion stops at Nyquist

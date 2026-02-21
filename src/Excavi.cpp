@@ -44,9 +44,6 @@ struct ShapeParamQuantity : ParamQuantity {
 	}
 };
 
-static constexpr int OVERSAMPLE = 4;
-static constexpr float OVERSAMPLE_INV = 1.0f/float(OVERSAMPLE);
-
 struct Excavi : Module {
 	enum ParamIds {
 		ENUMS(PITCH_PARAM,2),
@@ -89,14 +86,24 @@ struct Excavi : Module {
 	float driftPhaseA2 = 0.0f;
 	float driftPhaseB1 = 0.0f;
 	float driftPhaseB2 = 0.0f;
-	float lastSampleTime = 1.0f/44100.0f;
+	float lastSampleRate = 0.0f;
 	float last_age = 0.0f;
 	float blinkTime = 0.0f;
+
+	std::vector<dsp::Decimator<4, 8>> decimatorA4;
+	std::vector<dsp::Decimator<4, 8>> decimatorB4;
+	std::vector<dsp::Decimator<2, 8>> decimatorA2;
+	std::vector<dsp::Decimator<2, 8>> decimatorB2;
+
+	static int getOversampleAmount(const float sampleRate) {
+		if (sampleRate < 50000.0f) return 4;
+		if (sampleRate < 100000.0f) return 2;
+		return 1;
+	}
+
 	dsp::SchmittTrigger schmittButton;
 	dsp::SchmittTrigger syncTrigger[16];
 	bool hardSyncEnabled = false;
-	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorA;
-	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorB;
 
 	Excavi() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -126,8 +133,8 @@ struct Excavi : Module {
 
 		configLight(HARD_SYNC_LIGHT, "Flashing");
 
-		decimatorA.resize(16);
-		decimatorB.resize(16);
+		decimatorA4.resize(16); decimatorB4.resize(16);
+		decimatorA2.resize(16); decimatorB2.resize(16);
 
 		for (int c = 0; c < 16; c++) {
 			hp1A[c].cutoff_hz = 30.0f + 0.0f * 9.0f;
@@ -135,15 +142,8 @@ struct Excavi : Module {
 			hp1B[c].cutoff_hz = hp1A[c].cutoff_hz;
 			hp2B[c].cutoff_hz = hp2A[c].cutoff_hz;
 
-			hp1A[c].setSampleTime(lastSampleTime*OVERSAMPLE_INV);
-			hp2A[c].setSampleTime(lastSampleTime*OVERSAMPLE_INV);
-			hp1B[c].setSampleTime(lastSampleTime*OVERSAMPLE_INV);
-			hp2B[c].setSampleTime(lastSampleTime*OVERSAMPLE_INV);
-
 			dcBlockerA[c].cutoff_hz = 2.0f;
 			dcBlockerB[c].cutoff_hz = 2.0f;
-			dcBlockerA[c].setSampleTime(lastSampleTime);
-			dcBlockerB[c].setSampleTime(lastSampleTime);
 		}
 	}
 
@@ -181,7 +181,140 @@ struct Excavi : Module {
 			hardSyncEnabled = json_boolean_value(hs);
 	}
 
+	struct MorphWeights {
+		// 0:sin
+		// 1:tri
+		// 2:saw
+		// 4:sqr
+
+		float sine = 0.0f, tri = 0.0f, saw = 0.0f, square = 0.0f;
+
+		void calculate(float shape) {
+			sine = tri = saw = square = 0.0f;
+			if (shape < 1.0f) {
+				tri = shape; sine = 1.0f - tri;
+			} else if (shape < 2.0f) {
+				saw = shape - 1.0f; tri = 1.0f - saw;
+			} else {
+				square = shape - 2.0f; saw = 1.0f - square;
+			}
+		}
+	};
+
+	static inline float calculateNaiveMorph(const MorphWeights& w, const float phase) {
+	    float naive = 0.0f;
+	    if (w.sine > 0.0f) naive += w.sine * sin_fast_high(phase * 2.0f * float(M_PI));
+	    if (w.tri > 0.0f) naive += w.tri * (phase < 0.5f ? -1.0f + 4.0f * phase : 3.0f - 4.0f * phase);
+	    if (w.saw > 0.0f) naive += w.saw * (2.0f * phase - 1.0f);
+	    if (w.square > 0.0f) naive += w.square * (phase < 0.5f ? -1.0f : 1.0f) * 0.7f;
+		// note that 0.7 is makeup-gain since square sounds much louder at same max amplitude as the other waveforms.
+	    return naive;
+	}
+
+	static inline float generateMorphingWaveform(const MorphWeights& w, float& phase, float dt, PredictiveBLEP& blep) {
+	    const float dir = (dt >= 0.0f) ? 1.0f : -1.0f;
+	    const float absDt = std::abs(dt);
+
+		const float jump0 = (w.saw * -2.0f + w.square * -2.0f * 0.7f) * dir;
+		const float jump5 = (w.square * 2.0f * 0.7f) * dir;
+	    const float corner0 = (w.tri * 8.0f) * dir;
+	    const float corner5 = (w.tri * -8.0f) * dir;
+
+	    const float nextPhase = phase + dt;
+
+	    if (dt >= 0.0f) {
+	        if (nextPhase >= 1.0f) {
+	            const float fraction = (nextPhase - 1.0f) / dt;
+	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop
+	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom
+	            phase = nextPhase - 1.0f;
+	        } else if (phase < 0.5f && nextPhase >= 0.5f) {
+	            const float fraction = (nextPhase - 0.5f) / dt;
+	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise
+	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top
+	            phase = nextPhase;
+	        } else { phase = nextPhase; }
+	    } else {
+	    	// TZFM (jump and corner's polarities are already flipped with the dir variable)
+	        if (nextPhase < 0.0f) {
+	            const float fraction = nextPhase / dt;
+	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop (inv)
+	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom (inv)
+	            phase = 1.0f + nextPhase;
+	        } else if (phase >= 0.5f && nextPhase < 0.5f) {
+	            const float fraction = (nextPhase - 0.5f) / dt;
+	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise (inv)
+	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top (inv)
+	            phase = nextPhase;
+	        } else {
+		        phase = nextPhase;
+	        }
+	    }
+
+	    return blep.process(calculateNaiveMorph(w, phase));
+	}
+
+	inline void processSubSample(int c, float dtA, float baseFreqB, float fmAmount, float osSampleTime, bool doExtSync,
+								const MorphWeights& wA, const MorphWeights& wB, float makeupGain, float& outA, float& outB) {
+		const float oldPhaseA = phaseA[c];
+
+		if (doExtSync) {
+			const float naiveBefore = calculateNaiveMorph(wA, phaseA[c]);
+			const float naiveAfter = calculateNaiveMorph(wA, 0.0f);
+			float jumpMag = naiveAfter - naiveBefore;
+			if (dtA < 0.0f) jumpMag = -jumpMag;// TZFM
+			blepA[c].jump(0.0f, jumpMag);// insert discontinuity from ext. sync
+			phaseA[c] = 0.0f;
+		}
+
+		outA = generateMorphingWaveform(wA, phaseA[c], dtA, blepA[c]);
+		lastOutA[c] = outA; // Store for TZFM
+
+		// TZFM
+		const float currentFreqB = baseFreqB + (baseFreqB * (lastOutA[c] * fmAmount));
+		const float dtB = currentFreqB * osSampleTime;
+
+		// hard sync logic
+		bool masterWrapped = (dtA > 0.0f && oldPhaseA + dtA >= 1.0f) ||
+							 (dtA < 0.0f && oldPhaseA + dtA < 0.0f);
+
+		if (hardSyncEnabled && masterWrapped) {
+			// Master just finished a period and slave should be synced
+			const float overshoot = (dtA > 0.0f) ? (oldPhaseA + dtA - 1.0f) : (oldPhaseA + dtA);
+			const float fraction = overshoot / dtA;
+
+			float phaseAtSync = phaseB[c] + dtB * (1.0f - fraction);
+			phaseAtSync -= std::floor(phaseAtSync);
+			if (phaseAtSync < 0.0f) phaseAtSync += 1.0f;
+
+			const float naiveBefore = calculateNaiveMorph(wB, phaseAtSync);
+			const float naiveAfter = calculateNaiveMorph(wB, 0.0f);
+			float jumpMag = naiveAfter - naiveBefore;
+
+			if (dtA < 0.0f) jumpMag = -jumpMag;
+
+			blepB[c].jump(fraction, jumpMag);
+			phaseB[c] = dtB * fraction;
+			phaseB[c] -= std::floor(phaseB[c]);
+			if (phaseB[c] < 0.0f) phaseB[c] += 1.0f;
+
+			outB = blepB[c].process(calculateNaiveMorph(wB, phaseB[c]));
+
+		} else {
+			outB = generateMorphingWaveform(wB, phaseB[c], dtB, blepB[c]);
+		}
+
+		outA = hp2A[c].process(hp1A[c].process(outA));
+		outB = hp2B[c].process(hp1B[c].process(outB));
+
+		outA = tanh_fast_high(outA * makeupGain);
+		outB = tanh_fast_high(outB * makeupGain);
+	}
+
 	void process(const ProcessArgs &args) override {
+
+		const int oversample = getOversampleAmount(args.sampleRate);
+		const float osSampleTime = args.sampleTime / (float)oversample;
 
 		if (schmittButton.process(params[HARD_SYNC_TOGGLE_PARAM].getValue() + inputs[CV_HARD_SYNC_TOGGLE_INPUT].getVoltage())) {
 			hardSyncEnabled = !hardSyncEnabled;
@@ -240,9 +373,7 @@ struct Excavi : Module {
         outputs[SOLO_OUTPUT + 0].setChannels(channels);
         outputs[SOLO_OUTPUT + 1].setChannels(channels);
 
-		const float osSampleTime = args.sampleTime * OVERSAMPLE_INV;
-
-		bool updateFilters = (std::abs(age - last_age) > 0.001f) || (args.sampleTime != lastSampleTime);
+		bool updateFilters = (std::abs(age - last_age) > 0.001f) || (args.sampleRate != lastSampleRate);
 
 		if (updateFilters) {
 			for (int c = 0; c < channels; c++) {
@@ -259,7 +390,7 @@ struct Excavi : Module {
 				dcBlockerA[c].setSampleTime(args.sampleTime);
 				dcBlockerB[c].setSampleTime(args.sampleTime);
 			}
-			lastSampleTime = args.sampleTime;
+			lastSampleRate = args.sampleRate;
 			last_age = age;
 		}
 
@@ -297,76 +428,31 @@ struct Excavi : Module {
         	// ext. sync
         	bool extSync = syncTrigger[c].process(inputs[CV_SYNC_INPUT].getPolyVoltage(c));
 
-            float outBufA[OVERSAMPLE];
-            float outBufB[OVERSAMPLE];
-
         	const float dtA = freqA * osSampleTime;
 
-            for (int i = 0; i < OVERSAMPLE; i++) {
+            float finalOutA = 0.0f;
+        	float finalOutB = 0.0f;
 
-                const float oldPhaseA = phaseA[c];
-            	if (extSync && i == 0) {
-            		const float naiveBefore = calculateNaiveMorph(wA, phaseA[c]);
-            		const float naiveAfter = calculateNaiveMorph(wA, 0.0f);
-            		float jumpMag = naiveAfter - naiveBefore;
-
-            		if (dtA < 0.0f) jumpMag = -jumpMag;// TZFM
-
-            		blepA[c].jump(0.0f, jumpMag);// insert discontinuity from ext. sync
-            		phaseA[c] = 0.0f;
-            	}
-                float outA = generateMorphingWaveform(wA, phaseA[c], dtA, blepA[c]);
-                lastOutA[c] = outA; // Store for TZFM
-
-                // TZFM
-                const float currentFreqB = baseFreqB + (baseFreqB * (lastOutA[c] * fmAmount));
-                const float dtB = currentFreqB * osSampleTime;
-
-                float outB = 0.0f;
-
-                // hard sync logic
-                bool masterWrapped = (dtA > 0.0f && oldPhaseA + dtA >= 1.0f) ||
-                                     (dtA < 0.0f && oldPhaseA + dtA < 0.0f);
-
-                if (hardSyncEnabled && masterWrapped) {
-                	// Master just finished a period and slave should be synced
-                    const float overshoot = (dtA > 0.0f) ? (oldPhaseA + dtA - 1.0f) : (oldPhaseA + dtA);
-                    const float fraction = overshoot / dtA; // Always +
-
-                    float phaseAtSync = phaseB[c] + dtB * (1.0f - fraction);
-                    phaseAtSync -= std::floor(phaseAtSync);
-                    if (phaseAtSync < 0.0f) phaseAtSync += 1.0f;
-
-                	const float naiveBefore = calculateNaiveMorph(wB, phaseAtSync);
-                	const float naiveAfter = calculateNaiveMorph(wB, 0.0f);
-                    float jumpMag = naiveAfter - naiveBefore;
-
-                    if (dtA < 0.0f) jumpMag = -jumpMag;
-
-                    blepB[c].jump(fraction, jumpMag);
-                    phaseB[c] = dtB * fraction;
-                    phaseB[c] -= std::floor(phaseB[c]);
-                    if (phaseB[c] < 0.0f) phaseB[c] += 1.0f;
-
-                	outB = blepB[c].process(calculateNaiveMorph(wB, phaseB[c]));
-                } else {
-                    outB = generateMorphingWaveform(wB, phaseB[c], dtB, blepB[c]);
-                }
-
-            	//if (age > 0.01f) {
-            		outA = hp2A[c].process(hp1A[c].process(outA));
-            		outB = hp2B[c].process(hp1B[c].process(outB));
-
-            		outA = tanh_fast_high(outA * makeupGain);
-            		outB = tanh_fast_high(outB * makeupGain);
-            	//}
-
-                outBufA[i] = outA;
-                outBufB[i] = outB;
-            }
-
-        	float finalOutA = decimatorA[c].process(outBufA) * gA;
-        	float finalOutB = decimatorB[c].process(outBufB) * gB;
+        	if (oversample == 4) {
+        		float outBufA[4], outBufB[4];
+        		for (int i = 0; i < 4; i++) {
+        			processSubSample(c, dtA, baseFreqB, fmAmount, osSampleTime, (extSync && i == 0), wA, wB, makeupGain, outBufA[i], outBufB[i]);
+        		}
+        		finalOutA = decimatorA4[c].process(outBufA) * gA;
+        		finalOutB = decimatorB4[c].process(outBufB) * gB;
+        	} else if (oversample == 2) {
+        		float outBufA[2], outBufB[2];
+        		for (int i = 0; i < 2; i++) {
+        			processSubSample(c, dtA, baseFreqB, fmAmount, osSampleTime, (extSync && i == 0), wA, wB, makeupGain, outBufA[i], outBufB[i]);
+        		}
+        		finalOutA = decimatorA2[c].process(outBufA) * gA;
+        		finalOutB = decimatorB2[c].process(outBufB) * gB;
+        	} else {
+        		// 1x (Bypass oversampling entirely at very high sample rates)
+        		processSubSample(c, dtA, baseFreqB, fmAmount, osSampleTime, extSync, wA, wB, makeupGain, finalOutA, finalOutB);
+        		finalOutA *= gA;
+        		finalOutB *= gB;
+        	}
 
         	finalOutA = dcBlockerA[c].process(finalOutA);
         	finalOutB = dcBlockerB[c].process(finalOutB);
@@ -381,80 +467,6 @@ struct Excavi : Module {
 
 		lights[HARD_SYNC_LIGHT].setBrightness(hardSyncEnabled ? 1.0f : 0.0f);
     }
-
-	struct MorphWeights {
-		// 0:sin
-		// 1:tri
-		// 2:saw
-		// 4:sqr
-
-	    float sine = 0.0f, tri = 0.0f, saw = 0.0f, square = 0.0f;
-
-	    void calculate(float shape) {
-	        sine = tri = saw = square = 0.0f;
-	        if (shape < 1.0f) {
-		        tri = shape; sine = 1.0f - tri;
-	        } else if (shape < 2.0f) {
-		        saw = shape - 1.0f; tri = 1.0f - saw;
-	        } else {
-		        square = shape - 2.0f; saw = 1.0f - square;
-	        }
-	    }
-	};
-
-	static inline float calculateNaiveMorph(const MorphWeights& w, const float phase) {
-	    float naive = 0.0f;
-	    if (w.sine > 0.0f) naive += w.sine * sin_fast_high(phase * 2.0f * float(M_PI));
-	    if (w.tri > 0.0f) naive += w.tri * (phase < 0.5f ? -1.0f + 4.0f * phase : 3.0f - 4.0f * phase);
-	    if (w.saw > 0.0f) naive += w.saw * (2.0f * phase - 1.0f);
-	    if (w.square > 0.0f) naive += w.square * (phase < 0.5f ? -1.0f : 1.0f) * 0.7f;
-		// note that 0.7 is makeup-gain since square sounds much louder at same max amplitude as the other waveforms.
-	    return naive;
-	}
-
-	static inline float generateMorphingWaveform(const MorphWeights& w, float& phase, float dt, PredictiveBLEP& blep) {
-	    const float dir = (dt >= 0.0f) ? 1.0f : -1.0f;
-	    const float absDt = std::abs(dt);
-
-		const float jump0 = (w.saw * -2.0f + w.square * -2.0f * 0.7f) * dir;
-		const float jump5 = (w.square * 2.0f * 0.7f) * dir;
-	    const float corner0 = (w.tri * 8.0f) * dir;
-	    const float corner5 = (w.tri * -8.0f) * dir;
-
-	    const float nextPhase = phase + dt;
-
-	    if (dt >= 0.0f) {
-	        if (nextPhase >= 1.0f) {
-	            const float fraction = (nextPhase - 1.0f) / dt;
-	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop
-	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom
-	            phase = nextPhase - 1.0f;
-	        } else if (phase < 0.5f && nextPhase >= 0.5f) {
-	            const float fraction = (nextPhase - 0.5f) / dt;
-	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise
-	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top
-	            phase = nextPhase;
-	        } else { phase = nextPhase; }
-	    } else {
-	    	// TZFM (jump and corner's polarities are already flipped with the dir variable)
-	        if (nextPhase < 0.0f) {
-	            const float fraction = nextPhase / dt;
-	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop (inv)
-	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom (inv)
-	            phase = 1.0f + nextPhase;
-	        } else if (phase >= 0.5f && nextPhase < 0.5f) {
-	            const float fraction = (nextPhase - 0.5f) / dt;
-	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise (inv)
-	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top (inv)
-	            phase = nextPhase;
-	        } else {
-		        phase = nextPhase;
-	        }
-	    }
-
-	    return blep.process(calculateNaiveMorph(w, phase));
-	}
-
 };
 
 struct ExcaviWidget : ModuleWidget {
