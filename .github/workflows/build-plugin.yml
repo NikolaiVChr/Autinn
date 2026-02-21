@@ -124,7 +124,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: dist
-          name: ${{ matrix.config.name }}
+          name: ${{ matrix.config.name }}.zip
           retention-days: 1
       - name: Perform CodeQL Analysis
         if: runner.os == 'Linux'

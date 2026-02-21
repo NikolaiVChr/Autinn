@@ -236,7 +236,7 @@ struct Bunker : Module {
 
         for (int c = 0; c < channels; c++) {
 
-        	// gain (+-2.5V per osc. [naive])
+        	// gain
             float gA = gainA_knob;
             if (inputs[CV_GAIN_INPUT + 0].isConnected()) {
                 gA *= clamp(inputs[CV_GAIN_INPUT + 0].getPolyVoltage(c) * 0.1f, 0.0f, 1.0f);
