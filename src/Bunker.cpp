@@ -251,6 +251,8 @@ struct Bunker : Module {
 				dcBlockerA[c].setSampleTime(args.sampleTime);
 				dcBlockerB[c].setSampleTime(args.sampleTime);
 			}
+			lastSampleTime = args.sampleTime;
+			last_age = age;
 		}
 
 		MorphWeights wA, wB;
@@ -371,8 +373,7 @@ struct Bunker : Module {
 
 		lights[HARD_SYNC_LIGHT].setBrightness(hardSyncEnabled ? 1.0f : 0.0f);
 
-		lastSampleTime = args.sampleTime;
-		last_age = age;
+
     }
 
 	struct MorphWeights {
