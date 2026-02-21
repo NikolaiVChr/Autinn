@@ -83,9 +83,10 @@ struct Bunker : Module {
 	float lastOutA[16] = {}; // 1-sample memory for TZFM
 	DCBlocker hp1A[16], hp2A[16];
 	DCBlocker hp1B[16], hp2B[16];
-	DCBlocker dcBlockerA[16];
-	DCBlocker dcBlockerB[16];
-	float driftTime = 0.0f;
+	float driftPhaseA1 = 0.0f;
+	float driftPhaseA2 = 0.0f;
+	float driftPhaseB1 = 0.0f;
+	float driftPhaseB2 = 0.0f;
 	float lastSampleTime = 1.0f/44100.0f;
 	float last_age = 0.0f;
 	float blinkTime = 0.0f;
@@ -102,8 +103,8 @@ struct Bunker : Module {
 		configParam(PITCH_PARAM + 0, -4.0f, 6.0f, 0.0f, "Master Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam(PITCH_PARAM + 1, -4.0f, 6.0f, 0.0f, "Slave Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam<Param3Digits>(AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
-		configParam(GAIN_PARAM + 0, 0.0f, 1.0f, 1.0f, "Master gain", " dB", 10.0f, 20.f, .0f);
-		configParam(GAIN_PARAM + 1, 0.0f, 1.0f, 1.0f, "Slave gain", " dB", 10.0f, 20.f, .0f);
+		configParam(GAIN_PARAM + 0, 0.0f, 1.0f, 1.0f, "Master gain", " dB", -10.0f, 20.f, .0f);
+		configParam(GAIN_PARAM + 1, 0.0f, 1.0f, 1.0f, "Slave gain", " dB", -10.0f, 20.f, .0f);
 		configParam(CROSS_MODULATION_PARAM, -1.0f, 1.0f, 0.0f, "Cross modulation");
 		configButton(HARD_SYNC_TOGGLE_PARAM, "Toggle hard sync");
 
@@ -125,15 +126,6 @@ struct Bunker : Module {
 
 		decimatorA.resize(16);
 		decimatorB.resize(16);
-
-		for (int c = 0; c < 16; c++) {
-			// Correct DC drift without killing the sub-bass.
-			dcBlockerA[c].cutoff_hz = 2.0f;
-			dcBlockerA[c].setSampleTime(lastSampleTime);
-
-			dcBlockerB[c].cutoff_hz = 2.0f;
-			dcBlockerB[c].setSampleTime(lastSampleTime);
-		}
 	}
 
 	void onReset(const ResetEvent& e) override {
@@ -142,8 +134,6 @@ struct Bunker : Module {
 			hp2A[c].reset();
 			hp1B[c].reset();
 			hp2B[c].reset();
-			dcBlockerA[c].reset();
-			dcBlockerB[c].reset();
 			phaseA[c] = 0.0f;
 			phaseB[c] = 0.0f;
 			syncTrigger[c].reset();
@@ -172,23 +162,35 @@ struct Bunker : Module {
 
 	void process(const ProcessArgs &args) override {
 
-        driftTime += args.sampleTime;
-        if (driftTime > 10000.0f) driftTime -= 10000.0f; // Prevent float overflow
-
-        // Analog pitch drift (Age knob)
+		// age
         const float ageKnob = params[AGE_PARAM].getValue();
         const float cv_age = inputs[CV_AGE_INPUT].getVoltage() * 10.0f;
         const float age = clamp(ageKnob + cv_age, 0.0f, 60.0f);
 
-        float driftA = 0.0f;
-        float driftB = 0.0f;
+		float driftA = 0.0f;
+		float driftB = 0.0f;
 
-        if (age > 0.01f) {
-            // Osc A wanders using two slow prime frequencies
-            driftA = (std::sin(driftTime * 0.43f) + std::sin(driftTime * 0.71f)) * 0.0005f * age;
-            // Osc B wanders using two different frequencies so they drift apart
-            driftB = (std::sin(driftTime * 0.59f) + std::sin(driftTime * 0.83f)) * 0.0005f * age;
-        }
+		if (age > 0.01f) {
+			// each vco have their own capacitor and power fluctuations, so we do them independently.
+			// 2 sines per vco make it sound random instead of vibrato.
+			// We use primes numbers divided by 100, to avoid repeating pattern the brain can pick up on.
+
+			// Wrap at 2*PI to prevent overflow safely
+			driftPhaseA1 += 0.43f * args.sampleTime;
+			if (driftPhaseA1 > 6.2831853f) driftPhaseA1 -= 6.2831853f;
+
+			driftPhaseA2 += 0.71f * args.sampleTime;
+			if (driftPhaseA2 > 6.2831853f) driftPhaseA2 -= 6.2831853f;
+
+			driftPhaseB1 += 0.59f * args.sampleTime;
+			if (driftPhaseB1 > 6.2831853f) driftPhaseB1 -= 6.2831853f;
+
+			driftPhaseB2 += 0.83f * args.sampleTime;
+			if (driftPhaseB2 > 6.2831853f) driftPhaseB2 -= 6.2831853f;
+
+			driftA = (sin_fast_high(driftPhaseA1) + sin_fast_high(driftPhaseA2)) * 0.0005f * age;
+			driftB = (sin_fast_high(driftPhaseB1) + sin_fast_high(driftPhaseB2)) * 0.0005f * age;
+		}
 
         const float shapeA_knob = params[SHAPE_PARAM + 0].getValue();
         const float shapeB_knob = params[SHAPE_PARAM + 1].getValue();
@@ -209,6 +211,22 @@ struct Bunker : Module {
         outputs[SOLO_OUTPUT + 0].setChannels(channels);
         outputs[SOLO_OUTPUT + 1].setChannels(channels);
 
+		bool updateFilters = (std::abs(age - last_age) > 0.001f) || (args.sampleTime != lastSampleTime);
+
+		if (updateFilters) {
+			for (int c = 0; c < channels; c++) {
+				hp1A[c].cutoff_hz = 2.0f + 28.0f * clamp(age * 10.0f, 0.0f, 1.0f) + (age * 9.0f);
+				hp2A[c].cutoff_hz = 0.5f + age * 4.0f;
+				hp1B[c].cutoff_hz = hp1A[c].cutoff_hz;
+				hp2B[c].cutoff_hz = hp2A[c].cutoff_hz;
+
+				hp1A[c].setSampleTime(args.sampleTime);
+				hp2A[c].setSampleTime(args.sampleTime);
+				hp1B[c].setSampleTime(args.sampleTime);
+				hp2B[c].setSampleTime(args.sampleTime);
+			}
+		}
+
 		MorphWeights wA, wB;
 		wA.calculate(shapeA_knob);
 		wB.calculate(shapeB_knob);
@@ -218,61 +236,48 @@ struct Bunker : Module {
 
         for (int c = 0; c < channels; c++) {
 
-        	if (age > 0.01f) {
-        		hp1A[c].cutoff_hz = 30.0f + age * 9.0f;
-        		hp2A[c].cutoff_hz = 0.5f + age * 4.0f;
-        		hp1B[c].cutoff_hz = 30.0f + age * 9.0f;
-        		hp2B[c].cutoff_hz = 0.5f + age * 4.0f;
-
-        		hp1A[c].setSampleTime(osSampleTime);
-        		hp2A[c].setSampleTime(osSampleTime);
-        		hp1B[c].setSampleTime(osSampleTime);
-        		hp2B[c].setSampleTime(osSampleTime);
-
-        		dcBlockerA[c].setSampleTime(args.sampleTime);
-        		dcBlockerB[c].setSampleTime(args.sampleTime);
-        	}
-
+        	// gain (+-2.5V per osc. [naive])
             float gA = gainA_knob;
             if (inputs[CV_GAIN_INPUT + 0].isConnected()) {
                 gA *= clamp(inputs[CV_GAIN_INPUT + 0].getPolyVoltage(c) * 0.1f, 0.0f, 1.0f);
             }
-
             float gB = gainB_knob;
             if (inputs[CV_GAIN_INPUT + 1].isConnected()) {
                 gB *= clamp(inputs[CV_GAIN_INPUT + 1].getPolyVoltage(c) * 0.1f, 0.0f, 1.0f);
             }
 
+        	// pitch
             const float cvA = inputs[CV_PITCH_INPUT + 0].getPolyVoltage(c);
             const float freqA = dsp::FREQ_C4 * std::exp2f(pitchA_knob + cvA);
-
             const float cvB = inputs[CV_PITCH_INPUT + 1].isConnected() ?
                         inputs[CV_PITCH_INPUT + 1].getPolyVoltage(c) : cvA;
             const float baseFreqB = dsp::FREQ_C4 * std::exp2f(pitchB_knob + cvB);
 
+        	// cross modulation (FM)
             float fmAmount = fmDepth_knob;
             if (inputs[CV_CROSS_MODULATION_INPUT].isConnected()) {
                 fmAmount *= clamp(inputs[CV_CROSS_MODULATION_INPUT].getPolyVoltage(c) * 0.2f, -1.0f, 1.0f);
             }
 
+        	// ext. sync
         	bool extSync = syncTrigger[c].process(inputs[CV_SYNC_INPUT].getPolyVoltage(c));
 
             float outBufA[OVERSAMPLE];
             float outBufB[OVERSAMPLE];
 
+        	const float dtA = freqA * osSampleTime;
+
             for (int i = 0; i < OVERSAMPLE; i++) {
 
-                float dtA = freqA * osSampleTime;
-
-                float oldPhaseA = phaseA[c];
+                const float oldPhaseA = phaseA[c];
             	if (extSync && i == 0) {
             		const float naiveBefore = calculateNaiveMorph(wA, phaseA[c]);
             		const float naiveAfter = calculateNaiveMorph(wA, 0.0f);
             		float jumpMag = naiveAfter - naiveBefore;
 
-            		if (dtA < 0.0f) jumpMag = -jumpMag;
+            		if (dtA < 0.0f) jumpMag = -jumpMag;// TZFM
 
-            		blepA[c].jump(0.0f, jumpMag);
+            		blepA[c].jump(0.0f, jumpMag);// insert discontinuity from ext. sync
             		phaseA[c] = 0.0f;
             	}
                 float outA = generateMorphingWaveform(wA, phaseA[c], dtA, blepA[c]);
@@ -289,6 +294,7 @@ struct Bunker : Module {
                                      (dtA < 0.0f && oldPhaseA + dtA < 0.0f);
 
                 if (hardSyncEnabled && masterWrapped) {
+                	// Master just finished a period and slave should be synced
                     const float overshoot = (dtA > 0.0f) ? (oldPhaseA + dtA - 1.0f) : (oldPhaseA + dtA);
                     const float fraction = overshoot / dtA; // Always +
 
@@ -313,10 +319,7 @@ struct Bunker : Module {
                 }
 
                 if (age > 0.01f) {
-                    outA = hp2A[c].process(hp1A[c].process(outA));
                     outA = tanh_fast_high(outA * makeupGain);
-
-                    outB = hp2B[c].process(hp1B[c].process(outB));
                     outB = tanh_fast_high(outB * makeupGain);
                 }
 
@@ -327,8 +330,10 @@ struct Bunker : Module {
         	float finalOutA = decimatorA[c].process(outBufA) * gA;
         	float finalOutB = decimatorB[c].process(outBufB) * gB;
 
-        	finalOutA = dcBlockerA[c].process(finalOutA);
-        	finalOutB = dcBlockerB[c].process(finalOutB);
+        	finalOutA = hp2A[c].process(hp1A[c].process(finalOutA));
+        	finalOutB = hp2B[c].process(hp1B[c].process(finalOutB));
+
+        	//TODO: Only calculate outB when OUT, RM OUT or SLAVE OUT is connected? ..waste of branching, since 99.9% of the time it will be in use.
 
             outputs[SOLO_OUTPUT + 0].setVoltage(finalOutA * 5.0f, c);
             outputs[SOLO_OUTPUT + 1].setVoltage(finalOutB * 5.0f, c);
@@ -343,6 +348,11 @@ struct Bunker : Module {
     }
 
 	struct MorphWeights {
+		// 0:sin
+		// 1:tri
+		// 2:saw
+		// 4:sqr
+
 	    float sine = 0.0f, tri = 0.0f, saw = 0.0f, square = 0.0f;
 
 	    void calculate(float shape) {
@@ -357,12 +367,12 @@ struct Bunker : Module {
 	    }
 	};
 
-	static inline float calculateNaiveMorph(const MorphWeights& w, float phase) {
+	static inline float calculateNaiveMorph(const MorphWeights& w, const float phase) {
 	    float naive = 0.0f;
 	    if (w.sine > 0.0f) naive += w.sine * sin_fast_high(phase * 2.0f * float(M_PI));
-	    if (w.tri > 0.0f) naive += w.tri * ((phase < 0.5f) ? (-1.0f + 4.0f * phase) : (3.0f - 4.0f * phase));
+	    if (w.tri > 0.0f) naive += w.tri * (phase < 0.5f ? -1.0f + 4.0f * phase : 3.0f - 4.0f * phase);
 	    if (w.saw > 0.0f) naive += w.saw * (2.0f * phase - 1.0f);
-	    if (w.square > 0.0f) naive += w.square * ((phase < 0.5f) ? -1.0f : 1.0f);
+	    if (w.square > 0.0f) naive += w.square * (phase < 0.5f ? -1.0f : 1.0f);
 	    return naive;
 	}
 
@@ -380,27 +390,30 @@ struct Bunker : Module {
 	    if (dt >= 0.0f) {
 	        if (nextPhase >= 1.0f) {
 	            const float fraction = (nextPhase - 1.0f) / dt;
-	            if (jump0 != 0.0f) blep.jump(fraction, jump0);
-	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);
+	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop
+	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom
 	            phase = nextPhase - 1.0f;
 	        } else if (phase < 0.5f && nextPhase >= 0.5f) {
 	            const float fraction = (nextPhase - 0.5f) / dt;
-	            if (jump5 != 0.0f) blep.jump(fraction, jump5);
-	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);
+	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise
+	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top
 	            phase = nextPhase;
 	        } else { phase = nextPhase; }
 	    } else {
+	    	// TZFM (jump and corner's polarities are already flipped with the dir variable)
 	        if (nextPhase < 0.0f) {
 	            const float fraction = nextPhase / dt;
-	            if (jump0 != 0.0f) blep.jump(fraction, jump0);
-	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);
+	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop (inv)
+	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom (inv)
 	            phase = 1.0f + nextPhase;
 	        } else if (phase >= 0.5f && nextPhase < 0.5f) {
 	            const float fraction = (nextPhase - 0.5f) / dt;
-	            if (jump5 != 0.0f) blep.jump(fraction, jump5);
-	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);
+	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise (inv)
+	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top (inv)
 	            phase = nextPhase;
-	        } else { phase = nextPhase; }
+	        } else {
+		        phase = nextPhase;
+	        }
 	    }
 
 	    return blep.process(calculateNaiveMorph(w, phase));
@@ -420,16 +433,18 @@ struct BunkerWidget : ModuleWidget {
             box.size = Vec(20 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
         }
 
+    	const float HP = RACK_GRID_WIDTH;
+
         addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-        constexpr float xLeft   = 60.0f;  // Master column
-        constexpr float xMidL   = 105.0f; // Inner left
-        constexpr float xCenter = 150.0f; // Bunker column
-        constexpr float xMidR   = 195.0f; // Inner right
-        constexpr float xRight  = 240.0f; // Slave column
+        const float xLeft   = 4.f * HP;  // Master column
+        const float xMidL   = 7.f * HP;  // Inner left
+        const float xCenter = 10.f * HP; // Bunker column
+        const float xMidR   = 13.f * HP; // Inner right
+        const float xRight  = 16.f * HP; // Slave column
 
         constexpr float yRow1 = 70.0f;  // Shapes & FM
         constexpr float yRow2 = 130.0f; // Pitch & age
@@ -472,7 +487,7 @@ struct BunkerWidget : ModuleWidget {
 		});
     	addParam(gain2Knob);
 
-        addChild(createLightCentered<MediumLight<GreenLight>>(Vec(xCenter, yRow3 + 20.0f), module, Bunker::HARD_SYNC_LIGHT));
+        addChild(createLightCentered<MediumLight<YellowLight>>(Vec((xCenter+xMidR)*0.5f, yRow3), module, Bunker::HARD_SYNC_LIGHT));
 
         // Row 4: Pitch CV & cross-mod CV
         addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow4), module, Bunker::CV_PITCH_INPUT + 0));

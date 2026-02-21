@@ -318,13 +318,14 @@
     },
     {
       "slug": "Bunker",
-      "name": "Bunker",
-      "description": "A polyphonic complex oscillator featuring morphing waveforms, true Through-Zero FM, screaming hard sync, and vintage analog degradation",
+      "name": "Excavi",
+      "description": "A polyphonic complex oscillator featuring morphing waveforms, Through-Zero FM, screaming hard sync, and vintage analog degradation and drift",
       "keywords": "complex oscillator, through-zero fm, TZFM, hard sync, ring mod, analog drift, morphing",
       "tags": [
         "Oscillator",
         "Polyphonic",
-        "Dual oscillator"
+        "Dual oscillator",
+        "Ring modulator"
       ]
     }
   ]

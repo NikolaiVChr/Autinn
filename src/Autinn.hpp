@@ -367,25 +367,31 @@ inline float sinh_fast_high(const float x) {
 	return x * (1.0f + p2 * (0.16666667f + p2 * 0.00833333f));
 }
 
-inline float sin_fast_low(float phase) {
+inline float sin_fast_low(const float radians) {
+	// Multiply by 1 / (2 * pi) for speed
+	float phase = radians * 0.159154943f;
+
 	// Wrap phase to 0.0 - 1.0
 	phase -= std::floor(phase);
 
 	// Shift to -1.0 to +1.0
-	float x = phase * 2.0f - 1.0f;
+	const float x = phase * 2.0f - 1.0f;
 
 	// Fast parabolic approximation
-	float sine = -4.0f * x * (1.0f - std::abs(x));
+	const float sine = -4.0f * x * (1.0f - std::abs(x));
 
 	return sine;
 }
 
-inline float sin_fast_high(float phase) {
+inline float sin_fast_high(const float radians) {
+	// Multiply by 1 / (2 * pi) for speed
+	float phase = radians * 0.159154943f;
+
 	// Wrap phase to 0.0 - 1.0
 	phase -= std::floor(phase);
 
 	// Shift to -1.0 to +1.0
-	float x = phase * 2.0f - 1.0f;
+	const float x = phase * 2.0f - 1.0f;
 
 	// Fast parabolic approximation
 	float sine = -4.0f * x * (1.0f - std::abs(x));
