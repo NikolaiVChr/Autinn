@@ -70,5 +70,5 @@ void init(rack::Plugin *p) {
 	p->addModel(modelGeiger);
 	p->addModel(modelSaw2);
 	p->addModel(modelScope);
-	p->addModel(modelBunker);
+	p->addModel(modelExcavi);
 }

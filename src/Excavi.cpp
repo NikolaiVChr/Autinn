@@ -47,7 +47,7 @@ struct ShapeParamQuantity : ParamQuantity {
 static constexpr int OVERSAMPLE = 4;
 static constexpr float OVERSAMPLE_INV = 1.0f/float(OVERSAMPLE);
 
-struct Bunker : Module {
+struct Excavi : Module {
 	enum ParamIds {
 		ENUMS(PITCH_PARAM,2),
 		AGE_PARAM,
@@ -98,7 +98,7 @@ struct Bunker : Module {
 	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorA;
 	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorB;
 
-	Bunker() {
+	Excavi() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam<ShapeParamQuantity>(SHAPE_PARAM + 0, 0.0f, 3.0f, 2.0f, "Osc Master Shape");
 		configParam<ShapeParamQuantity>(SHAPE_PARAM + 1, 0.0f, 3.0f, 1.0f, "Osc Slave Shape");
@@ -451,12 +451,12 @@ struct Bunker : Module {
 
 };
 
-struct BunkerWidget : ModuleWidget {
-    BunkerWidget(Bunker *module) {
+struct ExcaviWidget : ModuleWidget {
+    ExcaviWidget(Excavi *module) {
         setModule(module);
 
     	// 20 HP
-        setPanel(createPanel(asset::plugin(pluginInstance, "res/BunkerModule.svg")));
+        setPanel(createPanel(asset::plugin(pluginInstance, "res/ExcaviModule.svg")));
 
         // VCV standard: 15px per HP. 20 HP = 300px wide.
         if (box.size.x == 0) {
@@ -472,7 +472,7 @@ struct BunkerWidget : ModuleWidget {
 
         const float xLeft   = 4.f * HP;  // Master column
         const float xMidL   = 7.f * HP;  // Inner left
-        const float xCenter = 10.f * HP; // Bunker column
+        const float xCenter = 10.f * HP; // Excavi column
         const float xMidR   = 13.f * HP; // Inner right
         const float xRight  = 16.f * HP; // Slave column
 
@@ -484,57 +484,57 @@ struct BunkerWidget : ModuleWidget {
         constexpr float yRow6 = 330.0f; // Audio outputs
 
         // Row 1: Shapes & cross-modulation
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow1), module, Bunker::SHAPE_PARAM + 0));
-    	auto modKnob = createParamCentered<AutinnArcMidKnob>(Vec(xCenter, yRow1), module, Bunker::CROSS_MODULATION_PARAM);
-    	modKnob->setModulation(Bunker::CV_CROSS_MODULATION_INPUT, [](float cv, float val, float att) {
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow1), module, Excavi::SHAPE_PARAM + 0));
+    	auto modKnob = createParamCentered<AutinnArcMidKnob>(Vec(xCenter, yRow1), module, Excavi::CROSS_MODULATION_PARAM);
+    	modKnob->setModulation(Excavi::CV_CROSS_MODULATION_INPUT, [](float cv, float val, float att) {
 			return clamp(val * (cv * 0.2f), -1.0f, 1.0f);
 		});
     	addParam(modKnob);
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow1), module, Bunker::SHAPE_PARAM + 1));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow1), module, Excavi::SHAPE_PARAM + 1));
 
         // Row 2: Pitches & age
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow2), module, Bunker::PITCH_PARAM + 0));
-        auto ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(xCenter, yRow2), module, Bunker::AGE_PARAM);
-        ageKnob->setModulation(Bunker::CV_AGE_INPUT, [](float cv, float val, float att) {
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow2), module, Excavi::PITCH_PARAM + 0));
+        auto ageKnob = createParamCentered<AutinnArcMidKnob>(Vec(xCenter, yRow2), module, Excavi::AGE_PARAM);
+        ageKnob->setModulation(Excavi::CV_AGE_INPUT, [](float cv, float val, float att) {
             return clamp(val + (cv * 10.0f), 0.0f, 60.0f);
         });
         addParam(ageKnob);
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow2), module, Bunker::PITCH_PARAM + 1));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow2), module, Excavi::PITCH_PARAM + 1));
 
         // Row 3: Gains, sync CV, & sync Button
-    	auto gain1Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xLeft, yRow3), module, Bunker::GAIN_PARAM + 0);
-    	gain1Knob->setModulation(Bunker::CV_GAIN_INPUT+0, [](float cv, float val, float att) {
+    	auto gain1Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xLeft, yRow3), module, Excavi::GAIN_PARAM + 0);
+    	gain1Knob->setModulation(Excavi::CV_GAIN_INPUT+0, [](float cv, float val, float att) {
 			return clamp(val * (cv * 0.1f), 0.0f, 1.0f);
 		});
     	addParam(gain1Knob);
-        addInput(createInputCentered<InPortAutinn>(Vec(xMidL, yRow3), module, Bunker::CV_SYNC_INPUT));
-        addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xCenter, yRow3), module, Bunker::HARD_SYNC_TOGGLE_PARAM));
-        addInput(createInputCentered<InPortAutinn>(Vec(xMidR, yRow3), module, Bunker::CV_HARD_SYNC_TOGGLE_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(xMidL, yRow3), module, Excavi::CV_SYNC_INPUT));
+        addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xCenter, yRow3), module, Excavi::HARD_SYNC_TOGGLE_PARAM));
+        addInput(createInputCentered<InPortAutinn>(Vec(xMidR, yRow3), module, Excavi::CV_HARD_SYNC_TOGGLE_INPUT));
 
-    	auto gain2Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xRight, yRow3), module, Bunker::GAIN_PARAM + 1);
-    	gain2Knob->setModulation(Bunker::CV_GAIN_INPUT+1, [](float cv, float val, float att) {
+    	auto gain2Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xRight, yRow3), module, Excavi::GAIN_PARAM + 1);
+    	gain2Knob->setModulation(Excavi::CV_GAIN_INPUT+1, [](float cv, float val, float att) {
 			return clamp(val * (cv * 0.1f), 0.0f, 1.0f);
 		});
     	addParam(gain2Knob);
 
-        addChild(createLightCentered<MediumLight<YellowLight>>(Vec((xCenter+xMidR)*0.5f, yRow3), module, Bunker::HARD_SYNC_LIGHT));
+        addChild(createLightCentered<MediumLight<YellowLight>>(Vec((xCenter+xMidR)*0.5f, yRow3), module, Excavi::HARD_SYNC_LIGHT));
 
         // Row 4: Pitch CV & cross-mod CV
-        addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow4), module, Bunker::CV_PITCH_INPUT + 0));
-        addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow4), module, Bunker::CV_CROSS_MODULATION_INPUT));
-        addInput(createInputCentered<InPortAutinn>(Vec(xRight, yRow4), module, Bunker::CV_PITCH_INPUT + 1));
+        addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow4), module, Excavi::CV_PITCH_INPUT + 0));
+        addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow4), module, Excavi::CV_CROSS_MODULATION_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(xRight, yRow4), module, Excavi::CV_PITCH_INPUT + 1));
 
         // Row 5: Gain CV & age CV
-        addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow5), module, Bunker::CV_GAIN_INPUT + 0));
-        addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow5), module, Bunker::CV_AGE_INPUT));
-        addInput(createInputCentered<InPortAutinn>(Vec(xRight, yRow5), module, Bunker::CV_GAIN_INPUT + 1));
+        addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow5), module, Excavi::CV_GAIN_INPUT + 0));
+        addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow5), module, Excavi::CV_AGE_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(xRight, yRow5), module, Excavi::CV_GAIN_INPUT + 1));
 
         // Row 6: Outputs
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(xLeft, yRow6), module, Bunker::SOLO_OUTPUT + 0));
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(xMidL, yRow6), module, Bunker::RING_MODULATION_OUTPUT));
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(xMidR, yRow6), module, Bunker::BUZZ_OUTPUT));
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(xRight, yRow6), module, Bunker::SOLO_OUTPUT + 1));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(xLeft, yRow6), module, Excavi::SOLO_OUTPUT + 0));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(xMidL, yRow6), module, Excavi::RING_MODULATION_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(xMidR, yRow6), module, Excavi::BUZZ_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(xRight, yRow6), module, Excavi::SOLO_OUTPUT + 1));
     }
 };
 
-Model *modelBunker = createModel<Bunker, BunkerWidget>("Bunker");
+Model *modelExcavi = createModel<Excavi, ExcaviWidget>("Excavi");
