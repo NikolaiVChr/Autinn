@@ -19,18 +19,18 @@ Anti-aliasing
 
 Oscillators & Generators
 
-Module  Oversampling  Anti-Aliasing      Notes
+Module  Oversampling  Anti-Aliasing        Notes
 ---------------------------------------------------------------------------------
-Excavi  4x (Fixed)    polyBLAMP & polyBLEP
-Axe     4x (Fixed)    PolyBLEP           For square waveforms polyBLEP is applied twice
+Excavi  4x (Fixed)    PolyBLAMP & PolyBLEP
+Axe     4x (Fixed)    PolyBLEP             For square waveforms polyBLEP is applied twice
 Oxcart  4x            MinBLEP
-Jette   No            Harmonic Limiting  Chebyshev recursion stops at Nyquist
-Sjip    No            Harmonic Limiting  Fades out harmonics near Nyquist
-Square  4x (Fixed)    Wavetable          Interpolated band-limited LUTs
-Saw     4x (Fixed)    Wavetable          Interpolated band-limited LUTs
-Punch   No            None               Sine body + filtered noise
-Stomp   No            None               Sine body + noise click
-Rad     No            None               Filter pings and noise pulses
+Jette   No            Harmonic Limiting    Chebyshev recursion stops at Nyquist
+Sjip    No            Harmonic Limiting    Fades out harmonics near Nyquist
+Square  4x (Fixed)    Wavetable            Interpolated band-limited LUTs
+Saw     4x (Fixed)    Wavetable            Interpolated band-limited LUTs
+Punch   No            None
+Stomp   No            None
+Rad     No            None
 
 
 Effects & Processors
@@ -41,16 +41,16 @@ Fil          Selectable (2x, 4x, 8x)   Defaults to 4x
 Nap          Selectable (2x, 4x)       Defaults to 2x
 Flora        Selectable (2x, 4x)       Defaults to 2x
 Bass         Selectable (2x, 4x)       Defaults to 2x
-Zod          4x (Fixed)                Limiter/Compressor detection
-Non          4x (Fixed)                Limiter/Compressor detection
-Digi         2x (Fixed)                Bit-crusher/Quantizer
-Flopper      2x (Fixed)                Audio Clipper/Folder
+Zod          4x (Fixed)
+Non          4x (Fixed)
+Digi         2x (Fixed)
+Flopper      2x (Fixed)
 Deadband     2x (Fixed)
-Amp          No                        Standard VCA
-Mera         No                        Gain/Attenuator
-Coil         No                        Physical Spring Model
-DC           No                        DC Detector
-Imp          No                        EQ
+Amp          No
+Mera         No
+Coil         No
+DC           No
+Imp          No
 Vibrato      No                        B-Spline interpolation
 Chord        No
 Mixer6       No

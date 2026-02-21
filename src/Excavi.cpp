@@ -105,9 +105,9 @@ struct Excavi : Module {
 		configParam(PITCH_PARAM + 0, -4.0f, 6.0f, 0.0f, "Master Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam(PITCH_PARAM + 1, -4.0f, 6.0f, 0.0f, "Slave Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam<Param3Digits>(AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
-		configParam(GAIN_PARAM + 0, 0.0f, 1.0f, 1.0f, "Master gain", " dB", -10.0f, 20.f, .0f);
-		configParam(GAIN_PARAM + 1, 0.0f, 1.0f, 1.0f, "Slave gain", " dB", -10.0f, 20.f, .0f);
-		configParam(CROSS_MODULATION_PARAM, -1.0f, 1.0f, 0.0f, "Cross modulation");
+		configParam<Param3Digits>(GAIN_PARAM + 0, 0.0f, 1.0f, 1.0f, "Master gain", " dB", -10.0f, 20.f, .0f);
+		configParam<Param3Digits>(GAIN_PARAM + 1, 0.0f, 1.0f, 1.0f, "Slave gain", " dB", -10.0f, 20.f, .0f);
+		configParam<Param3Digits>(CROSS_MODULATION_PARAM, -1.0f, 1.0f, 0.0f, "Cross modulation");
 		configButton(HARD_SYNC_TOGGLE_PARAM, "Toggle hard sync");
 
 		configInput(CV_PITCH_INPUT+0, "Master 1V/Oct CV");
@@ -380,8 +380,6 @@ struct Excavi : Module {
         }
 
 		lights[HARD_SYNC_LIGHT].setBrightness(hardSyncEnabled ? 1.0f : 0.0f);
-
-
     }
 
 	struct MorphWeights {
