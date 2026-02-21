@@ -83,6 +83,7 @@ struct Bunker : Module {
 	float lastOutA[16] = {}; // 1-sample memory for TZFM
 	DCBlocker hp1A[16], hp2A[16];
 	DCBlocker hp1B[16], hp2B[16];
+	DCBlocker dcBlockerA[16], dcBlockerB[16];
 	float driftPhaseA1 = 0.0f;
 	float driftPhaseA2 = 0.0f;
 	float driftPhaseB1 = 0.0f;
@@ -126,6 +127,23 @@ struct Bunker : Module {
 
 		decimatorA.resize(16);
 		decimatorB.resize(16);
+
+		for (int c = 0; c < 16; c++) {
+			hp1A[c].cutoff_hz = 30.0f + 0.0f * 9.0f;
+			hp2A[c].cutoff_hz = 0.5f + 0.0f * 4.0f;
+			hp1B[c].cutoff_hz = hp1A[c].cutoff_hz;
+			hp2B[c].cutoff_hz = hp2A[c].cutoff_hz;
+
+			hp1A[c].setSampleTime(lastSampleTime/float(OVERSAMPLE));
+			hp2A[c].setSampleTime(lastSampleTime/float(OVERSAMPLE));
+			hp1B[c].setSampleTime(lastSampleTime/float(OVERSAMPLE));
+			hp2B[c].setSampleTime(lastSampleTime/float(OVERSAMPLE));
+
+			dcBlockerA[c].cutoff_hz = 2.0f;
+			dcBlockerB[c].cutoff_hz = 2.0f;
+			dcBlockerA[c].setSampleTime(lastSampleTime);
+			dcBlockerB[c].setSampleTime(lastSampleTime);
+		}
 	}
 
 	void onReset(const ResetEvent& e) override {
@@ -134,6 +152,8 @@ struct Bunker : Module {
 			hp2A[c].reset();
 			hp1B[c].reset();
 			hp2B[c].reset();
+			dcBlockerA[c].reset();
+			dcBlockerB[c].reset();
 			phaseA[c] = 0.0f;
 			phaseB[c] = 0.0f;
 			syncTrigger[c].reset();
@@ -211,19 +231,24 @@ struct Bunker : Module {
         outputs[SOLO_OUTPUT + 0].setChannels(channels);
         outputs[SOLO_OUTPUT + 1].setChannels(channels);
 
+		const float osSampleTime = args.sampleTime / (float)OVERSAMPLE;
+
 		bool updateFilters = (std::abs(age - last_age) > 0.001f) || (args.sampleTime != lastSampleTime);
 
 		if (updateFilters) {
 			for (int c = 0; c < channels; c++) {
-				hp1A[c].cutoff_hz = 2.0f + 28.0f * clamp(age * 10.0f, 0.0f, 1.0f) + (age * 9.0f);
+				hp1A[c].cutoff_hz = 30.0f + age * 9.0f;
 				hp2A[c].cutoff_hz = 0.5f + age * 4.0f;
 				hp1B[c].cutoff_hz = hp1A[c].cutoff_hz;
 				hp2B[c].cutoff_hz = hp2A[c].cutoff_hz;
 
-				hp1A[c].setSampleTime(args.sampleTime);
-				hp2A[c].setSampleTime(args.sampleTime);
-				hp1B[c].setSampleTime(args.sampleTime);
-				hp2B[c].setSampleTime(args.sampleTime);
+				hp1A[c].setSampleTime(osSampleTime);
+				hp2A[c].setSampleTime(osSampleTime);
+				hp1B[c].setSampleTime(osSampleTime);
+				hp2B[c].setSampleTime(osSampleTime);
+
+				dcBlockerA[c].setSampleTime(args.sampleTime);
+				dcBlockerB[c].setSampleTime(args.sampleTime);
 			}
 		}
 
@@ -231,7 +256,6 @@ struct Bunker : Module {
 		wA.calculate(shapeA_knob);
 		wB.calculate(shapeB_knob);
 
-		const float osSampleTime = args.sampleTime / (float)OVERSAMPLE;
 		const float makeupGain = 1.0f + (age * 0.1f);
 
         for (int c = 0; c < channels; c++) {
@@ -318,10 +342,13 @@ struct Bunker : Module {
                     outB = generateMorphingWaveform(wB, phaseB[c], dtB, blepB[c]);
                 }
 
-                if (age > 0.01f) {
-                    outA = tanh_fast_high(outA * makeupGain);
-                    outB = tanh_fast_high(outB * makeupGain);
-                }
+            	if (age > 0.01f) {
+            		outA = hp2A[c].process(hp1A[c].process(outA));
+            		outB = hp2B[c].process(hp1B[c].process(outB));
+
+            		outA = tanh_fast_high(outA * makeupGain);
+            		outB = tanh_fast_high(outB * makeupGain);
+            	}
 
                 outBufA[i] = outA;
                 outBufB[i] = outB;
@@ -330,8 +357,8 @@ struct Bunker : Module {
         	float finalOutA = decimatorA[c].process(outBufA) * gA;
         	float finalOutB = decimatorB[c].process(outBufB) * gB;
 
-        	finalOutA = hp2A[c].process(hp1A[c].process(finalOutA));
-        	finalOutB = hp2B[c].process(hp1B[c].process(finalOutB));
+        	finalOutA = dcBlockerA[c].process(finalOutA);
+        	finalOutB = dcBlockerB[c].process(finalOutB);
 
         	//TODO: Only calculate outB when OUT, RM OUT or SLAVE OUT is connected? ..waste of branching, since 99.9% of the time it will be in use.
 
