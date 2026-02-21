@@ -476,12 +476,12 @@ struct ExcaviWidget : ModuleWidget {
         const float xMidR   = 13.f * HP; // Inner right
         const float xRight  = 16.f * HP; // Slave column
 
-        constexpr float yRow1 = 70.0f;  // Shapes & FM
-        constexpr float yRow2 = 130.0f; // Pitch & age
-        constexpr float yRow3 = 190.0f; // Gains & sync
-        constexpr float yRow4 = 240.0f; // Pitch/FM CV
-        constexpr float yRow5 = 280.0f; // Gain/age CV
-        constexpr float yRow6 = 330.0f; // Audio outputs
+        const float yRow1 = 70.0f + 1.0f * HP;  // Shapes & FM
+        const float yRow2 = 130.0f + 0.5f * HP; // Pitch & age
+        const float yRow3 = 190.0f; // Gains & sync
+        const float yRow4 = 240.0f; // Pitch/FM CV
+        const float yRow5 = 280.0f; // Gain/age CV
+        const float yRow6 = 330.0f; // Audio outputs
 
         // Row 1: Shapes & cross-modulation
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow1), module, Excavi::SHAPE_PARAM + 0));
