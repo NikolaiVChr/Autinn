@@ -45,6 +45,7 @@ struct ShapeParamQuantity : ParamQuantity {
 };
 
 static constexpr int OVERSAMPLE = 4;
+static constexpr float OVERSAMPLE_INV = 1.0f/float(OVERSAMPLE);
 
 struct Bunker : Module {
 	enum ParamIds {
@@ -94,8 +95,8 @@ struct Bunker : Module {
 	dsp::SchmittTrigger schmittButton;
 	dsp::SchmittTrigger syncTrigger[16];
 	bool hardSyncEnabled = false;
-	std::vector<dsp::Decimator<OVERSAMPLE, 16>> decimatorA;
-	std::vector<dsp::Decimator<OVERSAMPLE, 16>> decimatorB;
+	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorA;
+	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimatorB;
 
 	Bunker() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -134,10 +135,10 @@ struct Bunker : Module {
 			hp1B[c].cutoff_hz = hp1A[c].cutoff_hz;
 			hp2B[c].cutoff_hz = hp2A[c].cutoff_hz;
 
-			hp1A[c].setSampleTime(lastSampleTime/float(OVERSAMPLE));
-			hp2A[c].setSampleTime(lastSampleTime/float(OVERSAMPLE));
-			hp1B[c].setSampleTime(lastSampleTime/float(OVERSAMPLE));
-			hp2B[c].setSampleTime(lastSampleTime/float(OVERSAMPLE));
+			hp1A[c].setSampleTime(lastSampleTime*OVERSAMPLE_INV);
+			hp2A[c].setSampleTime(lastSampleTime*OVERSAMPLE_INV);
+			hp1B[c].setSampleTime(lastSampleTime*OVERSAMPLE_INV);
+			hp2B[c].setSampleTime(lastSampleTime*OVERSAMPLE_INV);
 
 			dcBlockerA[c].cutoff_hz = 2.0f;
 			dcBlockerB[c].cutoff_hz = 2.0f;
@@ -231,7 +232,7 @@ struct Bunker : Module {
         outputs[SOLO_OUTPUT + 0].setChannels(channels);
         outputs[SOLO_OUTPUT + 1].setChannels(channels);
 
-		const float osSampleTime = args.sampleTime / (float)OVERSAMPLE;
+		const float osSampleTime = args.sampleTime * OVERSAMPLE_INV;
 
 		bool updateFilters = (std::abs(age - last_age) > 0.001f) || (args.sampleTime != lastSampleTime);
 
@@ -342,13 +343,13 @@ struct Bunker : Module {
                     outB = generateMorphingWaveform(wB, phaseB[c], dtB, blepB[c]);
                 }
 
-            	if (age > 0.01f) {
+            	//if (age > 0.01f) {
             		outA = hp2A[c].process(hp1A[c].process(outA));
             		outB = hp2B[c].process(hp1B[c].process(outB));
 
             		outA = tanh_fast_high(outA * makeupGain);
             		outB = tanh_fast_high(outB * makeupGain);
-            	}
+            	//}
 
                 outBufA[i] = outA;
                 outBufB[i] = outB;
@@ -399,7 +400,8 @@ struct Bunker : Module {
 	    if (w.sine > 0.0f) naive += w.sine * sin_fast_high(phase * 2.0f * float(M_PI));
 	    if (w.tri > 0.0f) naive += w.tri * (phase < 0.5f ? -1.0f + 4.0f * phase : 3.0f - 4.0f * phase);
 	    if (w.saw > 0.0f) naive += w.saw * (2.0f * phase - 1.0f);
-	    if (w.square > 0.0f) naive += w.square * (phase < 0.5f ? -1.0f : 1.0f);
+	    if (w.square > 0.0f) naive += w.square * (phase < 0.5f ? -1.0f : 1.0f) * 0.7f;
+		// note that 0.7 is makeup-gain since square sounds much louder at same max amplitude as the other waveforms.
 	    return naive;
 	}
 
@@ -407,8 +409,8 @@ struct Bunker : Module {
 	    const float dir = (dt >= 0.0f) ? 1.0f : -1.0f;
 	    const float absDt = std::abs(dt);
 
-	    const float jump0 = (w.saw * -2.0f + w.square * -2.0f) * dir;
-	    const float jump5 = (w.square * 2.0f) * dir;
+		const float jump0 = (w.saw * -2.0f + w.square * -2.0f * 0.7f) * dir;
+		const float jump5 = (w.square * 2.0f * 0.7f) * dir;
 	    const float corner0 = (w.tri * 8.0f) * dir;
 	    const float corner5 = (w.tri * -8.0f) * dir;
 
