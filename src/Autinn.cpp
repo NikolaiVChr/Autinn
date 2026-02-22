@@ -71,4 +71,5 @@ void init(rack::Plugin *p) {
 	p->addModel(modelSaw2);
 	p->addModel(modelScope);
 	p->addModel(modelExcavi);
+	p->addModel(modelAlias);
 }

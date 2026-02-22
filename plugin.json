@@ -1,7 +1,7 @@
 {
   "slug": "Autinn",
   "name": "Autinn",
-  "version": "2.6.30",
+  "version": "2.6.31",
   "minRackVersion": "2.4.0",
   "license": "GPL-3.0-or-later",
   "brand": "Autinn",
@@ -326,6 +326,17 @@
         "Polyphonic",
         "Dual",
         "Ring modulator"
+      ]
+    },
+    {
+      "slug": "Alias",
+      "name": "Aliasmeter",
+      "description": "THD-N meter",
+      "keywords": "measure monitor analyse",
+      "hidden": true,
+      "tags": [
+        "Visual",
+        "Utility"
       ]
     }
   ]

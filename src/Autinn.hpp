@@ -471,3 +471,4 @@ extern Model *modelGeiger;
 extern Model *modelSaw2;
 extern Model *modelScope;
 extern Model *modelExcavi;
+extern Model *modelAlias;
