@@ -22,8 +22,6 @@
 
 **/
 
-#define OVERSAMPLE 4
-
 struct Oxcart : Module {
 	enum ParamIds {
 		PITCH_PARAM,
@@ -49,8 +47,15 @@ struct Oxcart : Module {
 	dsp::MinBlepGenerator<zeroCrossings,overSample,float> oxMinBLEP[16];// 16 zero crossings, x32 oversample
 	DCBlocker dcBlocker[16];
 	float discontinuity = tanh_fast_high(4.0f);
-	float lastSampleTime = 1.0f/44100.0f;
-	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimators;
+	float lastSampleRate = 0.0f;
+	std::vector<dsp::Decimator<2, 8>> decimators2;
+	std::vector<dsp::Decimator<4, 8>> decimators4;
+
+	static int getOversampleAmount(const float sampleRate) {
+		if (sampleRate < 50000.0f) return 4;
+		if (sampleRate < 100000.0f) return 2;
+		return 1;
+	}
 
 	Oxcart() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -58,10 +63,10 @@ struct Oxcart : Module {
 		configParam(Oxcart::PITCH_PARAM, -3.0f, 3.0f, 0.0f, "Frequency"," Hz", 2.0f, dsp::FREQ_C4);
 		configInput(PITCH_INPUT, "1V/Oct CV");
 		configOutput(BUZZ_OUTPUT, "Audio");
-		decimators.resize(16);
-		for (int ch = 0; ch < 16; ch++) {
-			dcBlocker[ch].cutoff_hz = 1.0f;
-			dcBlocker[ch].setSampleTime(lastSampleTime);
+		decimators4.resize(16);
+		decimators2.resize(16);
+		for (auto & filter : dcBlocker) {
+			filter.cutoff_hz = 1.0f;
 		}
 	}
 
@@ -71,6 +76,7 @@ struct Oxcart : Module {
 		}
 	}
 
+	float processSubSample(int ch, float deltaPhase, float period);
 	void process(const ProcessArgs &args) override;
 };
 
@@ -83,12 +89,15 @@ void Oxcart::process(const ProcessArgs &args) {
 		return;
 	}
 
-	if (lastSampleTime != args.sampleTime) {
-		for (auto & chDcBlocker : dcBlocker) {
-			chDcBlocker.setSampleTime(args.sampleTime);
+	const int oversample = getOversampleAmount(args.sampleRate);
+	const float osSampleTime = args.sampleTime / (float)oversample;
+
+	if (lastSampleRate != args.sampleRate) {
+		for (auto & filter : dcBlocker) {
+			filter.setSampleTime(args.sampleTime);
 		}
 	}
-	lastSampleTime = args.sampleTime;
+	lastSampleRate = args.sampleRate;
 
 	int channels = std::max(1, inputs[PITCH_INPUT].getChannels());
     outputs[BUZZ_OUTPUT].setChannels(channels);
@@ -96,32 +105,42 @@ void Oxcart::process(const ProcessArgs &args) {
 
 	float pitchBase = params[PITCH_PARAM].getValue();
 	int pitchInputChannels = inputs[PITCH_INPUT].getChannels();
+	const float period = 4.0f;
 
 	for (int ch = 0; ch < channels; ch++) {
 		float pitch = pitchBase + (pitchInputChannels>ch?inputs[PITCH_INPUT].getPolyVoltage(ch):inputs[PITCH_INPUT].getVoltage());
 		pitch = clamp(pitch, -4.0f, 6.0f);
-		//float freq = dsp::FREQ_C4 * powf(2.0f, pitch);
 		float freq = dsp::FREQ_C4 * std::exp2f(pitch);//faster
 	
-		float period = 4.0f;
-		float deltaPhase = freq * deltaTime * period / float(OVERSAMPLE);
-		float outBuf  [OVERSAMPLE];
 
-		for (float & buf : outBuf) {
-			phase[ch] += deltaPhase;
+		float deltaPhase = freq * osSampleTime * period;
 
-			if (phase[ch] >= period) {
-				phase[ch] -= period;
-				float crossing = -phase[ch] / deltaPhase;
-				// since we oversample we don't need to apply a polyBLAMP table (minBLAMP) also.
-				oxMinBLEP[ch].insertDiscontinuity(crossing, discontinuity);
+		float finalOut = 0.0f;
+
+		switch (oversample) {
+			case 4: {
+				float outBuf[4];
+				for (float & buf : outBuf) {
+					buf = processSubSample(ch, deltaPhase, period);
+				}
+				finalOut = decimators4[ch].process(outBuf);
+				break;
 			}
-
-			buf = -tanh_fast_high(phase[ch])+oxMinBLEP[ch].process();
+			case 2: {
+				float outBuf[2];
+				for (float & buf : outBuf) {
+					buf = processSubSample(ch, deltaPhase, period);
+				}
+				finalOut = decimators2[ch].process(outBuf);
+				break;
+			}
+			default: {
+				// 1x Bypass
+				finalOut = processSubSample(ch, deltaPhase, period);
+			}
 		}
 
-		const float out = decimators[ch].process(outBuf);
-		const float buzz = dcBlocker[ch].process(out);
+		const float buzz = dcBlocker[ch].process(finalOut);
 
 		// x4.5 to keep its peak within approx 5V
 		// minBLEP will increase peak (x1.15 approx)
@@ -134,10 +153,25 @@ void Oxcart::process(const ProcessArgs &args) {
 		if (ch == 0) {
             blinkTime += deltaTime;
             float blinkPeriod = 1.0f/(freq*0.01f);
-            if (blinkTime >= blinkPeriod) blinkTime = 0.0f;
+			if (blinkTime >= blinkPeriod) blinkTime -= blinkPeriod;
             lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod*0.5f) ? 1.0f : 0.0f;
         }
 	}
+}
+
+inline float Oxcart::processSubSample(const int ch, const float deltaPhase, const float period) {
+	phase[ch] += deltaPhase;
+
+	if (phase[ch] >= period) {
+		phase[ch] -= period;
+		const float crossing = -phase[ch] / deltaPhase;
+		// since we oversample we don't need to apply a polyBLAMP table (minBLAMP) also,
+		// despite there is both a discontinuity (minBLEP fixable) and slope change (minBLAMP fixable).
+		oxMinBLEP[ch].insertDiscontinuity(crossing, discontinuity);
+	}
+
+	// The core Oxcart wave: inverted tanh ramp + MinBlep residual
+	return -tanh_fast_high(phase[ch]) + oxMinBLEP[ch].process();
 }
 
 struct OxcartWidget : ModuleWidget {

@@ -23,7 +23,7 @@ Module  Oversampling  Anti-Aliasing        Notes
 ---------------------------------------------------------------------------------
 Excavi  4x (Dynamic)  PolyBLAMP & PolyBLEP
 Axe     4x (Dynamic)  PolyBLEP             For square waveforms polyBLEP is applied twice
-Oxcart  4x            MinBLEP
+Oxcart  4x (Dynamic)  MinBLEP
 Jette   No            Harmonic Limiting    Chebyshev recursion stops at Nyquist
 Sjip    No            Harmonic Limiting    Fades out harmonics near Nyquist
 Square  4x (Fixed)    Wavetable            Interpolated band-limited LUTs
