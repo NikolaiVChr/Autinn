@@ -29,23 +29,23 @@ struct ShapeParamQuantity : ParamQuantity {
 		if (val <= 0.02f) return "Sine";
 		if (val >= 0.98f && val <= 1.02f) return "Triangle";
 		if (val >= 1.98f && val <= 2.02f) return "Sawtooth";
-		if (val >= 2.98f) return "Square";
+		if (val >= 2.98f && val <= 3.02f) return "Square";
 
 		if (val < 1.0f) {
-			int pct = (int)std::round(val * 100.0f);
+			const int pct = (int)std::round(val * 100.0f);
 			return string::f("Sine/Tri (%d%%)", pct);
 		}
 		if (val < 2.0f) {
-			int pct = (int)std::round((val - 1.0f) * 100.0f);
+			const int pct = (int)std::round((val - 1.0f) * 100.0f);
 			return string::f("Tri/Saw (%d%%)", pct);
 		}
 		if (val <= 3.0f) {
-			int pct = (int)std::round((val - 2.0f) * 100.0f);
+			const int pct = (int)std::round((val - 2.0f) * 100.0f);
 			return string::f("Saw/Sq (%d%%)", pct);
 		}
 		// Map 3.0-5.0 to 50% - 2% Pulse Width
-		int pct = (int)std::round(50.0f - ((val - 3.0f) / 2.0f * 48.0f));
-		return string::f("Sqr PWM (%d%%)", pct);
+		const int pct = (int)std::round(50.0f - ((val - 3.0f) / 2.0f * 48.0f));
+		return string::f("Sqr (%d%% PWM)", pct);
 	}
 };
 
