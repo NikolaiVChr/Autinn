@@ -182,12 +182,12 @@ struct AliasDisplay : TransparentWidget {
 struct AliasWidget : ModuleWidget {
 	AliasWidget(Alias* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/AliasModule.svg")));
+		//setPanel(createPanel(asset::plugin(pluginInstance, "res/AliasModule.svg")));
 
 		// 10 HP Wide
-		if (box.size.x == 0) {
+		//if (box.size.x == 0) {
 			box.size = Vec(10 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
-		}
+		//}
 
 		const float HP = RACK_GRID_WIDTH;
 		const float centerX = box.size.x / 2.0f;
