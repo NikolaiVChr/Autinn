@@ -71,9 +71,11 @@ struct Oxcart : Module {
 	}
 
 	void onReset(const ResetEvent& e) override {
-		for (auto & filter : dcBlocker) {
-			filter.reset();
+		for (int c = 0; c < 16; c++) {
+			dcBlocker[c].reset();
+			phase[c] = 0.0f;
 		}
+		blinkTime = 0.0f;
 	}
 
 	float processSubSample(int ch, float deltaPhase, float period);
@@ -153,7 +155,7 @@ void Oxcart::process(const ProcessArgs &args) {
 		if (ch == 0) {
             blinkTime += deltaTime;
             float blinkPeriod = 1.0f/(freq*0.01f);
-			if (blinkTime >= blinkPeriod) blinkTime -= blinkPeriod;
+			while (blinkTime >= blinkPeriod) blinkTime -= blinkPeriod;
             lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod*0.5f) ? 1.0f : 0.0f;
         }
 	}
