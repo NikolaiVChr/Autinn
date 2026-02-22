@@ -47,7 +47,7 @@ struct Saw2 : Module {
 	};
 
 	float phase[16] = {};
-	PredictiveBLEP blep[16];
+	ReactiveBLEP blep[16];
 	DCBlocker dcBlocker[16] = {};
 	DCBlocker hp1[16] = {};
 	DCBlocker hp2[16] = {};
