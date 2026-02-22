@@ -39,8 +39,13 @@ struct ShapeParamQuantity : ParamQuantity {
 			int pct = (int)std::round((val - 1.0f) * 100.0f);
 			return string::f("Tri/Saw (%d%%)", pct);
 		}
-		int pct = (int)std::round((val - 2.0f) * 100.0f);
-		return string::f("Saw/Sq (%d%%)", pct);
+		if (val <= 3.0f) {
+			int pct = (int)std::round((val - 2.0f) * 100.0f);
+			return string::f("Saw/Sq (%d%%)", pct);
+		}
+		// Map 3.0-5.0 to 50% - 2% Pulse Width
+		int pct = (int)std::round(50.0f - ((val - 3.0f) / 2.0f * 48.0f));
+		return string::f("Sqr PWM (%d%%)", pct);
 	}
 };
 
@@ -61,6 +66,7 @@ struct Excavi : Module {
 		CV_AGE_INPUT,
 		CV_HARD_SYNC_TOGGLE_INPUT,
 		CV_CROSS_MODULATION_INPUT,
+		ENUMS(CV_SHAPE_INPUT,2),
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -108,8 +114,8 @@ struct Excavi : Module {
 
 	Excavi() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam<ShapeParamQuantity>(SHAPE_PARAM + 0, 0.0f, 3.0f, 2.0f, "Osc Master Shape");
-		configParam<ShapeParamQuantity>(SHAPE_PARAM + 1, 0.0f, 3.0f, 1.0f, "Osc Slave Shape");
+		configParam<ShapeParamQuantity>(SHAPE_PARAM + 0, 0.0f, 5.0f, 2.0f, "Osc Master Shape");
+		configParam<ShapeParamQuantity>(SHAPE_PARAM + 1, 0.0f, 5.0f, 1.0f, "Osc Slave Shape");
 		configParam(PITCH_PARAM + 0, -4.0f, 6.0f, 0.0f, "Master Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam(PITCH_PARAM + 1, -4.0f, 6.0f, 0.0f, "Slave Frequency", " Hz", 2.0f, dsp::FREQ_C4);
 		configParam<Param3Digits>(AGE_PARAM, 0.0f, 40.0f, 15.0f, "Age", " Years");
@@ -126,6 +132,8 @@ struct Excavi : Module {
 		configInput(CV_HARD_SYNC_TOGGLE_INPUT, "CV hard sync toggle");
 		configInput(CV_AGE_INPUT, "1V/decade age CV");
 		configInput(CV_CROSS_MODULATION_INPUT, "Cross modulation CV");
+		configInput(CV_SHAPE_INPUT+0, "1V/shape CV master");
+		configInput(CV_SHAPE_INPUT+1, "1V/shape CV slave");
 
 		configOutput(BUZZ_OUTPUT, "Main audio");
 		configOutput(RING_MODULATION_OUTPUT, "Ring modulation audio");
@@ -193,16 +201,41 @@ struct Excavi : Module {
 		// 4:sqr
 
 		float sine = 0.0f, tri = 0.0f, saw = 0.0f, square = 0.0f;
+		float pulseWidth = 0.5f;
+		float sqrGain = 0.7f;
 
 		void calculate(float shape) {
+			float polarity = 1.0f;
+			if (shape < 0.0f) {
+				polarity = -1.0f;
+				shape = -shape;
+			}
 			sine = tri = saw = square = 0.0f;
 			if (shape < 1.0f) {
 				tri = shape; sine = 1.0f - tri;
 			} else if (shape < 2.0f) {
 				saw = shape - 1.0f; tri = 1.0f - saw;
-			} else {
+			} else if (shape <= 3.0f) {
 				square = shape - 2.0f; saw = 1.0f - square;
+				pulseWidth = 0.5f;
+			} else {
+				// PWM territory!
+				square = 1.0f;
+				float squeeze = (shape - 3.0f) / 2.0f; // Scales 0.0 to 1.0
+				pulseWidth = 0.5f - (squeeze * 0.48f); // Shrinks from 0.5 down to 0.02
+
+				// Calculate dynamic makeup gain based on how narrow the pulse is
+				// pwDeviation is 0.0 at 50% PW, and ~0.48 at 2% PW.
+				float pwDeviation = std::fabs(pulseWidth - 0.5f);
+
+				// We use a non-linear curve to boost the volume as the pulse gets thinner
+				sqrGain = 0.7f + (pwDeviation * 1.5f);
 			}
+
+			sine *= polarity;
+			tri *= polarity;
+			saw *= polarity;
+			square *= polarity;
 		}
 	};
 
@@ -211,7 +244,7 @@ struct Excavi : Module {
 	    if (w.sine > 0.0f) naive += w.sine * sin_fast_high(phase * 2.0f * float(M_PI));
 	    if (w.tri > 0.0f) naive += w.tri * (phase < 0.5f ? -1.0f + 4.0f * phase : 3.0f - 4.0f * phase);
 	    if (w.saw > 0.0f) naive += w.saw * (2.0f * phase - 1.0f);
-	    if (w.square > 0.0f) naive += w.square * (phase < 0.5f ? -1.0f : 1.0f) * 0.7f;
+		if (w.square > 0.0f) naive += w.square * (phase < w.pulseWidth ? -1.0f : 1.0f) * w.sqrGain;
 		// note that 0.7 is makeup-gain since square sounds much louder at same max amplitude as the other waveforms.
 	    return naive;
 	}
@@ -219,9 +252,10 @@ struct Excavi : Module {
 	static inline float generateMorphingWaveform(const MorphWeights& w, float& phase, float dt, ReactiveBLEP& blep) {
 	    const float dir = (dt >= 0.0f) ? 1.0f : -1.0f;
 	    const float absDt = std::abs(dt);
+		const float pw = w.pulseWidth;
 
-		const float jump0 = (w.saw * -2.0f + w.square * -2.0f * 0.7f) * dir;
-		const float jump5 = (w.square * 2.0f * 0.7f) * dir;
+		const float jump0 = (w.saw * -2.0f + w.square * -2.0f * w.sqrGain) * dir;
+		const float jump5 = (w.square * 2.0f * w.sqrGain) * dir;
 	    const float corner0 = (w.tri * 8.0f) * dir;
 	    const float corner5 = (w.tri * -8.0f) * dir;
 
@@ -233,8 +267,8 @@ struct Excavi : Module {
 	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop
 	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom
 	            phase = nextPhase - 1.0f;
-	        } else if (phase < 0.5f && nextPhase >= 0.5f) {
-	            const float fraction = (nextPhase - 0.5f) / dt;
+	        } else if (phase < pw && nextPhase >= pw) {
+	            const float fraction = (nextPhase - pw) / dt;
 	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise
 	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top
 	            phase = nextPhase;
@@ -246,8 +280,8 @@ struct Excavi : Module {
 	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop (inv)
 	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom (inv)
 	            phase = 1.0f + nextPhase;
-	        } else if (phase >= 0.5f && nextPhase < 0.5f) {
-	            const float fraction = (nextPhase - 0.5f) / dt;
+	        } else if (phase >= pw && nextPhase < pw) {
+	            const float fraction = (nextPhase - pw) / dt;
 	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise (inv)
 	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top (inv)
 	            phase = nextPhase;
@@ -373,13 +407,27 @@ struct Excavi : Module {
         outputs[SOLO_OUTPUT + 0].setChannels(channels);
         outputs[SOLO_OUTPUT + 1].setChannels(channels);
 
-		MorphWeights wA, wB;
-		wA.calculate(shapeA_knob);
-		wB.calculate(shapeB_knob);
-
+		int shapeCVAChannels = inputs[CV_SHAPE_INPUT + 0].getChannels();
+		int shapeCVBChannels = inputs[CV_SHAPE_INPUT + 1].getChannels();
 
 
         for (int c = 0; c < channels; c++) {
+
+        	float shapeA = params[SHAPE_PARAM + 0].getValue();
+        	if (inputs[CV_SHAPE_INPUT + 0].isConnected()) {
+        		shapeA += shapeCVAChannels>c?inputs[CV_SHAPE_INPUT + 0].getPolyVoltage(c):inputs[CV_SHAPE_INPUT + 0].getVoltage();
+        	}
+        	shapeA = clamp(shapeA, -5.0f, 5.0f);
+
+        	float shapeB = params[SHAPE_PARAM + 1].getValue();
+        	if (inputs[CV_SHAPE_INPUT + 1].isConnected()) {
+        		shapeB += shapeCVBChannels>c?inputs[CV_SHAPE_INPUT + 1].getPolyVoltage(c):inputs[CV_SHAPE_INPUT + 1].getVoltage();
+        	}
+        	shapeB = clamp(shapeB, -5.0f, 5.0f);
+
+        	MorphWeights wA, wB;
+        	wA.calculate(shapeA);
+        	wB.calculate(shapeB);
 
         	// age
         	float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
@@ -506,17 +554,25 @@ struct ExcaviWidget : ModuleWidget {
         const float yRow2 = 130.0f + 0.5f * HP; // Pitch & age
         const float yRow3 = 190.0f; // Gains & sync
         const float yRow4 = 240.0f; // Pitch/FM CV
-        const float yRow5 = 280.0f; // Gain/age CV
+        const float yRow5 = 280.0f; // Gain/shape/age CV
         const float yRow6 = 330.0f; // Audio outputs
 
         // Row 1: Shapes & cross-modulation
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow1), module, Excavi::SHAPE_PARAM + 0));
+    	auto shape1Knob = createParamCentered<AutinnArcMidKnob>(Vec(xLeft, yRow1), module, Excavi::SHAPE_PARAM + 0);
+    	shape1Knob->setModulation(Excavi::CV_SHAPE_INPUT + 0, [](float cv, float val, float att) {
+			return clamp(val + (cv), -5.0f, 5.0f);
+		});
+    	addParam(shape1Knob);
     	auto modKnob = createParamCentered<AutinnArcMidKnob>(Vec(xCenter, yRow1), module, Excavi::CROSS_MODULATION_PARAM);
     	modKnob->setModulation(Excavi::CV_CROSS_MODULATION_INPUT, [](float cv, float val, float att) {
 			return clamp(val + (cv * 0.2f), -1.0f, 1.0f);
 		});
     	addParam(modKnob);
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow1), module, Excavi::SHAPE_PARAM + 1));
+    	auto shape2Knob = createParamCentered<AutinnArcMidKnob>(Vec(xRight, yRow1), module, Excavi::SHAPE_PARAM + 1);
+    	shape2Knob->setModulation(Excavi::CV_SHAPE_INPUT + 1, [](float cv, float val, float att) {
+			return clamp(val + (cv), -5.0f, 5.0f);
+		});
+    	addParam(shape2Knob);
 
         // Row 2: Pitches & age
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow2), module, Excavi::PITCH_PARAM + 0));
@@ -552,7 +608,9 @@ struct ExcaviWidget : ModuleWidget {
 
         // Row 5: Gain CV & age CV
         addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow5), module, Excavi::CV_GAIN_INPUT + 0));
-        addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow5), module, Excavi::CV_AGE_INPUT));
+    	addInput(createInputCentered<InPortAutinn>(Vec(xMidL, yRow5), module, Excavi::CV_SHAPE_INPUT + 0));
+    	addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow5), module, Excavi::CV_AGE_INPUT));
+    	addInput(createInputCentered<InPortAutinn>(Vec(xMidR, yRow5), module, Excavi::CV_SHAPE_INPUT + 1));
         addInput(createInputCentered<InPortAutinn>(Vec(xRight, yRow5), module, Excavi::CV_GAIN_INPUT + 1));
 
         // Row 6: Outputs
