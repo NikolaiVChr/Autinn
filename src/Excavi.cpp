@@ -241,10 +241,10 @@ struct Excavi : Module {
 
 	static inline float calculateNaiveMorph(const MorphWeights& w, const float phase) {
 	    float naive = 0.0f;
-	    if (w.sine > 0.0f) naive += w.sine * sin_fast_high(phase * 2.0f * float(M_PI));
-	    if (w.tri > 0.0f) naive += w.tri * (phase < 0.5f ? -1.0f + 4.0f * phase : 3.0f - 4.0f * phase);
-	    if (w.saw > 0.0f) naive += w.saw * (2.0f * phase - 1.0f);
-		if (w.square > 0.0f) naive += w.square * (phase < w.pulseWidth ? -1.0f : 1.0f) * w.sqrGain;
+	    if (w.sine != 0.0f) naive += w.sine * sin_fast_high(phase * 2.0f * float(M_PI));
+	    if (w.tri != 0.0f) naive += w.tri * (phase < 0.5f ? -1.0f + 4.0f * phase : 3.0f - 4.0f * phase);
+	    if (w.saw != 0.0f) naive += w.saw * (2.0f * phase - 1.0f);
+		if (w.square != 0.0f) naive += w.square * (phase < w.pulseWidth ? -1.0f : 1.0f) * w.sqrGain;
 		// note that 0.7 is makeup-gain since square sounds much louder at same max amplitude as the other waveforms.
 	    return naive;
 	}
