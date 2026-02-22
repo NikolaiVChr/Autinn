@@ -154,7 +154,7 @@ struct Saw2 : Module {
 		// We apply the high pass logic again to the output of Stage 1.
 		const float stage2 = hp2[c].process(stage1);
 
-		return out;//tanh_fast_high(stage2 * makeupGain);
+		return tanh_fast_high(stage2 * makeupGain);
 	}
 
 	void process(const ProcessArgs &args) override {
