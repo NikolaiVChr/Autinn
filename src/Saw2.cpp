@@ -52,7 +52,8 @@ struct Saw2 : Module {
 	DCBlocker hp1[16];
 	DCBlocker hp2[16];
 	float roofLPF[16] = {};
-	float lastSampleTime = 1.0f/44100.0f;
+	float lastSampleTime[16];
+	float lastAge[16]; // Init to -1 so it triggers on frame 1
 	float blinkTime = 0.0f;
 	float squareGain = 0.7f;// attenuate square to match the perceived loudness of the saw.
 	bool square = false;
@@ -78,10 +79,11 @@ struct Saw2 : Module {
 		decimators4.resize(16);
 		decimators2.resize(16);
 
-		for (auto & filter : dcBlocker) {
+		for (int ch = 0; ch < 16; ch++) {
 			// extremely slow. It corrects the DC drift without touching the bass.
-			filter.cutoff_hz = 2.0f;
-			filter.setSampleTime(lastSampleTime);
+			dcBlocker[ch].cutoff_hz = 2.0f;
+			lastAge[ch] = -1.0f;
+			lastSampleTime[ch] = 0.0f;
 		}
 	}
 
@@ -180,27 +182,30 @@ struct Saw2 : Module {
 		const float pitchBase = params[PITCH_PARAM].getValue();
 		const int pitchInputChannels = inputs[CV_PITCH_INPUT].getChannels();
 
-		if (lastSampleTime != args.sampleTime) {
-			for (auto & chDcBlocker : dcBlocker) {
-				chDcBlocker.setSampleTime(args.sampleTime);
-			}
-		}
-		lastSampleTime = args.sampleTime;
-
 		const int oversample = getOversampleAmount(args.sampleRate);
 		const float osSampleTime = args.sampleTime / (float)oversample;
 
 		for (int c = 0; c < channels; c++) {
+			if (lastSampleTime[c] != args.sampleTime) {
+				dcBlocker[c].setSampleTime(args.sampleTime);
+			}
+
 			float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
 			cv_age *= 4.0f;
 
 			// 30Hz is the magic number for a new capacitor droop
 			const float age = clamp(cv_age+params[AGE_PARAM].getValue(), 0.0f, 60.0f);
-			hp1[c].cutoff_hz = 30.0f + age*9.0f;
-			hp1[c].setSampleTime(osSampleTime);
 
-			hp2[c].cutoff_hz = 0.5f + age*4.0f;
-			hp2[c].setSampleTime(osSampleTime);
+			if (age != lastAge[c] || lastSampleTime[c] != args.sampleTime) {
+				hp1[c].cutoff_hz = 30.0f + age*9.0f;
+				hp1[c].setSampleTime(osSampleTime);
+
+				hp2[c].cutoff_hz = 0.5f + age*4.0f;
+				hp2[c].setSampleTime(osSampleTime);
+
+				lastAge[c] = age;
+				lastSampleTime[c] = args.sampleTime;
+			}
 
 			// As the capacitor dries out (age increases), bass is lost and the signal thins out.
 			// We add gain to compensate, making the bulge even bigger.
@@ -243,7 +248,7 @@ struct Saw2 : Module {
 			if (c == 0) {
 				blinkTime += args.sampleTime;
 				float blinkPeriod = 1.0f / (freq * 0.05f);
-				if (blinkTime >= blinkPeriod) blinkTime -= blinkPeriod;
+				while (blinkTime >= blinkPeriod) blinkTime -= blinkPeriod;
 				lights[BLINK_LIGHT].value = (blinkTime < blinkPeriod * 0.5f) ? 1.0f : 0.0f;
 			}
 		}
