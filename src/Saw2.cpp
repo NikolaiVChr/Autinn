@@ -22,8 +22,6 @@
 
 **/
 
-static constexpr int OVERSAMPLE = 4;
-
 struct Saw2 : Module {
 	enum ParamIds {
 		PITCH_PARAM,
@@ -58,7 +56,14 @@ struct Saw2 : Module {
 	float squareGain = 0.7f;// attenuate square to match the perceived loudness of the saw.
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
-	std::vector<dsp::Decimator<OVERSAMPLE, 8>> decimators;
+	std::vector<dsp::Decimator<4, 8>> decimators4;
+	std::vector<dsp::Decimator<2, 8>> decimators2;
+
+	static int getOversampleAmount(const float sampleRate) {
+		if (sampleRate < 50000.0f) return 4;
+		if (sampleRate < 100000.0f) return 2;
+		return 1;
+	}
 
 	Saw2() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -69,7 +74,8 @@ struct Saw2 : Module {
 		configInput(CV_AGE_INPUT, "4 Years/V CV");
 		configInput(CV_TYPE_INPUT, "Type trigger");
 		configOutput(BUZZ_OUTPUT, "Audio");
-		decimators.resize(16);
+		decimators4.resize(16);
+		decimators2.resize(16);
 
 		for (auto & filter : dcBlocker) {
 			// extremely slow. It corrects the DC drift without touching the bass.
@@ -108,6 +114,49 @@ struct Saw2 : Module {
 			square = json_boolean_value(ext);
 	}
 
+	inline float processSubSample(int c, float dt, float makeupGain) {
+		const float nextPhase = phase[c] + dt;
+		const float magDown = square ? squareGain * -2.0f : -2.0f;
+		const float magUp   = square ? squareGain *  2.0f :  0.0f;
+
+		if (nextPhase >= 1.0f) {
+			const float overshoot = nextPhase - 1.0f;
+			const float fraction = overshoot / dt;
+			blep[c].jump(fraction, magDown);
+			phase[c] = overshoot;
+		} else if (square && phase[c] < 0.5f && nextPhase >= 0.5f) {
+			const float overshoot = nextPhase - 0.5f;
+			const float fraction = overshoot / dt;
+			blep[c].jump(fraction, magUp);
+			phase[c] = nextPhase;
+		} else {
+			phase[c] = nextPhase;
+		}
+
+		float naive = 0.0f;
+		if (!square) {
+			naive = 2.0f * phase[c] - 1.0f;
+		} else {
+			naive = (phase[c] < 0.5f) ? -1.0f : 1.0f;
+			naive *= squareGain;
+		}
+
+		const float out = blep[c].process(naive);
+
+		// Apply HP Filter
+		// This mimics the AC coupling capacitor that bends the saw into a shark fin.
+
+		// We use a simple leaky integrator to track the DC offset
+		// Stage 1: The Curve (Shark Fin)
+		const float stage1 = hp1[c].process(out);
+
+		// Stage 2: Creates the Overshoot
+		// We apply the high pass logic again to the output of Stage 1.
+		const float stage2 = hp2[c].process(stage1);
+
+		return tanh_fast_high(stage2 * makeupGain);
+	}
+
 	void process(const ProcessArgs &args) override {
 		if (!outputs[BUZZ_OUTPUT].isConnected()) {
 			return;
@@ -132,6 +181,9 @@ struct Saw2 : Module {
 		}
 		lastSampleTime = args.sampleTime;
 
+		const int oversample = getOversampleAmount(args.sampleRate);
+		const float osSampleTime = args.sampleTime / (float)oversample;
+
 		for (int c = 0; c < channels; c++) {
 			float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
 			cv_age *= 4.0f;
@@ -139,10 +191,10 @@ struct Saw2 : Module {
 			// 30Hz is the magic number for a new capacitor droop
 			const float age = clamp(cv_age+params[AGE_PARAM].getValue(), 0.0f, 60.0f);
 			hp1[c].cutoff_hz = 30.0f + age*9.0f;
-			hp1[c].setSampleTime(args.sampleTime/float(OVERSAMPLE));
+			hp1[c].setSampleTime(osSampleTime);
 
 			hp2[c].cutoff_hz = 0.5f + age*4.0f;
-			hp2[c].setSampleTime(args.sampleTime/float(OVERSAMPLE));
+			hp2[c].setSampleTime(osSampleTime);
 
 			// As the capacitor dries out (age increases), bass is lost and the signal thins out.
 			// We add gain to compensate, making the bulge even bigger.
@@ -151,63 +203,31 @@ struct Saw2 : Module {
 			// Calculate Frequency
 			float pitch = pitchBase + (pitchInputChannels > c ? inputs[CV_PITCH_INPUT].getPolyVoltage(c) : inputs[CV_PITCH_INPUT].getVoltage());
 			pitch = clamp(pitch, -4.0f, 6.0f); // Allow a slightly higher range
-			float freq = dsp::FREQ_C4 * std::exp2f(pitch);
+			const float freq = dsp::FREQ_C4 * std::exp2f(pitch);
 
+			const float dt = freq * osSampleTime;
+			float finalOut = 0.0f;
 
-			float outBuf  [OVERSAMPLE];
-
-			for (int i = 0; i < OVERSAMPLE; i++) {
-				const float dt = freq * args.sampleTime / (float)OVERSAMPLE;
-				const float nextPhase = phase[c] + dt;
-
-				const float magDown = square ? squareGain * -2.0f : -2.0f;
-				const float magUp   = square ? squareGain *  2.0f :  0.0f;
-
-				if (nextPhase >= 1.0f) {
-					const float overshoot = nextPhase - 1.0f;
-					const float fraction = overshoot / dt;
-
-					blep[c].jump(fraction, magDown);
-					phase[c] = overshoot;
-				} else if (square && phase[c] < 0.5f && nextPhase >= 0.5f) {
-					const float overshoot = nextPhase - 0.5f;
-					const float fraction = overshoot / dt;
-
-					blep[c].jump(fraction, magUp);
-					phase[c] = nextPhase;
-				} else {
-					phase[c] = nextPhase;
+			if (oversample == 4) {
+				float outBuf[4];
+				for (float & i : outBuf) {
+					i = processSubSample(c, dt, makeupGain);
 				}
-
-				float naive = 0.0f;
-				if (!square) {
-					naive = 2.0f * phase[c] - 1.0f;
-				} else {
-					naive = (phase[c] < 0.5f) ? -1.0f : 1.0f;
-					naive *= squareGain;
+				finalOut = decimators4[c].process(outBuf);
+			} else if (oversample == 2) {
+				float outBuf[2];
+				for (float & i : outBuf) {
+					i = processSubSample(c, dt, makeupGain);
 				}
-
-				const float out = blep[c].process(naive);
-
-				// Apply HP Filter
-				// This mimics the AC coupling capacitor that bends the saw into a shark fin.
-
-				// We use a simple leaky integrator to track the DC offset
-				// Stage 1: The Curve (Shark Fin)
-				const float stage1 = hp1[c].process(out);
-
-				// Stage 2: Creates the Overshoot
-				// We apply the high pass logic again to the output of Stage 1.
-				const float stage2 = hp2[c].process(stage1);
-
-				outBuf[i] = tanh_fast_high(stage2 * makeupGain);
+				finalOut = decimators2[c].process(outBuf);
+			} else {
+				// 1x Bypass
+				finalOut = processSubSample(c, dt, makeupGain);
 			}
-
-			float out = decimators[c].process(outBuf);
 
 			// remove DC offset
 			// Measure the current offset (Accumulate average)
-			out = dcBlocker[c].process(out);
+			float out = dcBlocker[c].process(finalOut);
 
 			// Output Gain Staging
 			// Bass will gain it a bit, so we keep the voltage down.
