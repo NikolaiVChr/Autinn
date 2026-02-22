@@ -88,9 +88,8 @@ struct Excavi : Module {
 	float driftPhaseA2 = 0.0f;
 	float driftPhaseB1 = 0.0f;
 	float driftPhaseB2 = 0.0f;
-	float lastSampleRate = 0.0f;
-	float last_age = 0.0f;
-	float blinkTime = 0.0f;
+	float lastSampleRate[16];
+	float lastAge[16];
 
 	std::vector<dsp::Decimator<4, 16>> decimatorA4;
 	std::vector<dsp::Decimator<4, 16>> decimatorB4;
@@ -133,7 +132,7 @@ struct Excavi : Module {
 		configOutput(SOLO_OUTPUT+0, "Master audio");
 		configOutput(SOLO_OUTPUT+1, "Slave audio");
 
-		configLight(HARD_SYNC_LIGHT, "Flashing");
+		configLight(HARD_SYNC_LIGHT, "Hard sync");
 
 		decimatorA4.resize(16); decimatorB4.resize(16);
 		decimatorA2.resize(16); decimatorB2.resize(16);
@@ -146,6 +145,9 @@ struct Excavi : Module {
 
 			dcBlockerA[c].cutoff_hz = 2.0f;
 			dcBlockerB[c].cutoff_hz = 2.0f;
+
+			lastAge[c] = -1.0f;
+			lastSampleRate[c] = 0.0f;
 		}
 	}
 
@@ -163,7 +165,6 @@ struct Excavi : Module {
 			phaseB[c] = 0.0f;
 			syncTrigger[c].reset();
 		}
-		blinkTime = 0.0f;
 		schmittButton.reset();
 		hardSyncEnabled = false;
 		Module::onReset(e);
@@ -279,7 +280,7 @@ struct Excavi : Module {
 		const float dtB = currentFreqB * osSampleTime;
 
 		// hard sync logic
-		bool masterWrapped = (dtA > 0.0f && oldPhaseA + dtA >= 1.0f) ||
+		const bool masterWrapped = (dtA > 0.0f && oldPhaseA + dtA >= 1.0f) ||
 							 (dtA < 0.0f && oldPhaseA + dtA < 0.0f);
 
 		if (hardSyncEnabled && masterWrapped) {
@@ -337,40 +338,30 @@ struct Excavi : Module {
 			return;
 		}
 
-		// age
-        const float ageKnob = params[AGE_PARAM].getValue();
-        const float cv_age = inputs[CV_AGE_INPUT].getVoltage() * 10.0f;
-        const float age = clamp(ageKnob + cv_age, 0.0f, 60.0f);
+		// each vco have their own capacitor and power fluctuations, so we do them independently.
+		// 2 sines per vco make it sound random instead of vibrato.
+		// We use primes numbers divided by 100, to avoid repeating pattern the brain can pick up on.
 
-		float driftA = 0.0f;
-		float driftB = 0.0f;
+		// Wrap at 2*PI to prevent overflow safely
+		driftPhaseA1 += 0.43f * args.sampleTime;
+		if (driftPhaseA1 > 6.2831853f) driftPhaseA1 -= 6.2831853f;
 
-		if (age > 0.01f) {
-			// each vco have their own capacitor and power fluctuations, so we do them independently.
-			// 2 sines per vco make it sound random instead of vibrato.
-			// We use primes numbers divided by 100, to avoid repeating pattern the brain can pick up on.
+		driftPhaseA2 += 0.71f * args.sampleTime;
+		if (driftPhaseA2 > 6.2831853f) driftPhaseA2 -= 6.2831853f;
 
-			// Wrap at 2*PI to prevent overflow safely
-			driftPhaseA1 += 0.43f * args.sampleTime;
-			if (driftPhaseA1 > 6.2831853f) driftPhaseA1 -= 6.2831853f;
+		driftPhaseB1 += 0.59f * args.sampleTime;
+		if (driftPhaseB1 > 6.2831853f) driftPhaseB1 -= 6.2831853f;
 
-			driftPhaseA2 += 0.71f * args.sampleTime;
-			if (driftPhaseA2 > 6.2831853f) driftPhaseA2 -= 6.2831853f;
+		driftPhaseB2 += 0.83f * args.sampleTime;
+		if (driftPhaseB2 > 6.2831853f) driftPhaseB2 -= 6.2831853f;
 
-			driftPhaseB1 += 0.59f * args.sampleTime;
-			if (driftPhaseB1 > 6.2831853f) driftPhaseB1 -= 6.2831853f;
-
-			driftPhaseB2 += 0.83f * args.sampleTime;
-			if (driftPhaseB2 > 6.2831853f) driftPhaseB2 -= 6.2831853f;
-
-			driftA = (sin_fast_high(driftPhaseA1) + sin_fast_high(driftPhaseA2)) * 0.0005f * age;
-			driftB = (sin_fast_high(driftPhaseB1) + sin_fast_high(driftPhaseB2)) * 0.0005f * age;
-		}
+		float rawDriftA = (sin_fast_high(driftPhaseA1) + sin_fast_high(driftPhaseA2)) * 0.0005f;
+		float rawDriftB = (sin_fast_high(driftPhaseB1) + sin_fast_high(driftPhaseB2)) * 0.0005f;
 
         const float shapeA_knob = params[SHAPE_PARAM + 0].getValue();
         const float shapeB_knob = params[SHAPE_PARAM + 1].getValue();
-        const float pitchA_knob = params[PITCH_PARAM + 0].getValue() + driftA;
-        const float pitchB_knob = params[PITCH_PARAM + 1].getValue() + driftB;
+        const float pitchA_knob = params[PITCH_PARAM + 0].getValue();
+        const float pitchB_knob = params[PITCH_PARAM + 1].getValue();
         const float gainA_knob = params[GAIN_PARAM + 0].getValue();
         const float gainB_knob = params[GAIN_PARAM + 1].getValue();
         const float fmDepth_knob = params[CROSS_MODULATION_PARAM].getValue();
@@ -382,56 +373,64 @@ struct Excavi : Module {
         outputs[SOLO_OUTPUT + 0].setChannels(channels);
         outputs[SOLO_OUTPUT + 1].setChannels(channels);
 
-		bool updateFilters = (std::abs(age - last_age) > 0.001f) || (args.sampleRate != lastSampleRate);
-
-		if (updateFilters) {
-			for (int c = 0; c < channels; c++) {
-				hp1A[c].cutoff_hz = 30.0f + age * 9.0f;
-				hp2A[c].cutoff_hz = 0.5f + age * 4.0f;
-				hp1B[c].cutoff_hz = hp1A[c].cutoff_hz;
-				hp2B[c].cutoff_hz = hp2A[c].cutoff_hz;
-
-				hp1A[c].setSampleTime(osSampleTime);
-				hp2A[c].setSampleTime(osSampleTime);
-				hp1B[c].setSampleTime(osSampleTime);
-				hp2B[c].setSampleTime(osSampleTime);
-
-				dcBlockerA[c].setSampleTime(args.sampleTime);
-				dcBlockerB[c].setSampleTime(args.sampleTime);
-			}
-			lastSampleRate = args.sampleRate;
-			last_age = age;
-		}
-
 		MorphWeights wA, wB;
 		wA.calculate(shapeA_knob);
 		wB.calculate(shapeB_knob);
 
-		const float makeupGain = 1.0f + (age * 0.1f);
+
 
         for (int c = 0; c < channels; c++) {
+
+        	// age
+        	float cv_age = inputs[CV_AGE_INPUT].getChannels() > c? inputs[CV_AGE_INPUT].getPolyVoltage(c):inputs[CV_AGE_INPUT].getVoltage();
+        	float age = clamp(params[AGE_PARAM].getValue() + cv_age * 10.f, 0.0f, 60.0f);
+        	const float makeupGain = 1.0f + (age * 0.1f);
+
+        	float driftA = rawDriftA * age;
+        	float driftB = rawDriftB * age;
+
+        	if (std::abs(age - lastAge[c]) > 0.001f || args.sampleRate != lastSampleRate[c]) {
+        		hp1A[c].cutoff_hz = 30.0f + age * 9.0f;
+        		hp2A[c].cutoff_hz = 0.5f + age * 4.0f;
+        		hp1B[c].cutoff_hz = hp1A[c].cutoff_hz;
+        		hp2B[c].cutoff_hz = hp2A[c].cutoff_hz;
+
+        		hp1A[c].setSampleTime(osSampleTime);
+        		hp2A[c].setSampleTime(osSampleTime);
+        		hp1B[c].setSampleTime(osSampleTime);
+        		hp2B[c].setSampleTime(osSampleTime);
+
+        		dcBlockerA[c].setSampleTime(args.sampleTime);
+        		dcBlockerB[c].setSampleTime(args.sampleTime);
+
+        		lastAge[c] = age;
+        		lastSampleRate[c] = args.sampleRate;
+        	}
 
         	// gain
             float gA = gainA_knob;
             if (inputs[CV_GAIN_INPUT + 0].isConnected()) {
-                gA *= clamp(inputs[CV_GAIN_INPUT + 0].getPolyVoltage(c) * 0.1f, 0.0f, 1.0f);
+                gA += inputs[CV_GAIN_INPUT + 0].getPolyVoltage(c) * 0.1f;
             }
+        	gA = clamp(gA, 0.0f, 1.0f);
             float gB = gainB_knob;
             if (inputs[CV_GAIN_INPUT + 1].isConnected()) {
-                gB *= clamp(inputs[CV_GAIN_INPUT + 1].getPolyVoltage(c) * 0.1f, 0.0f, 1.0f);
+                gB += inputs[CV_GAIN_INPUT + 1].getPolyVoltage(c) * 0.1f;
             }
+        	gB = clamp(gB, 0.0f, 1.0f);
 
         	// pitch
             const float cvA = inputs[CV_PITCH_INPUT + 0].getPolyVoltage(c);
-            const float freqA = dsp::FREQ_C4 * std::exp2f(pitchA_knob + cvA);
+            const float freqA = dsp::FREQ_C4 * std::exp2f(pitchA_knob + cvA + driftA);
             const float cvB = inputs[CV_PITCH_INPUT + 1].isConnected() ?
                         inputs[CV_PITCH_INPUT + 1].getPolyVoltage(c) : cvA;
-            const float baseFreqB = dsp::FREQ_C4 * std::exp2f(pitchB_knob + cvB);
+            const float baseFreqB = dsp::FREQ_C4 * std::exp2f(pitchB_knob + cvB + driftB);
 
         	// cross modulation (FM)
             float fmAmount = fmDepth_knob;
             if (inputs[CV_CROSS_MODULATION_INPUT].isConnected()) {
-                fmAmount *= clamp(inputs[CV_CROSS_MODULATION_INPUT].getPolyVoltage(c) * 0.2f, -1.0f, 1.0f);
+            	fmAmount += inputs[CV_CROSS_MODULATION_INPUT].getPolyVoltage(c) * 0.2f;
+            	fmAmount = clamp(fmAmount, -1.0f, 1.0f);
             }
 
         	// ext. sync
@@ -514,7 +513,7 @@ struct ExcaviWidget : ModuleWidget {
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xLeft, yRow1), module, Excavi::SHAPE_PARAM + 0));
     	auto modKnob = createParamCentered<AutinnArcMidKnob>(Vec(xCenter, yRow1), module, Excavi::CROSS_MODULATION_PARAM);
     	modKnob->setModulation(Excavi::CV_CROSS_MODULATION_INPUT, [](float cv, float val, float att) {
-			return clamp(val * (cv * 0.2f), -1.0f, 1.0f);
+			return clamp(val + (cv * 0.2f), -1.0f, 1.0f);
 		});
     	addParam(modKnob);
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(xRight, yRow1), module, Excavi::SHAPE_PARAM + 1));
@@ -531,7 +530,7 @@ struct ExcaviWidget : ModuleWidget {
         // Row 3: Gains, sync CV, & sync Button
     	auto gain1Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xLeft, yRow3), module, Excavi::GAIN_PARAM + 0);
     	gain1Knob->setModulation(Excavi::CV_GAIN_INPUT+0, [](float cv, float val, float att) {
-			return clamp(val * (cv * 0.1f), 0.0f, 1.0f);
+			return clamp(val + (cv * 0.1f), 0.0f, 1.0f);
 		});
     	addParam(gain1Knob);
         addInput(createInputCentered<InPortAutinn>(Vec(xMidL, yRow3), module, Excavi::CV_SYNC_INPUT));
@@ -540,7 +539,7 @@ struct ExcaviWidget : ModuleWidget {
 
     	auto gain2Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xRight, yRow3), module, Excavi::GAIN_PARAM + 1);
     	gain2Knob->setModulation(Excavi::CV_GAIN_INPUT+1, [](float cv, float val, float att) {
-			return clamp(val * (cv * 0.1f), 0.0f, 1.0f);
+			return clamp(val + (cv * 0.1f), 0.0f, 1.0f);
 		});
     	addParam(gain2Knob);
 
