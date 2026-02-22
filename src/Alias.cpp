@@ -22,6 +22,9 @@ struct Alias : Module {
 	enum State {
 		READY,
 		WORKING,
+		WAIT_ZERO_CROSS,
+		SETTLE,
+		RECORD,
 		FINISHED
 	};
 
@@ -31,19 +34,43 @@ struct Alias : Module {
 	float sweepPhase = 0.0f;
 	float sweepFreq = 20.0f;
 	
+	int currentStep = 0;
+	int settleCounter = 0;
+
 	// Graph Data
 	float thdCurve[256]; 
 	float score100Hz = -120.0f;
 	float score1kHz = -120.0f;
 	float score10kHz = -120.0f;
 
-	Alias() {
+	static const int FFT_SIZE = 4096;
+	dsp::RealFFT fft;
+	float windowArray[FFT_SIZE];
+	float audioBuffer[FFT_SIZE];
+	float fftOutput[FFT_SIZE];
+	int bufferIndex = 0;
+
+	Alias() : fft(FFT_SIZE) { // Initialize the FFT size in the constructor initialization list
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configButton(START_BUTTON, "Start Sweep");
 		configInput(RETURN_INPUT, "Audio Return");
 		configOutput(TEST_OUTPUT, "Sine Test Output");
 
 		for(int i = 0; i < 256; i++) thdCurve[i] = -120.0f;
+
+		// Pre-calculate the Blackman-Harris window
+		const float a0 = 0.35875f;
+		const float a1 = 0.48829f;
+		const float a2 = 0.14128f;
+		const float a3 = 0.01168f;
+
+		for (int i = 0; i < FFT_SIZE; i++) {
+			float phase = (float)i / (float)(FFT_SIZE - 1);
+			windowArray[i] = a0
+						   - a1 * std::cos(2.0f * (float)M_PI * phase)
+						   + a2 * std::cos(4.0f * (float)M_PI * phase)
+						   - a3 * std::cos(6.0f * (float)M_PI * phase);
+		}
 	}
 
 	void onReset(const ResetEvent& e) override {
@@ -55,12 +82,20 @@ struct Alias : Module {
 		Module::onReset(e);
 	}
 
-	void process(const ProcessArgs &args) override {
+	// calculate the frequency for a specific pixel on the graph
+	float getFreqForStep(int step) {
+		float logMin = std::log10(20.0f);
+		float logMax = std::log10(20000.0f);
+		float stepLog = logMin + (step / 255.0f) * (logMax - logMin);
+		return std::pow(10.0f, stepLog);
+	}
 
+	void process(const ProcessArgs &args) override {
 		if (startTrigger.process(params[START_BUTTON].getValue())) {
-			if (currentState != WORKING) {
-				currentState = WORKING;
-				sweepFreq = 20.0f;
+			if (currentState == READY || currentState == FINISHED) {
+				currentState = WAIT_ZERO_CROSS;
+				currentStep = 0;
+				sweepFreq = getFreqForStep(0);
 				sweepPhase = 0.0f;
 				score100Hz = score1kHz = score10kHz = -120.0f;
 				for(int i = 0; i < 256; i++) thdCurve[i] = -120.0f;
@@ -69,42 +104,99 @@ struct Alias : Module {
 
 		float out = 0.0f;
 
-		if (currentState == WORKING) {
+		if (currentState != READY && currentState != FINISHED) {
 			// Generate pure sine (+/- 5V)
-			out = std::sin(sweepPhase * 2.0f * float(M_PI)) * 5.0f; 
-			
+			out = std::sin(sweepPhase * 2.0f * float(M_PI)) * 5.0f;
+
+			// Advance phase and check for zero-crossing
 			sweepPhase += sweepFreq * args.sampleTime;
-			if (sweepPhase >= 1.0f) sweepPhase -= 1.0f;
+			bool crossedZero = false;
+			if (sweepPhase >= 1.0f) {
+				sweepPhase -= 1.0f;
+				crossedZero = true; // The wave wrapped perfectly around 0!
+			}
 
-			// Exponentially sweep from 20Hz to 20kHz over 5 seconds
-			float sweepMultiplier = std::pow(20000.0f / 20.0f, args.sampleTime / 5.0f);
-			sweepFreq *= sweepMultiplier; 
+			// state
+			if (currentState == WAIT_ZERO_CROSS) {
+				if (crossedZero) {
+					// Snap to the new frequency precisely at 0.0V to prevent clicks
+					sweepFreq = getFreqForStep(currentStep);
+					currentState = SETTLE;
+					settleCounter = 0;
+				}
+			}
+			else if (currentState == SETTLE) {
+				// Wait for 2000 samples (~45ms) to let external audio settle
+				settleCounter++;
+				if (settleCounter >= 2000) {
+					currentState = RECORD;
+					bufferIndex = 0;
+				}
+			}
+			else if (currentState == RECORD) {
+				// Record the stable signal
+				audioBuffer[bufferIndex] = inputs[RETURN_INPUT].getVoltage() * 0.2f;
+				bufferIndex++;
 
-			if (sweepFreq >= 20000.0f) {
-				currentState = FINISHED;
-				sweepFreq = 20.0f;
-				out = 0.0f;
-			} else {
-				// TODO: DSP
-				
-				// Placeholder for testing the UI drawing:
-				float currentThd = -100.0f + (sweepFreq / 20000.0f) * 80.0f; 
+				// When buffer is full, do the math!
+				if (bufferIndex >= FFT_SIZE) {
 
-				// Data for the UI
-				
-				// Map 20Hz - 20kHz to our 0-255 array logarithmically
-				float logMin = std::log10(20.0f);
-				float logMax = std::log10(20000.0f);
-				float currentLog = std::log10(sweepFreq);
-				
-				int pixelIndex = (currentLog - logMin) / (logMax - logMin) * 255.0f;
-				pixelIndex = clamp(pixelIndex, 0, 255);
-				thdCurve[pixelIndex] = currentThd;
+					// Apply Window and FFT
+					for (int i = 0; i < FFT_SIZE; i++) audioBuffer[i] *= windowArray[i];
+					fft.rfft(audioBuffer, fftOutput);
 
-				// benchmarks
-				if (sweepFreq >= 100.0f && sweepFreq < 105.0f) score100Hz = currentThd;
-				if (sweepFreq >= 997.0f && sweepFreq < 1005.0f) score1kHz = currentThd; // AES17
-				if (sweepFreq >= 10000.0f && sweepFreq < 10100.0f) score10kHz = currentThd;
+					const int numBins = FFT_SIZE / 2;
+					float magnitudes[numBins];
+					for (int k = 1; k < numBins; k++) {
+						float re = fftOutput[2 * k];
+						float im = fftOutput[2 * k + 1];
+						magnitudes[k] = (re * re) + (im * im);
+					}
+
+					float signalPower = 0.0f;
+					float binResolution = args.sampleRate / FFT_SIZE;
+					const int notchWidth = 4; // Because freq is stable, we only need a tight 4-bin notch
+
+					// Mute Fundamental and Harmonics
+					for (int h = 1; (h * sweepFreq) < (args.sampleRate / 2.0f); h++) {
+						float targetFreq = h * sweepFreq;
+						int centerBin = (int)std::round(targetFreq / binResolution);
+
+						float currentHarmonicPower = 0.0f;
+						for (int b = centerBin - notchWidth; b <= centerBin + notchWidth; b++) {
+							if (b > 0 && b < numBins) {
+								currentHarmonicPower += magnitudes[b];
+								magnitudes[b] = 0.0f;
+							}
+						}
+						if (h == 1) signalPower = currentHarmonicPower;
+					}
+
+					// Calculate Noise and THD
+					float noisePower = 0.0f;
+					for (int k = 1; k < numBins; k++) noisePower += magnitudes[k];
+
+					float currentThd = -120.0f;
+					if (signalPower > 1e-9f && noisePower > 1e-9f) {
+						currentThd = 10.0f * std::log10(noisePower / signalPower);
+					}
+
+					// Save the score
+					thdCurve[currentStep] = currentThd;
+
+					// Catch the Benchmarks (Check the current step's frequency)
+					if (sweepFreq >= 100.0f && sweepFreq < 105.0f) score100Hz = currentThd;
+					if (sweepFreq >= 997.0f && sweepFreq < 1005.0f) score1kHz = currentThd;
+					if (sweepFreq >= 10000.0f && sweepFreq < 10100.0f) score10kHz = currentThd;
+
+					// Advance to the next pixel
+					currentStep++;
+					if (currentStep >= 256) {
+						currentState = FINISHED;
+					} else {
+						currentState = WAIT_ZERO_CROSS; // Prepare for the next pitch
+					}
+				}
 			}
 		}
 
@@ -182,12 +274,12 @@ struct AliasDisplay : TransparentWidget {
 struct AliasWidget : ModuleWidget {
 	AliasWidget(Alias* module) {
 		setModule(module);
-		//setPanel(createPanel(asset::plugin(pluginInstance, "res/AliasModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/AliasModule.svg")));
 
 		// 10 HP Wide
-		//if (box.size.x == 0) {
+		if (box.size.x == 0) {
 			box.size = Vec(10 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
-		//}
+		}
 
 		const float HP = RACK_GRID_WIDTH;
 		const float centerX = box.size.x / 2.0f;
