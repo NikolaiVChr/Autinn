@@ -51,13 +51,14 @@ struct Saw2 : Module {
 	DCBlocker dcBlocker[16];
 	DCBlocker hp1[16];
 	DCBlocker hp2[16];
+	float roofLPF[16] = {};
 	float lastSampleTime = 1.0f/44100.0f;
 	float blinkTime = 0.0f;
 	float squareGain = 0.7f;// attenuate square to match the perceived loudness of the saw.
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
-	std::vector<dsp::Decimator<4, 16>> decimators4;
-	std::vector<dsp::Decimator<2, 16>> decimators2;
+	std::vector<dsp::Decimator<4, 8>> decimators4;
+	std::vector<dsp::Decimator<2, 8>> decimators2;
 
 	static int getOversampleAmount(const float sampleRate) {
 		if (sampleRate < 50000.0f) return 4;
@@ -154,7 +155,9 @@ struct Saw2 : Module {
 		// We apply the high pass logic again to the output of Stage 1.
 		const float stage2 = hp2[c].process(stage1);
 
-		return tanh_fast_high(stage2 * makeupGain);
+		roofLPF[c] += 0.5f * (stage2 - roofLPF[c]);
+
+		return tanh_fast_high(roofLPF[c] * makeupGain);
 	}
 
 	void process(const ProcessArgs &args) override {
