@@ -48,16 +48,16 @@ struct Saw2 : Module {
 
 	float phase[16] = {};
 	ReactiveBLEP blep[16];
-	DCBlocker dcBlocker[16] = {};
-	DCBlocker hp1[16] = {};
-	DCBlocker hp2[16] = {};
+	DCBlocker dcBlocker[16];
+	DCBlocker hp1[16];
+	DCBlocker hp2[16];
 	float lastSampleTime = 1.0f/44100.0f;
 	float blinkTime = 0.0f;
 	float squareGain = 0.7f;// attenuate square to match the perceived loudness of the saw.
 	bool square = false;
 	dsp::SchmittTrigger schmittButton;
-	std::vector<dsp::Decimator<4, 8>> decimators4;
-	std::vector<dsp::Decimator<2, 8>> decimators2;
+	std::vector<dsp::Decimator<4, 16>> decimators4;
+	std::vector<dsp::Decimator<2, 16>> decimators2;
 
 	static int getOversampleAmount(const float sampleRate) {
 		if (sampleRate < 50000.0f) return 4;

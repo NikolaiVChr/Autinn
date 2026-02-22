@@ -152,14 +152,14 @@ struct Melody : Module {
 	int rest_amount[16] = {};
 	/// @brief Pulse generator for the "Start Phrase" trigger output.
 	/// Generates a 1ms pulse whenever the sequence loops back to index 0.
-	dsp::PulseGenerator startPulse[16] = {};
+	dsp::PulseGenerator startPulse[16];
 	/// @brief Pulse generator for the "New Phrase" trigger output.
 	/// Generates a 1ms pulse only when a *newly generated* phrase begins playing.
-	dsp::PulseGenerator newPhrasePulse[16] = {};
+	dsp::PulseGenerator newPhrasePulse[16];
 	/// @brief State tracking for the "Generate" button/input to detect rising edges.
 	/// Prevents the generator from triggering continuously while the button is held.
 	//bool generate_prev = false;
-	dsp::SchmittTrigger generateTriggerCV[16] = {};
+	dsp::SchmittTrigger generateTriggerCV[16];
 	dsp::BooleanTrigger generateTriggerButton;
 	/// @brief Low-priority counter for throttling expensive parameter updates.
 	/// Parameter `attenuvert` calculations only run when this reaches 512.

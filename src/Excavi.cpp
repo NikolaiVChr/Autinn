@@ -90,10 +90,10 @@ struct Excavi : Module {
 	float last_age = 0.0f;
 	float blinkTime = 0.0f;
 
-	std::vector<dsp::Decimator<4, 8>> decimatorA4;
-	std::vector<dsp::Decimator<4, 8>> decimatorB4;
-	std::vector<dsp::Decimator<2, 8>> decimatorA2;
-	std::vector<dsp::Decimator<2, 8>> decimatorB2;
+	std::vector<dsp::Decimator<4, 16>> decimatorA4;
+	std::vector<dsp::Decimator<4, 16>> decimatorB4;
+	std::vector<dsp::Decimator<2, 16>> decimatorA2;
+	std::vector<dsp::Decimator<2, 16>> decimatorB2;
 
 	static int getOversampleAmount(const float sampleRate) {
 		if (sampleRate < 50000.0f) return 4;
