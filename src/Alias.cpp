@@ -155,7 +155,7 @@ struct Alias : Module {
 
 					float signalPower = 0.0f;
 					float binResolution = args.sampleRate / FFT_SIZE;
-					const int notchWidth = 4; // Because freq is stable, we only need a tight 4-bin notch
+					const int notchWidth = 7; // Because freq is stable, we only need a tight 4-bin notch
 
 					// Mute Fundamental and Harmonics
 					for (int h = 1; (h * sweepFreq) < (args.sampleRate / 2.0f); h++) {
@@ -214,7 +214,7 @@ struct AliasDisplay : TransparentWidget {
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1 || !module) return;
 
-		std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/ShareTechMono-Regular.ttf"));
+		std::shared_ptr<Font> font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
 		
 		if (font) {
 			nvgFontSize(args.vg, 12);
@@ -265,7 +265,7 @@ struct AliasDisplay : TransparentWidget {
 			}
 
 			nvgStrokeColor(args.vg, nvgRGBA(0x44, 0xFF, 0x44, 0xFF)); 
-			nvgStrokeWidth(args.vg, 1.5f);
+			nvgStrokeWidth(args.vg, 0.8f);
 			nvgStroke(args.vg);
 		}
 	}
