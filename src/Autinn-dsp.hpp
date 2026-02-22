@@ -208,7 +208,7 @@ public:
      * @param dt The phase increment per sample (sampleTime/phaseTime)
      * @param slopeChange The new slope minus the old slope
      */
-    void insertCorner(const float fraction, const float dt, const float slopeChange) {
+    void corner(const float fraction, const float dt, const float slopeChange) {
         // Correct the sample before the corner
         const float u0 = fraction;
         buffer[0] += slopeChange * dt * (u0 * u0 * u0) / 6.0f;

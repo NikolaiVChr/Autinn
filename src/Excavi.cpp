@@ -76,8 +76,8 @@ struct Excavi : Module {
 
 	float phaseA[16] = {};
 	float phaseB[16] = {};
-	PredictiveBLEP blepA[16];
-	PredictiveBLEP blepB[16];
+	ReactiveBLEP blepA[16];
+	ReactiveBLEP blepB[16];
 	float lastOutA[16] = {}; // 1-sample memory for TZFM
 	DCBlocker hp1A[16], hp2A[16];
 	DCBlocker hp1B[16], hp2B[16];
@@ -211,7 +211,7 @@ struct Excavi : Module {
 	    return naive;
 	}
 
-	static inline float generateMorphingWaveform(const MorphWeights& w, float& phase, float dt, PredictiveBLEP& blep) {
+	static inline float generateMorphingWaveform(const MorphWeights& w, float& phase, float dt, ReactiveBLEP& blep) {
 	    const float dir = (dt >= 0.0f) ? 1.0f : -1.0f;
 	    const float absDt = std::abs(dt);
 
