@@ -82,6 +82,8 @@ struct Excavi : Module {
 	DCBlocker hp1A[16], hp2A[16];
 	DCBlocker hp1B[16], hp2B[16];
 	DCBlocker dcBlockerA[16], dcBlockerB[16];
+	float roofLpfA[16] = {};
+	float roofLpfB[16] = {};
 	float driftPhaseA1 = 0.0f;
 	float driftPhaseA2 = 0.0f;
 	float driftPhaseB1 = 0.0f;
@@ -155,6 +157,8 @@ struct Excavi : Module {
 			hp2B[c].reset();
 			dcBlockerA[c].reset();
 			dcBlockerB[c].reset();
+			roofLpfA[c] = 0.0f;
+			roofLpfB[c] = 0.0f;
 			phaseA[c] = 0.0f;
 			phaseB[c] = 0.0f;
 			syncTrigger[c].reset();
@@ -307,8 +311,13 @@ struct Excavi : Module {
 		outA = hp2A[c].process(hp1A[c].process(outA));
 		outB = hp2B[c].process(hp1B[c].process(outB));
 
-		outA = tanh_fast_high(outA * makeupGain);
-		outB = tanh_fast_high(outB * makeupGain);
+		// roof filters (1-Pole LP to kill IMD before saturation)
+		// 20.3 to 22.1khz cutoff, depending on rack samplerate
+		roofLpfA[c] += 0.5f * (outA - roofLpfA[c]);
+		roofLpfB[c] += 0.5f * (outB - roofLpfB[c]);
+
+		outA = tanh_fast_high(roofLpfA[c] * makeupGain);
+		outB = tanh_fast_high(roofLpfB[c] * makeupGain);
 	}
 
 	void process(const ProcessArgs &args) override {

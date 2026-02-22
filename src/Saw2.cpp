@@ -92,6 +92,7 @@ struct Saw2 : Module {
 			hp2[c].reset();
 			phase[c] = 0.0f;
 			dcBlocker[c].reset();
+			roofLPF[c] = 0.0f;
 		}
 		blinkTime = 0.0f;
 		schmittButton.reset();
@@ -155,6 +156,8 @@ struct Saw2 : Module {
 		// We apply the high pass logic again to the output of Stage 1.
 		const float stage2 = hp2[c].process(stage1);
 
+		// roof filters (1-Pole LP to kill IMD before saturation)
+		// 20.3 to 22.1khz cutoff, depending on rack samplerate
 		roofLPF[c] += 0.5f * (stage2 - roofLPF[c]);
 
 		return tanh_fast_high(roofLPF[c] * makeupGain);
