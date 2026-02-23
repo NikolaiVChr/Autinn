@@ -51,9 +51,9 @@ struct Alias : Module {
 
 	static constexpr int FFT_SIZE = 4096;
 	dsp::RealFFT fft;
-	float windowArray[FFT_SIZE];
-	float audioBuffer[FFT_SIZE];
-	float fftOutput[FFT_SIZE];
+	alignas(16) float windowArray[FFT_SIZE];
+	alignas(16) float audioBuffer[FFT_SIZE];
+	alignas(16) float fftOutput[FFT_SIZE];
 	int bufferIndex = 0;
 
 	Alias() : fft(FFT_SIZE) { // Initialize the FFT size in the constructor initialization list
