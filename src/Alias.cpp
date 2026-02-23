@@ -378,7 +378,7 @@ struct AliasDisplay : TransparentWidget {
 			nvgSave(args.vg);
 			nvgScissor(args.vg, graphX, graphY, graphWidth, graphHeight);
 			nvgBeginPath(args.vg);
-			for (int i = 0; i < STEPS; i++) {
+			for (int i = 0; i < module->STEPS; i++) {
 				float x = graphX + (i / float(module->STEPS-1)) * graphWidth;
 				
 				// Map -120dB (bottom) to 0dB (top)
