@@ -2,8 +2,6 @@
 #include "Autinn-dsp.hpp"
 #include <cmath>
 
-constexpr int notchWidth = 7; // Because freq is stable, we only need a tight 4-bin notch
-
 struct Alias : Module {
 	enum ParamIds {
 		START_BUTTON,
@@ -49,7 +47,7 @@ struct Alias : Module {
 	float score1kHz = -120.0f;
 	float score10kHz = -120.0f;
 
-	static constexpr int FFT_SIZE = 4096;
+	static constexpr int FFT_SIZE = 8192;
 	dsp::RealFFT fft;
 	alignas(16) float windowArray[FFT_SIZE];
 	alignas(16) float audioBuffer[FFT_SIZE];
@@ -65,6 +63,7 @@ struct Alias : Module {
 
 		for(int i = 0; i < 256; i++) thdCurve[i] = -120.0f;
 
+		/*
 		// Pre-calculate the Blackman-Harris window
 		const float a0 = 0.35875f;
 		const float a1 = 0.48829f;
@@ -78,6 +77,22 @@ struct Alias : Module {
 						   + a2 * std::cos(4.0f * (float)M_PI * phase)
 						   - a3 * std::cos(6.0f * (float)M_PI * phase);
 		}
+		*/
+
+		// Flat Top Window coefficients
+		float a0 = 0.21557895;
+		float a1 = 0.41663158;
+		float a2 = 0.27726315;
+		float a3 = 0.08357894;
+		float a4 = 0.00694736;
+
+		for (int i = 0; i < FFT_SIZE; i++) {
+			windowArray[i] = a0
+				- a1 * cos(2.0 * M_PI * (double)i / double(FFT_SIZE))
+				+ a2 * cos(4.0 * M_PI * (double)i / double(FFT_SIZE))
+				- a3 * cos(6.0 * M_PI * (double)i / double(FFT_SIZE))
+				+ a4 * cos(8.0 * M_PI * (double)i / double(FFT_SIZE));
+		}
 	}
 
 	void onReset(const ResetEvent& e) override {
@@ -89,12 +104,34 @@ struct Alias : Module {
 		Module::onReset(e);
 	}
 
-	// calculate the frequency for a specific pixel on the graph
+	/*
 	static float getFreqForStep(int step) {
 		float logMin = std::log10(20.0f);
 		float logMax = std::log10(20000.0f);
 		float stepLog = logMin + (step / 255.0f) * (logMax - logMin);
 		return std::pow(10.0f, stepLog);
+	}
+	*/
+
+	/**
+	 * Calculate the frequency for a specific pixel on the graph
+	 *
+	 */
+	float getFreqForStep(int step) {
+		// Calculate the ideal log frequency
+		float logP = step / 255.0f;
+		float idealFreq = 20.0f * std::pow(20000.0f / 20.0f, logP);
+
+		float sRate = (lastSampleRate > 0) ? lastSampleRate : 44100.0f;
+
+		// Snap it to the nearest FFT bin (Synchronous Sampling)
+		float binRes = sRate / float(FFT_SIZE);
+		float binIndex = std::round(idealFreq / binRes);
+
+		// Don't let it be bin 0 (DC)
+		if (binIndex < 2) binIndex = 2;
+
+		return binIndex * binRes;
 	}
 
 	void process(const ProcessArgs &args) override {
@@ -195,7 +232,7 @@ struct Alias : Module {
 
 						// Apply the limits! (Minimum 4 bins for the Blackman-Harris window)
 						dynamicNotch = std::min(dynamicNotch, maxSafeNotch);
-						dynamicNotch = std::max(4, dynamicNotch);
+						dynamicNotch = std::max(7, dynamicNotch);// 4 for blackman-harris, 7 for flattop
 
 						float currentHarmonicPower = 0.0f;
 						for (int b = centerBin - dynamicNotch; b <= centerBin + dynamicNotch; b++) {
@@ -354,11 +391,11 @@ struct AliasWidget : ModuleWidget {
 		addChild(display);
 
 		// Controls & Ports
-		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(centerX, 150.0f), module, Alias::SETTLE_KNOB));
+		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(centerX, 250.0f), module, Alias::SETTLE_KNOB));
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(centerX, 200.0f), module, Alias::START_BUTTON));
 		
-		addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX - 25.0f, 260.0f), module, Alias::TEST_OUTPUT));
-		addInput(createInputCentered<InPortAutinn>(Vec(centerX + 25.0f, 260.0f), module, Alias::RETURN_INPUT));
+		addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX - 25.0f, 300.0f), module, Alias::TEST_OUTPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(centerX + 25.0f, 300.0f), module, Alias::RETURN_INPUT));
 	}
 };
 
