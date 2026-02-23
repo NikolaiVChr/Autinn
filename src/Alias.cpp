@@ -292,7 +292,7 @@ struct Alias : Module {
 
 					// Calculate Noise and THD
 					float noisePower = 0.0f;
-					for (int k = 6; k < numBins; k++) noisePower += magnitudes[k];
+					for (int k = 8; k < numBins; k++) noisePower += magnitudes[k];
 
 					float currentThd = -210.0f;
 					if (signalPower > 1e-5f && noisePower > 1e-20f) {
