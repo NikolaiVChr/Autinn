@@ -45,6 +45,7 @@ struct Alias : Module {
 
 	static constexpr int FFT_SIZE = 16384;
 	static constexpr int STEPS = 256;
+	static const int numBins = FFT_SIZE / 2;
 
 	// Graph Data
 	float thdCurve[STEPS];
@@ -56,6 +57,7 @@ struct Alias : Module {
 	alignas(16) float windowArray[FFT_SIZE];
 	alignas(16) float audioBuffer[FFT_SIZE];
 	alignas(16) float fftOutput[FFT_SIZE];
+	alignas(16) float magnitudes[numBins] = {};
 	int bufferIndex = 0;
 
 	Alias() : fft(FFT_SIZE) { // Initialize the FFT size in the constructor initialization list
@@ -233,8 +235,7 @@ struct Alias : Module {
 					for (int i = 0; i < FFT_SIZE; i++) audioBuffer[i] *= windowArray[i];
 					fft.rfft(audioBuffer, fftOutput);
 
-					constexpr int numBins = FFT_SIZE / 2;
-					float magnitudes[numBins];
+					magnitudes[0] = 0.0f;
 					for (int k = 1; k < numBins; k++) {
 						float re = fftOutput[2 * k];
 						float im = fftOutput[2 * k + 1];
@@ -367,7 +368,7 @@ struct AliasDisplay : TransparentWidget {
 					if (module->benchmarkScores[i] <= -200.0f) {
 						nvgText(args.vg, 0, 25 + (i * 12), string::f("%s    --- dB", label.c_str()).c_str(), nullptr);
 					} else {
-						nvgText(args.vg, 0, 25 + (i * 12), string::f("%s %-6.1f dB", label.c_str(), module->benchmarkScores[i]).c_str(), nullptr);
+						nvgText(args.vg, 0, 25 + (i * 12), string::f("%s %+6.1f dB", label.c_str(), module->benchmarkScores[i]).c_str(), nullptr);
 					}
 				}
 			}
