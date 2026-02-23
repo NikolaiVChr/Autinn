@@ -229,11 +229,6 @@ struct Alias : Module {
 				// When buffer is full, do the math!
 				if (bufferIndex >= FFT_SIZE) {
 
-					float dcOffset = 0.0f;
-					for (int i = 0; i < FFT_SIZE; i++) dcOffset += audioBuffer[i];
-					dcOffset /= (float)FFT_SIZE;
-					for (int i = 0; i < FFT_SIZE; i++) audioBuffer[i] -= dcOffset;
-
 					// Apply Window and FFT
 					for (int i = 0; i < FFT_SIZE; i++) audioBuffer[i] *= windowArray[i];
 					fft.rfft(audioBuffer, fftOutput);
@@ -281,7 +276,7 @@ struct Alias : Module {
 
 					// Calculate Noise and THD
 					float noisePower = 0.0f;
-					for (int k = 1; k < numBins; k++) noisePower += magnitudes[k];
+					for (int k = 6; k < numBins; k++) noisePower += magnitudes[k];
 
 					float currentThd = -210.0f;
 					if (signalPower > 1e-5f && noisePower > 1e-20f) {
