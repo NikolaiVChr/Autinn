@@ -61,6 +61,7 @@ struct Alias : Module {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(SETTLE_KNOB, 0.01f, 2.5f, 0.05f, "Settle Time", " s");
 		configButton(START_BUTTON, "Start Sweep");
+		configButton(VCO_MODE_SWITCH, "Toggle mode");
 		configInput(RETURN_INPUT, "Audio Return");
 		configOutput(TEST_OUTPUT, "Sine Test Output");
 
@@ -341,8 +342,9 @@ struct AliasDisplay : TransparentWidget {
 
 			// mode
 			nvgFillColor(args.vg, nvgRGBA(0, 255, 0, 255));
-			std::string modeText = (module->params[Alias::VCO_MODE_SWITCH].getValue() > 0.5f) ? "MODE: VCO" : "MODE: FX";
-			nvgText(args.vg, 70, 10, modeText.c_str(), nullptr);
+			nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE );
+			std::string modeText = (module->params[Alias::VCO_MODE_SWITCH].getValue() > 0.5f) ? "VCO" : "FX";
+			nvgText(args.vg, panelWidth, 10, modeText.c_str(), nullptr);
 		}
 
 		// Line Graph
