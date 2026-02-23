@@ -45,7 +45,9 @@ struct Alias : Module {
 
 	static constexpr int FFT_SIZE = 16384;
 	static constexpr int STEPS = 256;
-	static const int numBins = FFT_SIZE / 2;
+	static constexpr int numBins = FFT_SIZE / 2;
+	static constexpr float START_HZ = 50.0f;
+	static constexpr float END_HZ = 20000.0f;
 
 	// Graph Data
 	float thdCurve[STEPS];
@@ -104,7 +106,7 @@ struct Alias : Module {
 
 	void onReset(const ResetEvent& e) override {
 		currentState = READY;
-		sweepFreq = 20.0f;
+		sweepFreq = getFreqForStep(0);
 		sweepPhase = 0.0f;
 		benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
 		mode = false;
@@ -126,28 +128,34 @@ struct Alias : Module {
 		}
 	}
 
-	/*
-	static float getFreqForStep(int step) {
-		float logMin = std::log10(20.0f);
-		float logMax = std::log10(20000.0f);
-		float stepLog = logMin + (step / 255.0f) * (logMax - logMin);
-		return std::pow(10.0f, stepLog);
-	}
-	*/
-
 	/**
 	 * Calculate the frequency for a specific pixel on the graph
 	 *
 	 */
-	float getFreqForStep(int step) {
-		// Calculate the ideal log frequency
-		float logP = step / float(STEPS-1);
-		float idealFreq = 20.0f * std::pow(20000.0f / 20.0f, logP);
+	float getFreqForStep(const int step) const {
+		const float sRate = (lastSampleRate > 0) ? lastSampleRate : 44100.0f;
+		const float binRes = sRate / float(FFT_SIZE);
 
-		float sRate = (lastSampleRate > 0) ? lastSampleRate : 44100.0f;
+		// Align start exactly to the bin nearest to START_HZ Hz
+		const float startFreq = std::round(START_HZ / binRes) * binRes;
+		constexpr float endFreq = END_HZ;
 
-		// Snap it to the nearest FFT bin (Synchronous Sampling)
-		float binRes = sRate / float(FFT_SIZE);
+		// Base ideal frequency from pure log sweep
+		const float logP = step / float(STEPS - 1);
+		float idealFreq = startFreq * std::pow(endFreq / startFreq, logP);
+
+		// Pin to exact benchmark targets if this is the closest step
+		for (int i = 0; i < 3; i++) {
+			const float target = targetFrequencies[i];
+			const float targetLogP = std::log(target / startFreq) / std::log(endFreq / startFreq);
+			const int targetStep = std::round(targetLogP * (STEPS - 1));
+
+			if (step == targetStep) {
+				idealFreq = target;
+			}
+		}
+
+		// Snap to the nearest FFT bin (Synchronous Sampling)
 		float binIndex = std::round(idealFreq / binRes);
 
 		// Don't let it be bin 0 (DC)
@@ -303,11 +311,14 @@ struct Alias : Module {
 					thdCurve[currentStep] = currentThd;
 
 					// Catch the Benchmarks (Check the current step's frequency)
+					float startFreq = std::round(START_HZ / binResolution) * binResolution;
+
 					for (int i = 0; i < 3; i++) {
 						float target = targetFrequencies[i];
+						float targetLogP = std::log(target / startFreq) / std::log(END_HZ / startFreq);
+						int targetStep = std::round(targetLogP * (STEPS - 1));
 
-						// If we haven't recorded this benchmark yet, and we just crossed or hit it
-						if (benchmarkScores[i] <= -200.0f && sweepFreq >= target) {
+						if (benchmarkScores[i] <= -200.0f && currentStep >= targetStep) {
 							benchmarkScores[i] = currentThd;
 						}
 					}
@@ -331,7 +342,7 @@ struct AliasDisplay : TransparentWidget {
 	Alias* module;
 
 	float panelHeight = 110.0f;
-	float panelWidth = 130.0f;
+	float panelWidth = 128.0f;
 
 	AliasDisplay() : module(nullptr) {
 		box.size = Vec(panelWidth, panelHeight);
@@ -395,16 +406,18 @@ struct AliasDisplay : TransparentWidget {
 			nvgFill(args.vg);
 
 			// Draw vertical grid lines
+			float sRate = (module->lastSampleRate > 0) ? module->lastSampleRate : 44100.0f;
+			float binRes = sRate / float(module->FFT_SIZE);
+			float startFreq = std::round(module->START_HZ / binRes) * binRes;
+
 			nvgBeginPath(args.vg);
-			// 100 Hz = ~23.3% | 1 kHz = ~56.6% | 10 kHz = ~90.0%
-			float x100 = graphX + 0.233f * graphWidth;
-			float x1k  = graphX + 0.566f * graphWidth;
-			float x10k = graphX + 0.900f * graphWidth;
+			for (int i = 0; i < 3; i++) {
+				float targetLogP = std::log(module->targetFrequencies[i] / startFreq) / std::log(module->END_HZ / startFreq);
+				float x = graphX + targetLogP * graphWidth;
 
-			nvgMoveTo(args.vg, x100, graphY); nvgLineTo(args.vg, x100, graphY + graphHeight);
-			nvgMoveTo(args.vg, x1k, graphY);  nvgLineTo(args.vg, x1k, graphY + graphHeight);
-			nvgMoveTo(args.vg, x10k, graphY); nvgLineTo(args.vg, x10k, graphY + graphHeight);
-
+				nvgMoveTo(args.vg, x, graphY);
+				nvgLineTo(args.vg, x, graphY + graphHeight);
+			}
 			nvgStrokeColor(args.vg, nvgRGBA(0x00, 0x55, 0x00, 0xFF)); // Faint dark green
 			nvgStrokeWidth(args.vg, 0.5f);
 			nvgStroke(args.vg);
@@ -454,7 +467,7 @@ struct AliasWidget : ModuleWidget {
 
 		// Display Screen
 		AliasDisplay* display = new AliasDisplay();
-		display->box.pos = Vec(10.0f, 50.0f);
+		display->box.pos = Vec(11.0f, 50.0f);
 		display->module = module;
 		addChild(display);
 
