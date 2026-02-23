@@ -244,10 +244,25 @@ struct Alias : Module {
 					float signalPower = 0.0f;
 					float binResolution = args.sampleRate / FFT_SIZE;
 
+					// Find the TRUE fundamental
+					int expectedFundBin = (int)std::round(sweepFreq / binResolution);
+					int searchWidth = std::max(5, (int)(expectedFundBin * 0.05f)); // Search +/- 5% around expected pitch
+
+					int actualFundBin = expectedFundBin;
+					float maxMag = 0.0f;
+					for (int b = std::max(1, expectedFundBin - searchWidth); b <= std::min(numBins - 1, expectedFundBin + searchWidth); b++) {
+						if (magnitudes[b] > maxMag) {
+							maxMag = magnitudes[b];
+							actualFundBin = b;
+						}
+					}
+
+					// This is the actual frequency the VCO is outputting
+					float trueFundFreq = actualFundBin * binResolution;
 
 					// Mute Fundamental and Harmonics
-					for (int h = 1; (h * sweepFreq) < (args.sampleRate / 2.0f); h++) {
-						float targetFreq = h * sweepFreq;
+					for (int h = 1; (h * trueFundFreq) < (args.sampleRate / 2.0f); h++) {
+						float targetFreq = h * trueFundFreq;
 						int centerBin = (int)std::round(targetFreq / binResolution);
 
 						// Calculate +-5% musical width in bins
@@ -255,8 +270,8 @@ struct Alias : Module {
 						int dynamicNotch = (int)std::round(hzWidth / binResolution);
 
 						// Calculate the maximum safe width so we don't eat the next harmonic
-						// Harmonics are spaced apart by exactly `sweepFreq`
-						int maxSafeNotch = (int)((sweepFreq / binResolution) * 0.45f);
+						// Harmonics are spaced apart by exactly `trueFundFreq`
+						int maxSafeNotch = (int)((trueFundFreq / binResolution) * 0.45f);
 
 						// Apply the limits! (Minimum 4 bins for the Blackman-Harris window)
 						dynamicNotch = std::max(7, dynamicNotch);// 4 for blackman-harris, 7 for flattop
