@@ -333,7 +333,7 @@
       "name": "Aliasmeter",
       "description": "THD-N meter",
       "keywords": "measure monitor analyse",
-      "hidden": true,
+      "hidden": false,
       "tags": [
         "Visual",
         "Utility"

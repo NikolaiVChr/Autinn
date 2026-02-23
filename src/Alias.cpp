@@ -472,9 +472,9 @@ struct AliasWidget : ModuleWidget {
 		addChild(display);
 
 		// Controls & Ports
-		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(centerX, 250.0f), module, Alias::SETTLE_KNOB));
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(centerX*0.5f, 200.0f), module, Alias::START_BUTTON));
-		addParam(createParamCentered<RoundToggleButtonSmallAutinn>(Vec(centerX*1.5f, 200.0f), module, Alias::VCO_MODE_SWITCH));
+		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(centerX*0.25f, 250.0f), module, Alias::SETTLE_KNOB));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(centerX, 200.0f), module, Alias::START_BUTTON));
+		addParam(createParamCentered<RoundToggleButtonSmallAutinn>(Vec(centerX*1.5f, 250.0f), module, Alias::VCO_MODE_SWITCH));
 		
 		addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX - 25.0f, 300.0f), module, Alias::TEST_OUTPUT));
 		addInput(createInputCentered<InPortAutinn>(Vec(centerX + 25.0f, 300.0f), module, Alias::RETURN_INPUT));
