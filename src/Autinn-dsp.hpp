@@ -122,6 +122,55 @@ public:
 };
 
 /**
+ * 2-pole Butterworth Low-Pass Filter (Biquad)
+ * 12dB/octave slope.
+ */
+struct RoofFilter {
+private:
+    float x1 = 0.f, x2 = 0.f;
+    float y1 = 0.f, y2 = 0.f;
+    float b0 = 0.f, b1 = 0.f, b2 = 0.f;
+    float a1 = 0.f, a2 = 0.f;
+    const float PI = float(M_PI);
+public:
+    float cutoff_hz = 20000.0f; // call setSampleTime() after modifying this
+
+    void setSampleTime(const float sampleTime) {
+        const float fs = 1.0f / sampleTime;
+        const float w0 = 2.0f * PI * cutoff_hz / fs;
+        const float cos_w0 = std::cos(w0);
+
+        // Q = 1/sqrt(2) (0.707) for a Butterworth response
+        const float alpha = std::sin(w0) / (2.0f * 0.70710678f);
+
+        const float a0 = 1.0f + alpha;
+        b0 = ((1.0f - cos_w0) / 2.0f) / a0;
+        b1 = (1.0f - cos_w0) / a0;
+        b2 = ((1.0f - cos_w0) / 2.0f) / a0;
+        a1 = (-2.0f * cos_w0) / a0;
+        a2 = (1.0f - alpha) / a0;
+    }
+
+    float process(const float x) {
+        // Direct Form I Biquad Equation
+        float y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2 + 1e-18f;
+        if (!std::isfinite(y)) y = 0.0f;
+
+        // Shift the delay lines
+        x2 = x1;
+        x1 = x;
+        y2 = y1;
+        y1 = y;
+
+        return y;
+    }
+
+    void reset() {
+        x1 = x2 = y1 = y2 = 0.0f;
+    }
+};
+
+/**
  * When I know in advance the discontinuity is coming and when.
  * Supports multiple discontinuities per sample.
  */

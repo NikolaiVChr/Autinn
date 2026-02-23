@@ -88,14 +88,14 @@ struct Excavi : Module {
 	DCBlocker hp1A[16], hp2A[16];
 	DCBlocker hp1B[16], hp2B[16];
 	DCBlocker dcBlockerA[16], dcBlockerB[16];
-	float roofLpfA[16] = {};
-	float roofLpfB[16] = {};
+	RoofFilter roofLpfA[16];
+	RoofFilter roofLpfB[16];
 	float driftPhaseA1 = 0.0f;
 	float driftPhaseA2 = 0.0f;
 	float driftPhaseB1 = 0.0f;
 	float driftPhaseB2 = 0.0f;
-	float lastSampleRate[16];
-	float lastAge[16];
+	float lastSampleRate[16]{};
+	float lastAge[16]{};
 
 	std::vector<dsp::Decimator<4, 16>> decimatorA4;
 	std::vector<dsp::Decimator<4, 16>> decimatorB4;
@@ -154,6 +154,9 @@ struct Excavi : Module {
 			dcBlockerA[c].cutoff_hz = 2.0f;
 			dcBlockerB[c].cutoff_hz = 2.0f;
 
+			roofLpfA[c].cutoff_hz = 20000.0f;
+			roofLpfB[c].cutoff_hz = 20000.0f;
+
 			lastAge[c] = -1.0f;
 			lastSampleRate[c] = 0.0f;
 		}
@@ -167,8 +170,8 @@ struct Excavi : Module {
 			hp2B[c].reset();
 			dcBlockerA[c].reset();
 			dcBlockerB[c].reset();
-			roofLpfA[c] = 0.0f;
-			roofLpfB[c] = 0.0f;
+			roofLpfA[c].reset();
+			roofLpfB[c].reset();
 			phaseA[c] = 0.0f;
 			phaseB[c] = 0.0f;
 			syncTrigger[c].reset();
@@ -348,11 +351,11 @@ struct Excavi : Module {
 
 		// roof filters (1-Pole LP to kill IMD before saturation)
 		// 20.3 to 22.1khz cutoff, depending on rack samplerate
-		roofLpfA[c] += 0.5f * (outA - roofLpfA[c]);
-		roofLpfB[c] += 0.5f * (outB - roofLpfB[c]);
+		outA = roofLpfA[c].process(outA);
+		outB = roofLpfB[c].process(outB);
 
-		outA = tanh_fast_high(roofLpfA[c] * makeupGain);
-		outB = tanh_fast_high(roofLpfB[c] * makeupGain);
+		outA = tanh_fast_high(outA * makeupGain);
+		outB = tanh_fast_high(outB * makeupGain);
 	}
 
 	void process(const ProcessArgs &args) override {
@@ -450,6 +453,9 @@ struct Excavi : Module {
 
         		dcBlockerA[c].setSampleTime(args.sampleTime);
         		dcBlockerB[c].setSampleTime(args.sampleTime);
+
+        		roofLpfA[c].setSampleTime(osSampleTime);
+        		roofLpfB[c].setSampleTime(osSampleTime);
 
         		lastAge[c] = age;
         		lastSampleRate[c] = args.sampleRate;
