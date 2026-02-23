@@ -147,9 +147,9 @@ struct Alias : Module {
 					settleCounter = 0;
 				}
 			} else if (currentState == SETTLE) {
-				// Wait for 2000 samples (~45ms) to let external audio settle
+				// Wait for 45 milliseconds
 				settleCounter++;
-				if (settleCounter >= 2000) {
+				if ((settleCounter * args.sampleTime) >= 0.045f) {
 					currentState = RECORD;
 					bufferIndex = 0;
 				}
@@ -234,6 +234,11 @@ struct AliasDisplay : TransparentWidget {
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1 || !module) return;
 
+		nvgBeginPath(args.vg);
+		nvgRect(args.vg, 0, 0, 130, 110);
+		nvgFillColor(args.vg, nvgRGBA(0x00, 0x10, 0x00, 0xFF));
+		nvgFill(args.vg);
+
 		std::shared_ptr<Font> font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
 		
 		if (font) {
@@ -257,19 +262,34 @@ struct AliasDisplay : TransparentWidget {
 			}
 		}
 
-		float graphX = 0.0f;
-		float graphY = 65.0f;
-		float graphWidth = 130.0f;
-		float graphHeight = 45.0f;
-
-		// Draw graph background bounding box
-		nvgBeginPath(args.vg);
-		nvgRect(args.vg, graphX, graphY, graphWidth, graphHeight);
-		nvgFillColor(args.vg, nvgRGBA(0x00, 0x22, 0x00, 0xFF));
-		nvgFill(args.vg);
-
 		// Line Graph
 		if (module->currentState != Alias::READY) {
+
+			float graphX = 0.0f;
+			float graphY = 65.0f;
+			float graphWidth = 130.0f;
+			float graphHeight = 45.0f;
+
+			// Draw graph background bounding box
+			nvgBeginPath(args.vg);
+			nvgRect(args.vg, graphX, graphY, graphWidth, graphHeight);
+			nvgFillColor(args.vg, nvgRGBA(0x00, 0x22, 0x00, 0xFF));
+			nvgFill(args.vg);
+
+			// Draw vertical grid lines
+			nvgBeginPath(args.vg);
+			// 100 Hz = ~23.3% | 1 kHz = ~56.6% | 10 kHz = ~90.0%
+			float x100 = graphX + 0.233f * graphWidth;
+			float x1k  = graphX + 0.566f * graphWidth;
+			float x10k = graphX + 0.900f * graphWidth;
+
+			nvgMoveTo(args.vg, x100, graphY); nvgLineTo(args.vg, x100, graphY + graphHeight);
+			nvgMoveTo(args.vg, x1k, graphY);  nvgLineTo(args.vg, x1k, graphY + graphHeight);
+			nvgMoveTo(args.vg, x10k, graphY); nvgLineTo(args.vg, x10k, graphY + graphHeight);
+
+			nvgStrokeColor(args.vg, nvgRGBA(0x00, 0x55, 0x00, 0xFF)); // Faint dark green
+			nvgStrokeWidth(args.vg, 0.5f);
+			nvgStroke(args.vg);
 
 			// Draw the THD curve
 			nvgBeginPath(args.vg);
