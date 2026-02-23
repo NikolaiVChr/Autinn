@@ -41,8 +41,9 @@ struct Alias : Module {
 	int settleCounter = 0;
 	float lastSampleRate = 0.0f;
 	float activeSettleTime = 0.05f;
+	volatile bool mode = false;
 
-	static constexpr int FFT_SIZE = 8192;
+	static constexpr int FFT_SIZE = 16384;
 	static constexpr int STEPS = 256;
 
 	// Graph Data
@@ -104,8 +105,23 @@ struct Alias : Module {
 		sweepFreq = 20.0f;
 		sweepPhase = 0.0f;
 		benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
+		mode = false;
 		for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
 		Module::onReset(e);
+	}
+
+	json_t *dataToJson() override {
+		json_t *root = json_object();
+		json_object_set_new(root, "mode", json_boolean(mode));
+		return root;
+	}
+
+	void dataFromJson(json_t *rootJ) override {
+		json_t *ext = json_object_get(rootJ, "mode");
+		if (ext) {
+			mode = json_boolean_value(ext);
+			params[VCO_MODE_SWITCH].setValue(mode?1.0f:0.0f);
+		}
 	}
 
 	/*
@@ -171,11 +187,11 @@ struct Alias : Module {
 
 		float out = 0.0f;
 
-		bool vcoMode = params[VCO_MODE_SWITCH].getValue() > 0.5f;
+		mode = params[VCO_MODE_SWITCH].getValue() > 0.5f;
 
 		if (currentState != READY && currentState != FINISHED) {
 
-			if (vcoMode) {
+			if (mode) {
 				// 1V/Octave
 				out = std::log2(sweepFreq / FREQ_C4);
 			} else {
@@ -213,6 +229,11 @@ struct Alias : Module {
 				// When buffer is full, do the math!
 				if (bufferIndex >= FFT_SIZE) {
 
+					float dcOffset = 0.0f;
+					for (int i = 0; i < FFT_SIZE; i++) dcOffset += audioBuffer[i];
+					dcOffset /= (float)FFT_SIZE;
+					for (int i = 0; i < FFT_SIZE; i++) audioBuffer[i] -= dcOffset;
+
 					// Apply Window and FFT
 					for (int i = 0; i < FFT_SIZE; i++) audioBuffer[i] *= windowArray[i];
 					fft.rfft(audioBuffer, fftOutput);
@@ -243,8 +264,9 @@ struct Alias : Module {
 						int maxSafeNotch = (int)((sweepFreq / binResolution) * 0.45f);
 
 						// Apply the limits! (Minimum 4 bins for the Blackman-Harris window)
-						dynamicNotch = std::min(dynamicNotch, maxSafeNotch);
 						dynamicNotch = std::max(7, dynamicNotch);// 4 for blackman-harris, 7 for flattop
+						dynamicNotch = std::min(dynamicNotch, maxSafeNotch);
+
 
 						float currentHarmonicPower = 0.0f;
 						for (int b = centerBin - dynamicNotch; b <= centerBin + dynamicNotch; b++) {
@@ -262,7 +284,7 @@ struct Alias : Module {
 					for (int k = 1; k < numBins; k++) noisePower += magnitudes[k];
 
 					float currentThd = -210.0f;
-					if (signalPower > 1e-9f && noisePower > 1e-9f) {
+					if (signalPower > 1e-5f && noisePower > 1e-20f) {
 						currentThd = 10.0f * std::log10(noisePower / signalPower);
 					}
 
@@ -343,7 +365,7 @@ struct AliasDisplay : TransparentWidget {
 			// mode
 			nvgFillColor(args.vg, nvgRGBA(0, 255, 0, 255));
 			nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_TOP );
-			std::string modeText = (module->params[Alias::VCO_MODE_SWITCH].getValue() > 0.5f) ? "VCO" : "FX";
+			std::string modeText = (module->mode > 0.5f) ? "VCO" : "FX";
 			nvgText(args.vg, panelWidth, 55, modeText.c_str(), nullptr);
 		}
 
