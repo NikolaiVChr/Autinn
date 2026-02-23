@@ -61,9 +61,9 @@ struct Alias : Module {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(SETTLE_KNOB, 0.01f, 2.5f, 0.05f, "Settle Time", " s");
 		configButton(START_BUTTON, "Start Sweep");
-		configButton(VCO_MODE_SWITCH, "Toggle mode");
+		configButton(VCO_MODE_SWITCH, "Toggle Mode");
 		configInput(RETURN_INPUT, "Audio Return");
-		configOutput(TEST_OUTPUT, "Sine Test Output");
+		configOutput(TEST_OUTPUT, "Test Send");
 
 		for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
 
@@ -123,7 +123,7 @@ struct Alias : Module {
 	 */
 	float getFreqForStep(int step) {
 		// Calculate the ideal log frequency
-		float logP = step / 255.0f;
+		float logP = step / float(STEPS-1);
 		float idealFreq = 20.0f * std::pow(20000.0f / 20.0f, logP);
 
 		float sRate = (lastSampleRate > 0) ? lastSampleRate : 44100.0f;
