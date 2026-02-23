@@ -7,6 +7,7 @@ constexpr int notchWidth = 7; // Because freq is stable, we only need a tight 4-
 struct Alias : Module {
 	enum ParamIds {
 		START_BUTTON,
+		SETTLE_KNOB,
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -40,6 +41,7 @@ struct Alias : Module {
 	int currentStep = 0;
 	int settleCounter = 0;
 	float lastSampleRate = 0.0f;
+	float activeSettleTime = 0.05f;
 
 	// Graph Data
 	float thdCurve[256]; 
@@ -56,6 +58,7 @@ struct Alias : Module {
 
 	Alias() : fft(FFT_SIZE) { // Initialize the FFT size in the constructor initialization list
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+		configParam(SETTLE_KNOB, 0.01f, 2.5f, 0.05f, "Settle Time", " s");
 		configButton(START_BUTTON, "Start Sweep");
 		configInput(RETURN_INPUT, "Audio Return");
 		configOutput(TEST_OUTPUT, "Sine Test Output");
@@ -118,6 +121,7 @@ struct Alias : Module {
 				currentState = WAIT_ZERO_CROSS;
 				currentStep = 0;
 				sweepFreq = getFreqForStep(0);
+				activeSettleTime = params[SETTLE_KNOB].getValue();
 				sweepPhase = 0.0f;
 				score100Hz = score1kHz = score10kHz = -120.0f;
 				for(int i = 0; i < 256; i++) thdCurve[i] = -120.0f;
@@ -147,9 +151,8 @@ struct Alias : Module {
 					settleCounter = 0;
 				}
 			} else if (currentState == SETTLE) {
-				// Wait for 45 milliseconds
 				settleCounter++;
-				if ((settleCounter * args.sampleTime) >= 0.045f) {
+				if ((settleCounter * args.sampleTime) >= activeSettleTime) {
 					currentState = RECORD;
 					bufferIndex = 0;
 				}
@@ -182,13 +185,26 @@ struct Alias : Module {
 						float targetFreq = h * sweepFreq;
 						int centerBin = (int)std::round(targetFreq / binResolution);
 
+						// Calculate +-5% musical width in bins
+						float hzWidth = targetFreq * 0.05f;
+						int dynamicNotch = (int)std::round(hzWidth / binResolution);
+
+						// Calculate the maximum safe width so we don't eat the next harmonic
+						// Harmonics are spaced apart by exactly `sweepFreq`
+						int maxSafeNotch = (int)((sweepFreq / binResolution) * 0.45f);
+
+						// Apply the limits! (Minimum 4 bins for the Blackman-Harris window)
+						dynamicNotch = std::min(dynamicNotch, maxSafeNotch);
+						dynamicNotch = std::max(4, dynamicNotch);
+
 						float currentHarmonicPower = 0.0f;
-						for (int b = centerBin - notchWidth; b <= centerBin + notchWidth; b++) {
+						for (int b = centerBin - dynamicNotch; b <= centerBin + dynamicNotch; b++) {
 							if (b > 0 && b < numBins) {
 								currentHarmonicPower += magnitudes[b];
 								magnitudes[b] = 0.0f;
 							}
 						}
+
 						if (h == 1) signalPower = currentHarmonicPower;
 					}
 
@@ -338,6 +354,7 @@ struct AliasWidget : ModuleWidget {
 		addChild(display);
 
 		// Controls & Ports
+		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(centerX, 150.0f), module, Alias::SETTLE_KNOB));
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(centerX, 200.0f), module, Alias::START_BUTTON));
 		
 		addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX - 25.0f, 260.0f), module, Alias::TEST_OUTPUT));
