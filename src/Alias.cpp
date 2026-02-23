@@ -2,6 +2,8 @@
 #include "Autinn-dsp.hpp"
 #include <cmath>
 
+constexpr int notchWidth = 7; // Because freq is stable, we only need a tight 4-bin notch
+
 struct Alias : Module {
 	enum ParamIds {
 		START_BUTTON,
@@ -20,6 +22,7 @@ struct Alias : Module {
 	};
 
 	enum State {
+		NOT_READY,
 		READY,
 		WORKING,
 		WAIT_ZERO_CROSS,
@@ -28,7 +31,7 @@ struct Alias : Module {
 		FINISHED
 	};
 
-	State currentState = READY;
+	State currentState = NOT_READY;
 	dsp::SchmittTrigger startTrigger;
 	
 	float sweepPhase = 0.0f;
@@ -36,6 +39,7 @@ struct Alias : Module {
 	
 	int currentStep = 0;
 	int settleCounter = 0;
+	float lastSampleRate = 0.0f;
 
 	// Graph Data
 	float thdCurve[256]; 
@@ -43,7 +47,7 @@ struct Alias : Module {
 	float score1kHz = -120.0f;
 	float score10kHz = -120.0f;
 
-	static const int FFT_SIZE = 4096;
+	static constexpr int FFT_SIZE = 4096;
 	dsp::RealFFT fft;
 	float windowArray[FFT_SIZE];
 	float audioBuffer[FFT_SIZE];
@@ -83,7 +87,7 @@ struct Alias : Module {
 	}
 
 	// calculate the frequency for a specific pixel on the graph
-	float getFreqForStep(int step) {
+	static float getFreqForStep(int step) {
 		float logMin = std::log10(20.0f);
 		float logMax = std::log10(20000.0f);
 		float stepLog = logMin + (step / 255.0f) * (logMax - logMin);
@@ -91,6 +95,24 @@ struct Alias : Module {
 	}
 
 	void process(const ProcessArgs &args) override {
+
+		bool sampleRateChanged = false;
+		if (args.sampleRate != lastSampleRate) {
+			lastSampleRate = args.sampleRate;
+			sampleRateChanged = true;
+		}
+
+		bool isPatched = inputs[RETURN_INPUT].isConnected() && outputs[TEST_OUTPUT].isConnected();
+
+		if (!isPatched || sampleRateChanged) {
+			// If a cable is pulled, abort everything.
+			currentState = NOT_READY;
+		} else if (currentState == NOT_READY) {
+			currentState = READY;
+			score100Hz = score1kHz = score10kHz = -120.0f;
+			for(int i = 0; i < 256; i++) thdCurve[i] = -120.0f;
+		}
+
 		if (startTrigger.process(params[START_BUTTON].getValue())) {
 			if (currentState == READY || currentState == FINISHED) {
 				currentState = WAIT_ZERO_CROSS;
@@ -124,16 +146,14 @@ struct Alias : Module {
 					currentState = SETTLE;
 					settleCounter = 0;
 				}
-			}
-			else if (currentState == SETTLE) {
+			} else if (currentState == SETTLE) {
 				// Wait for 2000 samples (~45ms) to let external audio settle
 				settleCounter++;
 				if (settleCounter >= 2000) {
 					currentState = RECORD;
 					bufferIndex = 0;
 				}
-			}
-			else if (currentState == RECORD) {
+			} else if (currentState == RECORD) {
 				// Record the stable signal
 				audioBuffer[bufferIndex] = inputs[RETURN_INPUT].getVoltage() * 0.2f;
 				bufferIndex++;
@@ -145,7 +165,7 @@ struct Alias : Module {
 					for (int i = 0; i < FFT_SIZE; i++) audioBuffer[i] *= windowArray[i];
 					fft.rfft(audioBuffer, fftOutput);
 
-					const int numBins = FFT_SIZE / 2;
+					constexpr int numBins = FFT_SIZE / 2;
 					float magnitudes[numBins];
 					for (int k = 1; k < numBins; k++) {
 						float re = fftOutput[2 * k];
@@ -155,7 +175,7 @@ struct Alias : Module {
 
 					float signalPower = 0.0f;
 					float binResolution = args.sampleRate / FFT_SIZE;
-					const int notchWidth = 7; // Because freq is stable, we only need a tight 4-bin notch
+
 
 					// Mute Fundamental and Harmonics
 					for (int h = 1; (h * sweepFreq) < (args.sampleRate / 2.0f); h++) {
@@ -185,9 +205,9 @@ struct Alias : Module {
 					thdCurve[currentStep] = currentThd;
 
 					// Catch the Benchmarks (Check the current step's frequency)
-					if (sweepFreq >= 100.0f && sweepFreq < 105.0f) score100Hz = currentThd;
-					if (sweepFreq >= 997.0f && sweepFreq < 1005.0f) score1kHz = currentThd;
-					if (sweepFreq >= 10000.0f && sweepFreq < 10100.0f) score10kHz = currentThd;
+					if (sweepFreq >= 100.0f && score100Hz <= -120.0f) score100Hz = currentThd;
+					if (sweepFreq >= 997.0f && score1kHz <= -120.0f) score1kHz = currentThd;
+					if (sweepFreq >= 10000.0f && score10kHz <= -120.0f) score10kHz = currentThd;
 
 					// Advance to the next pixel
 					currentStep++;
@@ -223,9 +243,10 @@ struct AliasDisplay : TransparentWidget {
 
 			// Status
 			std::string statusText = "STATUS: ";
-			if (module->currentState == Alias::READY) statusText += "READY";
-			else if (module->currentState == Alias::WORKING) statusText += "WORKING...";
+			if (module->currentState == Alias::NOT_READY) statusText += "NOT READY";
+			else if (module->currentState == Alias::READY) statusText += "READY";
 			else if (module->currentState == Alias::FINISHED) statusText += "FINISHED";
+			else statusText += "WORKING...";
 			nvgText(args.vg, 0, 10, statusText.c_str(), nullptr);
 
 			// Benchmarks
@@ -236,18 +257,19 @@ struct AliasDisplay : TransparentWidget {
 			}
 		}
 
+		float graphX = 0.0f;
+		float graphY = 65.0f;
+		float graphWidth = 130.0f;
+		float graphHeight = 45.0f;
+
+		// Draw graph background bounding box
+		nvgBeginPath(args.vg);
+		nvgRect(args.vg, graphX, graphY, graphWidth, graphHeight);
+		nvgFillColor(args.vg, nvgRGBA(0x00, 0x22, 0x00, 0xFF));
+		nvgFill(args.vg);
+
 		// Line Graph
 		if (module->currentState != Alias::READY) {
-			float graphX = 0.0f;
-			float graphY = 65.0f;
-			float graphWidth = 130.0f;
-			float graphHeight = 45.0f;
-
-			// Draw graph background bounding box
-			nvgBeginPath(args.vg);
-			nvgRect(args.vg, graphX, graphY, graphWidth, graphHeight);
-			nvgFillColor(args.vg, nvgRGBA(0x00, 0x22, 0x00, 0xFF));
-			nvgFill(args.vg);
 
 			// Draw the THD curve
 			nvgBeginPath(args.vg);
