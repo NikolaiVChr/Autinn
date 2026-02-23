@@ -180,6 +180,11 @@ struct Scope : Module {
 	std::atomic<bool> bufferFilled = {false}; // We wrapped the buffers at least once, so they has no garbage.
 	DCBlocker dcBlockers[4];
 	float lastSampleTime = 1.0f/44100.0f;
+	// for detecting freq:
+	float prevTrigSignal = 0.0f;
+	float prevFraction = 0.0f;
+	double periodHistory[16] = {};
+	int periodHistoryIndex = 0;
 
 
 	// persisted
@@ -316,6 +321,10 @@ struct Scope : Module {
 		showGrid = true;
 		showStats = STATS_ONE;
 		autoTimePeriods = 3;
+
+		prevTrigSignal = 0.0f;
+		prevFraction = 0.0f;
+		clearFreqHistory();
 
 		Module::onReset(e);
 	}
@@ -500,7 +509,7 @@ struct Scope : Module {
 			// its fine that this counts down while being frozen, as unfreezing will reset it anyways.
 			holdoffTime_s -= args.sampleTime;
 		}
-		bool holdoff_active = holdoffTime_s > 0.0f;
+		const bool holdoff_active = holdoffTime_s > 0.0f;
 
 		if (trigFoundTimer > 0.0f) {
 			trigFoundTimer -= args.sampleTime;
@@ -525,18 +534,55 @@ struct Scope : Module {
 		if (edgeFound) {
 			if (!frozen) {
 				if (!holdoff_active) {
-					bool periodValid = period_s < AUTO_TIME_PERIOD_MAX && period_s > AUTO_TIME_PERIOD_MIN;
+					// calculate trigger fractional index:
+					float fraction = 0.0f;
+					const float vDiff = signal - prevTrigSignal;
+					if (std::abs(vDiff) > 0.0001f) {
+						fraction = ((threshold + hysteresis) - prevTrigSignal) / vDiff;
+						fraction = clamp(fraction, 0.0f, 1.0f);
+					}
+					const double exactPeriod_s = period_s - (1.0 - fraction) * args.sampleTime + (1.0 - prevFraction) * args.sampleTime;
+					prevFraction = fraction;
+					const bool periodValid = exactPeriod_s < AUTO_TIME_PERIOD_MAX && exactPeriod_s > AUTO_TIME_PERIOD_MIN;
+					if (periodValid) {
+						// Rolling average buffer
+						periodHistory[periodHistoryIndex] = exactPeriod_s;
+						periodHistoryIndex = (periodHistoryIndex + 1) % 16;
+
+						int historyDepth = 16;
+						if (exactPeriod_s > 0.2) historyDepth = 1;       // Slower than 5 Hz: Instant readout
+						else if (exactPeriod_s > 0.05) historyDepth = 4; // Slower than 20 Hz: Fast average
+
+						double sumPeriod = 0.0;
+						int validCounts = 0;
+						for (int i = 0; i < historyDepth; i++) {
+							int idx = (periodHistoryIndex - 1 - i + 16) % 16;
+							if (periodHistory[idx] > 0.0) {
+								sumPeriod += periodHistory[idx];
+								validCounts++;
+							}
+						}
+
+						if (validCounts > 0) {
+							autoTimeFrequency_hz = float(validCounts / sumPeriod);
+						}
+					} else {
+						//autoTimeFrequency_hz = 0.0f;
+					}
+					/* old integer sample based method:
 					if (periodValid) {
 						autoTimeFrequency_hz = (float)(1.0 / period_s);
 					} else {
 						//autoTimeFrequency_hz = 0.0f;
 					}
+					*/
 					trigFoundTimer = TRIG_FOUND_TIMER;
 				}
 				period_s = 0.0;
 			}
 			trigOutPulse.trigger();
 		}
+		prevTrigSignal = signal;
 		return edgeFound;
 	}
 
@@ -583,29 +629,33 @@ struct Scope : Module {
 					autoTrigTimer_s = 0.0f;
 				}
 
-				if (trigMode == TRIG_MODE_AUTO || trigMode == TRIG_MODE_XY) {
-					autoTrigTimer_s += args.sampleTime;
-					// If no trigger for screen time, force update
 
-					// 25Hz = 0.04s
-					// TRIG_AUTO_MIN_TIMEOUT prevents the CPU from going hot on extremely fast time
-					// TRIG_AUTO_MAX_TIMEOUT prevents user on very slow time to think the scope got stuck doing nothing.
-					float timeout = clamp(totalScreenTime, TRIG_AUTO_MIN_TIMEOUT, TRIG_AUTO_MAX_TIMEOUT);
+				autoTrigTimer_s += args.sampleTime;
+				// If no trigger for screen time, force update
 
-					if (autoTimeFrequency_hz > 0.01f) {
-						float knownPeriod = 1.0f / autoTimeFrequency_hz;
-						// If the known period is longer than the screen time, use the period as the timeout
-						if (knownPeriod > timeout) {
-							timeout = knownPeriod;
-						}
+				// 25Hz = 0.04s
+				// TRIG_AUTO_MIN_TIMEOUT prevents the CPU from going hot on extremely fast time
+				// TRIG_AUTO_MAX_TIMEOUT prevents user on very slow time to think the scope got stuck doing nothing.
+				float timeout = clamp(totalScreenTime, TRIG_AUTO_MIN_TIMEOUT, TRIG_AUTO_MAX_TIMEOUT);
+
+				if (autoTimeFrequency_hz > 0.01f) {
+					float knownPeriod = 1.0f / autoTimeFrequency_hz;
+					// If the known period is longer than the screen time, use the period as the timeout
+					if (knownPeriod > timeout) {
+						timeout = knownPeriod;
 					}
+				}
 
-					// tiny buffer so we don't preempt a valid trigger that is just beyond the screen
-					timeout *= 1.05f;
+				// tiny buffer so we don't preempt a valid trigger that is just beyond the screen
+				timeout *= 1.05f;
 
-					//timeout = std::min(TRIG_AUTO_MAX_TIMEOUT, timeout);
+				//timeout = std::min(TRIG_AUTO_MAX_TIMEOUT, timeout);
 
-					if (autoTrigTimer_s > timeout) {
+				if (autoTrigTimer_s > timeout) {
+
+					clearFreqHistory();
+
+					if (trigMode == TRIG_MODE_AUTO || trigMode == TRIG_MODE_XY) {
 						// Force rolling trigger
 						lastTriggerIndex.store(triggerIndex);
 						triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;//only used for freezing.
@@ -613,17 +663,21 @@ struct Scope : Module {
 						triggerValid = false;
 						prev_triggerValid = false;
 						samplesSinceTrigger = 0;
-						autoTrigTimer_s = 0.0f;
-
 
 						if (freezePending) {
 							frozen = true;
 							freezePending = false;
 						}
 					}
+					autoTrigTimer_s = 0.0f;
 				}
 			}
 		}
+	}
+
+	void clearFreqHistory() {
+		for (int i = 0; i < 16; i++) periodHistory[i] = 0.0;
+		periodHistoryIndex = 0;
 	}
 
 	void autoTime() {
@@ -661,7 +715,9 @@ struct Scope : Module {
 		freezeBtn = (bool)params[FREEZE_PARAM].getValue();
 		autotimeBtn = (bool)params[AUTO_TIME_PARAM].getValue();
 		statsBtn = (bool)params[STATS_PARAM].getValue();
-		thresholdKnob = params[TRIG_LEVEL_PARAM].getValue();
+		float triggerThreshold = params[TRIG_LEVEL_PARAM].getValue();
+		if (thresholdKnob != triggerThreshold) clearFreqHistory();
+		thresholdKnob = triggerThreshold;
 		holdoffKnob = std::pow(10.f,params[HOLDOFF_PARAM].getValue());
 		for (int ch = 0; ch < 4; ch++) {
 			offset[ch] = params[POS_A_PARAM + ch].getValue();
@@ -686,6 +742,7 @@ struct Scope : Module {
 			triggerValid = false;
 			holdoffTime_s = 0.0f;// stop holdoff when switching source.
 			recording = false;
+			clearFreqHistory();
 		}
 		if (modeBtnTrig.process(trigModeKnob)) {
 			trigMode = (trigMode + 1) % 4;
@@ -694,9 +751,11 @@ struct Scope : Module {
 			triggerValid = false;
 			holdoffTime_s = 0.0f;// stop holdoff when switching mode.
 			recording = false;
+			clearFreqHistory();
 		}
 		if (edgeBtnTrig.process(trigEdgeBtn)) {
 			trigEdge = !trigEdge;
+			clearFreqHistory();
 		}
 		if (autoTimeBtnTrig.process(autotimeBtn)) {
 			autoTimeMode = !autoTimeMode;

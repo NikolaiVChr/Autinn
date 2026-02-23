@@ -62,7 +62,7 @@ frozen = false
 samplesSinceTrigger = garbage
 recording = false
 holdoffTime_s = 0.0f
-autoTrigTimer_s = garbage
+autoTrigTimer_s = time since last time we cleared the trigger fractional index buffer.
 triggerValid = maybe
 prev_triggerValid = maybe
 
@@ -82,7 +82,7 @@ frozen = false
 samplesSinceTrigger = garbage
 recording = false
 holdoffTime_s = 0.0f
-autoTrigTimer_s = garbage
+autoTrigTimer_s = time since last time we cleared the trigger fractional index buffer.
 triggerValid = maybe
 prev_triggerValid = maybe
 
