@@ -80,8 +80,8 @@ struct Excavi : Module {
 		NUM_LIGHTS
 	};
 
-	double phaseA[16] = {};
-	double phaseB[16] = {};
+	float phaseA[16] = {};
+	float phaseB[16] = {};
 	ReactiveBLEP blepA[16];
 	ReactiveBLEP blepB[16];
 	float lastOutA[16] = {}; // 1-sample memory for TZFM
@@ -239,19 +239,19 @@ struct Excavi : Module {
 		}
 	};
 
-	static inline float calculateNaiveMorph(const MorphWeights& w, const double phase) {
+	static inline float calculateNaiveMorph(const MorphWeights& w, const float phase) {
 	    float naive = 0.0f;
-	    if (w.sine != 0.0f) naive += w.sine * sin_fast_high(phase * 2.0 * M_PI);
-	    if (w.tri != 0.0f) naive += w.tri * (phase < 0.5 ? -1.0f + 4.0f * phase : 3.0f - 4.0f * phase);
+	    if (w.sine != 0.0f) naive += w.sine * sin_fast_high(phase * 2.0f * float(M_PI));
+	    if (w.tri != 0.0f) naive += w.tri * (phase < 0.5f ? -1.0f + 4.0f * phase : 3.0f - 4.0f * phase);
 	    if (w.saw != 0.0f) naive += w.saw * (2.0f * phase - 1.0f);
 		if (w.square != 0.0f) naive += w.square * (phase < w.pulseWidth ? -1.0f : 1.0f) * w.sqrGain;
 		// note that 0.7 is makeup-gain since square sounds much louder at same max amplitude as the other waveforms.
 	    return naive;
 	}
 
-	static inline float generateMorphingWaveform(const MorphWeights& w, double& phase, const double dt, ReactiveBLEP& blep) {
-	    const float dir = (dt >= 0.0) ? 1.0f : -1.0f;
-	    const double absDt = std::abs(dt);
+	static inline float generateMorphingWaveform(const MorphWeights& w, float& phase, float dt, ReactiveBLEP& blep) {
+	    const float dir = (dt >= 0.0f) ? 1.0f : -1.0f;
+	    const float absDt = std::abs(dt);
 		const float pw = w.pulseWidth;
 
 		const float jump0 = (w.saw * -2.0f + w.square * -2.0f * w.sqrGain) * dir;
@@ -259,29 +259,29 @@ struct Excavi : Module {
 	    const float corner0 = (w.tri * 8.0f) * dir;
 	    const float corner5 = (w.tri * -8.0f) * dir;
 
-	    const double nextPhase = phase + dt;
+	    const float nextPhase = phase + dt;
 
-	    if (dt >= 0.0) {
-	        if (nextPhase >= 1.0) {
-	            const double fraction = (nextPhase - 1.0) / dt;
+	    if (dt >= 0.0f) {
+	        if (nextPhase >= 1.0f) {
+	            const float fraction = (nextPhase - 1.0f) / dt;
 	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop
 	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom
 	            phase = nextPhase - 1.0f;
 	        } else if (phase < pw && nextPhase >= pw) {
-	            const double fraction = (nextPhase - pw) / dt;
+	            const float fraction = (nextPhase - pw) / dt;
 	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise
 	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top
 	            phase = nextPhase;
 	        } else { phase = nextPhase; }
 	    } else {
 	    	// TZFM (jump and corner's polarities are already flipped with the dir variable)
-	        if (nextPhase < 0.0) {
-	            const double fraction = nextPhase / dt;
+	        if (nextPhase < 0.0f) {
+	            const float fraction = nextPhase / dt;
 	            if (jump0 != 0.0f) blep.jump(fraction, jump0);// saw or sqr drop (inv)
 	            if (corner0 != 0.0f) blep.corner(fraction, absDt, corner0);//triangle bottom (inv)
 	            phase = 1.0f + nextPhase;
 	        } else if (phase >= pw && nextPhase < pw) {
-	            const double fraction = (nextPhase - pw) / dt;
+	            const float fraction = (nextPhase - pw) / dt;
 	            if (jump5 != 0.0f) blep.jump(fraction, jump5);// sqr rise (inv)
 	            if (corner5 != 0.0f) blep.corner(fraction, absDt, corner5);//triangle top (inv)
 	            phase = nextPhase;
@@ -290,19 +290,19 @@ struct Excavi : Module {
 	        }
 	    }
 
-	    return blep.process(calculateNaiveMorph(w, (float)phase));
+	    return blep.process(calculateNaiveMorph(w, phase));
 	}
 
-	inline void processSubSample(int c, double dtA, float baseFreqB, float fmAmount, float osSampleTime, bool doExtSync,
+	inline void processSubSample(int c, float dtA, float baseFreqB, float fmAmount, float osSampleTime, bool doExtSync,
 								const MorphWeights& wA, const MorphWeights& wB, float makeupGain, float& outA, float& outB) {
-		const double oldPhaseA = phaseA[c];
+		const float oldPhaseA = phaseA[c];
 
 		if (doExtSync) {
 			const float naiveBefore = calculateNaiveMorph(wA, phaseA[c]);
 			const float naiveAfter = calculateNaiveMorph(wA, 0.0f);
 			float jumpMag = naiveAfter - naiveBefore;
-			if (dtA < 0.0) jumpMag = -jumpMag;// TZFM
-			blepA[c].jump(0.0, jumpMag);// insert discontinuity from ext. sync
+			if (dtA < 0.0f) jumpMag = -jumpMag;// TZFM
+			blepA[c].jump(0.0f, jumpMag);// insert discontinuity from ext. sync
 			phaseA[c] = 0.0f;
 		}
 
@@ -311,18 +311,18 @@ struct Excavi : Module {
 
 		// TZFM
 		const float currentFreqB = baseFreqB + (baseFreqB * (lastOutA[c] * fmAmount));
-		const double dtB = currentFreqB * osSampleTime;
+		const float dtB = currentFreqB * osSampleTime;
 
 		// hard sync logic
-		const bool masterWrapped = (dtA > 0.0 && oldPhaseA + dtA >= 1.0) ||
-							 (dtA < 0.0 && oldPhaseA + dtA < 0.0);
+		const bool masterWrapped = (dtA > 0.0f && oldPhaseA + dtA >= 1.0f) ||
+							 (dtA < 0.0f && oldPhaseA + dtA < 0.0f);
 
 		if (hardSyncEnabled && masterWrapped) {
 			// Master just finished a period and slave should be synced
-			const double overshoot = (dtA > 0.0) ? (oldPhaseA + dtA - 1.0) : (oldPhaseA + dtA);
-			const double fraction = overshoot / dtA;
+			const float overshoot = (dtA > 0.0f) ? (oldPhaseA + dtA - 1.0f) : (oldPhaseA + dtA);
+			const float fraction = overshoot / dtA;
 
-			double phaseAtSync = phaseB[c] + dtB * (1.0 - fraction);
+			float phaseAtSync = phaseB[c] + dtB * (1.0f - fraction);
 			phaseAtSync -= std::floor(phaseAtSync);
 			if (phaseAtSync < 0.0f) phaseAtSync += 1.0f;
 
@@ -330,7 +330,7 @@ struct Excavi : Module {
 			const float naiveAfter = calculateNaiveMorph(wB, 0.0f);
 			float jumpMag = naiveAfter - naiveBefore;
 
-			if (dtA < 0.0) jumpMag = -jumpMag;
+			if (dtA < 0.0f) jumpMag = -jumpMag;
 
 			blepB[c].jump(fraction, jumpMag);
 			phaseB[c] = dtB * fraction;
@@ -484,7 +484,7 @@ struct Excavi : Module {
         	// ext. sync
         	bool extSync = syncTrigger[c].process(inputs[CV_SYNC_INPUT].getPolyVoltage(c));
 
-        	const double dtA = freqA * osSampleTime;
+        	const float dtA = freqA * osSampleTime;
 
             float finalOutA = 0.0f;
         	float finalOutB = 0.0f;

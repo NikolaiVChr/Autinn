@@ -189,14 +189,14 @@ public:
      * @param fraction how far towards the previous sample the discontinuity landed (0.0 [current] to 1.0 [prev])
      * @param mag magnitude and direction of the discontinuity
      */
-    void jump(const double fraction, const float mag) {
+    void jump(const float fraction, const float mag) {
         // Correct the sample before the jump (which will output right now)
-        const double t0 = fraction;
-        buffer[0] += 0.5 * t0 * t0 * mag;
+        const float t0 = fraction;
+        buffer[0] += mag * 0.5f * t0 * t0;
 
         // Correct the sample after the jump (which will output on the next step)
-        const double t1 = fraction - 1.0;
-        buffer[1] -= 0.5 * t1 * t1 * mag;
+        const float t1 = fraction - 1.0f;
+        buffer[1] -= mag * 0.5f * t1 * t1;
     }
 
     /**
@@ -208,14 +208,14 @@ public:
      * @param dt The phase increment per sample (sampleTime/phaseTime)
      * @param slopeChange The new slope minus the old slope
      */
-    void corner(const double fraction, const double dt, const float slopeChange) {
+    void corner(const float fraction, const float dt, const float slopeChange) {
         // Correct the sample before the corner
-        const double u0 = fraction;
-        buffer[0] += float(double(slopeChange) * dt * (u0 * u0 * u0) / 6.0);
+        const float u0 = fraction;
+        buffer[0] += slopeChange * dt * (u0 * u0 * u0) / 6.0f;
 
         // Correct the sample after the corner
-        const double u1 = 1.0 - fraction;
-        buffer[1] += float(double(slopeChange) * dt * (u1 * u1 * u1) / 6.0);
+        const float u1 = 1.0f - fraction;
+        buffer[1] += slopeChange * dt * (u1 * u1 * u1) / 6.0f;
     }
 
     /**
