@@ -280,12 +280,12 @@ struct Alias : Module {
 						int maxSearch = (int)((trueFundFreq / binResolution) * 0.45f);
 						searchRadius = std::min(std::max(searchRadius, 7), maxSearch);
 						int peakBin = expectedBin;
-						float maxMag = -1.0f;
+						float maxMag2 = -1.0f;
 						// Search the window for the loudest bin
 						for (int i = expectedBin - searchRadius; i <= expectedBin + searchRadius; i++) {
 							if (i > 0 && i < numBins) {
-								if (magnitudes[i] > maxMag) {
-									maxMag = magnitudes[i];
+								if (magnitudes[i] > maxMag2) {
+									maxMag2 = magnitudes[i];
 									peakBin = i;
 								}
 							}
@@ -296,7 +296,7 @@ struct Alias : Module {
 
 						for (int i = peakBin - measureRadius; i <= peakBin + measureRadius; i++) {
 							if (i > 0 && i < numBins) {
-								currentHarmonicPower += magnitudes[i];
+								currentHarmonicPower += magnitudes[i]*magnitudes[i];
 								magnitudes[i] = 0.0f; // Mute this harmonic so only noise remains
 							}
 						}
@@ -311,7 +311,7 @@ struct Alias : Module {
 
 					// Calculate Noise and THD
 					float noisePower = 0.0f;
-					for (int k = 8; k < numBins; k++) noisePower += magnitudes[k];
+					for (int k = 8; k < numBins; k++) noisePower += magnitudes[k]*magnitudes[k];
 
 					float currentThd = -210.0f;
 					if (signalPower > 1e-5f && noisePower > 1e-20f) {
