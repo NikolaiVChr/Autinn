@@ -6,6 +6,7 @@ struct Alias : Module {
 	enum ParamIds {
 		START_BUTTON,
 		SETTLE_KNOB,
+		VCO_MODE_SWITCH,
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -41,13 +42,15 @@ struct Alias : Module {
 	float lastSampleRate = 0.0f;
 	float activeSettleTime = 0.05f;
 
-	// Graph Data
-	float thdCurve[256]; 
-	float score100Hz = -120.0f;
-	float score1kHz = -120.0f;
-	float score10kHz = -120.0f;
-
 	static constexpr int FFT_SIZE = 8192;
+	static constexpr int STEPS = 256;
+
+	// Graph Data
+	float thdCurve[STEPS];
+	float targetFrequencies[3] = {100.0f, 997.0f, 10000.0f};// 997 is a prime and does not share a common factor with 44.1khz
+	std::string benchmarkLabels[3] = {"100 Hz", "1 KHz", "10K Hz"};
+	float benchmarkScores[3] = {-210.0f, -210.0f, -210.0f};
+
 	dsp::RealFFT fft;
 	alignas(16) float windowArray[FFT_SIZE];
 	alignas(16) float audioBuffer[FFT_SIZE];
@@ -61,7 +64,7 @@ struct Alias : Module {
 		configInput(RETURN_INPUT, "Audio Return");
 		configOutput(TEST_OUTPUT, "Sine Test Output");
 
-		for(int i = 0; i < 256; i++) thdCurve[i] = -120.0f;
+		for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
 
 		/*
 		// Pre-calculate the Blackman-Harris window
@@ -99,8 +102,8 @@ struct Alias : Module {
 		currentState = READY;
 		sweepFreq = 20.0f;
 		sweepPhase = 0.0f;
-		score100Hz = score1kHz = score10kHz = -120.0f;
-		for(int i = 0; i < 256; i++) thdCurve[i] = -120.0f;
+		benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
+		for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
 		Module::onReset(e);
 	}
 
@@ -149,8 +152,8 @@ struct Alias : Module {
 			currentState = NOT_READY;
 		} else if (currentState == NOT_READY) {
 			currentState = READY;
-			score100Hz = score1kHz = score10kHz = -120.0f;
-			for(int i = 0; i < 256; i++) thdCurve[i] = -120.0f;
+			benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
+			for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
 		}
 
 		if (startTrigger.process(params[START_BUTTON].getValue())) {
@@ -160,16 +163,24 @@ struct Alias : Module {
 				sweepFreq = getFreqForStep(0);
 				activeSettleTime = params[SETTLE_KNOB].getValue();
 				sweepPhase = 0.0f;
-				score100Hz = score1kHz = score10kHz = -120.0f;
-				for(int i = 0; i < 256; i++) thdCurve[i] = -120.0f;
+				benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
+				for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
 			}
 		}
 
 		float out = 0.0f;
 
+		bool vcoMode = params[VCO_MODE_SWITCH].getValue() > 0.5f;
+
 		if (currentState != READY && currentState != FINISHED) {
-			// Generate pure sine (+/- 5V)
-			out = std::sin(sweepPhase * 2.0f * float(M_PI)) * 5.0f;
+
+			if (vcoMode) {
+				// 1V/Octave
+				out = std::log2(sweepFreq / FREQ_C4);
+			} else {
+				// Generate pure sine (+/- 5V)
+				out = std::sin(sweepPhase * 2.0f * float(M_PI)) * 5.0f;
+			}
 
 			// Advance phase and check for zero-crossing
 			sweepPhase += sweepFreq * args.sampleTime;
@@ -249,7 +260,7 @@ struct Alias : Module {
 					float noisePower = 0.0f;
 					for (int k = 1; k < numBins; k++) noisePower += magnitudes[k];
 
-					float currentThd = -120.0f;
+					float currentThd = -210.0f;
 					if (signalPower > 1e-9f && noisePower > 1e-9f) {
 						currentThd = 10.0f * std::log10(noisePower / signalPower);
 					}
@@ -258,13 +269,18 @@ struct Alias : Module {
 					thdCurve[currentStep] = currentThd;
 
 					// Catch the Benchmarks (Check the current step's frequency)
-					if (sweepFreq >= 100.0f && score100Hz <= -120.0f) score100Hz = currentThd;
-					if (sweepFreq >= 997.0f && score1kHz <= -120.0f) score1kHz = currentThd;
-					if (sweepFreq >= 10000.0f && score10kHz <= -120.0f) score10kHz = currentThd;
+					for (int i = 0; i < 3; i++) {
+						float target = targetFrequencies[i];
+
+						// If we haven't recorded this benchmark yet, and we just crossed or hit it
+						if (benchmarkScores[i] <= -200.0f && sweepFreq >= target) {
+							benchmarkScores[i] = currentThd;
+						}
+					}
 
 					// Advance to the next pixel
 					currentStep++;
-					if (currentStep >= 256) {
+					if (currentStep >= STEPS) {
 						currentState = FINISHED;
 					} else {
 						currentState = WAIT_ZERO_CROSS; // Prepare for the next pitch
@@ -280,15 +296,18 @@ struct Alias : Module {
 struct AliasDisplay : TransparentWidget {
 	Alias* module;
 
+	float panelHeight = 110.0f;
+	float panelWidth = 130.0f;
+
 	AliasDisplay() : module(nullptr) {
-		box.size = Vec(130, 110);
+		box.size = Vec(panelWidth, panelHeight);
 	}
 
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1 || !module) return;
 
 		nvgBeginPath(args.vg);
-		nvgRect(args.vg, 0, 0, 130, 110);
+		nvgRect(args.vg, 0, 0, panelWidth, panelHeight);
 		nvgFillColor(args.vg, nvgRGBA(0x00, 0x10, 0x00, 0xFF));
 		nvgFill(args.vg);
 
@@ -308,19 +327,30 @@ struct AliasDisplay : TransparentWidget {
 			nvgText(args.vg, 0, 10, statusText.c_str(), nullptr);
 
 			// Benchmarks
-			if (module->currentState != Alias::READY) {
-				nvgText(args.vg, 0, 25, string::f("100 Hz: %5.1f dB", module->score100Hz).c_str(), nullptr);
-				nvgText(args.vg, 0, 40, string::f("1  kHz: %5.1f dB", module->score1kHz).c_str(), nullptr);
-				nvgText(args.vg, 0, 55, string::f("10 kHz: %5.1f dB", module->score10kHz).c_str(), nullptr);
+			if (module->currentState != Alias::READY && module->currentState != Alias::NOT_READY) {
+				for (int i = 0; i < 3; i++) {
+					std::string label = module->benchmarkLabels[i];
+
+					if (module->benchmarkScores[i] <= -200.0f) {
+						nvgText(args.vg, 0, 25 + (i * 15), string::f("%s    --- dB", label.c_str()).c_str(), nullptr);
+					} else {
+						nvgText(args.vg, 0, 25 + (i * 15), string::f("%s %5.1f dB", label.c_str(), module->benchmarkScores[i]).c_str(), nullptr);
+					}
+				}
 			}
+
+			// mode
+			nvgFillColor(args.vg, nvgRGBA(0, 255, 0, 255));
+			std::string modeText = (module->params[Alias::VCO_MODE_SWITCH].getValue() > 0.5f) ? "MODE: VCO" : "MODE: FX";
+			nvgText(args.vg, 70, 10, modeText.c_str(), nullptr);
 		}
 
 		// Line Graph
-		if (module->currentState != Alias::READY) {
+		if (module->currentState != Alias::READY && module->currentState != Alias::NOT_READY) {
 
 			float graphX = 0.0f;
 			float graphY = 65.0f;
-			float graphWidth = 130.0f;
+			float graphWidth = panelWidth;
 			float graphHeight = 45.0f;
 
 			// Draw graph background bounding box
@@ -345,9 +375,11 @@ struct AliasDisplay : TransparentWidget {
 			nvgStroke(args.vg);
 
 			// Draw the THD curve
+			nvgSave(args.vg);
+			nvgScissor(args.vg, graphX, graphY, graphWidth, graphHeight);
 			nvgBeginPath(args.vg);
-			for (int i = 0; i < 256; i++) {
-				float x = graphX + (i / 255.0f) * graphWidth;
+			for (int i = 0; i < STEPS; i++) {
+				float x = graphX + (i / float(module->STEPS-1)) * graphWidth;
 				
 				// Map -120dB (bottom) to 0dB (top)
 				float normalizedY = (module->thdCurve[i] + 120.0f) / 120.0f; 
@@ -362,6 +394,7 @@ struct AliasDisplay : TransparentWidget {
 			nvgStrokeColor(args.vg, nvgRGBA(0x44, 0xFF, 0x44, 0xFF)); 
 			nvgStrokeWidth(args.vg, 0.8f);
 			nvgStroke(args.vg);
+			nvgRestore(args.vg);
 		}
 	}
 };
@@ -392,7 +425,8 @@ struct AliasWidget : ModuleWidget {
 
 		// Controls & Ports
 		addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(centerX, 250.0f), module, Alias::SETTLE_KNOB));
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(centerX, 200.0f), module, Alias::START_BUTTON));
+		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(centerX*0.5f, 200.0f), module, Alias::START_BUTTON));
+		addParam(createParamCentered<RoundToggleButtonSmallAutinn>(Vec(centerX*1.5f, 200.0f), module, Alias::VCO_MODE_SWITCH));
 		
 		addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX - 25.0f, 300.0f), module, Alias::TEST_OUTPUT));
 		addInput(createInputCentered<InPortAutinn>(Vec(centerX + 25.0f, 300.0f), module, Alias::RETURN_INPUT));
