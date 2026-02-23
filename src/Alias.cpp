@@ -48,7 +48,7 @@ struct Alias : Module {
 	// Graph Data
 	float thdCurve[STEPS];
 	float targetFrequencies[3] = {100.0f, 997.0f, 10000.0f};// 997 is a prime and does not share a common factor with 44.1khz
-	std::string benchmarkLabels[3] = {"100 Hz", "1 KHz", "10K Hz"};
+	std::string benchmarkLabels[3] = {"100 Hz", " 1K Hz", "10K Hz"};
 	float benchmarkScores[3] = {-210.0f, -210.0f, -210.0f};
 
 	dsp::RealFFT fft;
@@ -333,18 +333,18 @@ struct AliasDisplay : TransparentWidget {
 					std::string label = module->benchmarkLabels[i];
 
 					if (module->benchmarkScores[i] <= -200.0f) {
-						nvgText(args.vg, 0, 25 + (i * 15), string::f("%s    --- dB", label.c_str()).c_str(), nullptr);
+						nvgText(args.vg, 0, 25 + (i * 12), string::f("%s    --- dB", label.c_str()).c_str(), nullptr);
 					} else {
-						nvgText(args.vg, 0, 25 + (i * 15), string::f("%s %5.1f dB", label.c_str(), module->benchmarkScores[i]).c_str(), nullptr);
+						nvgText(args.vg, 0, 25 + (i * 12), string::f("%s %-6.1f dB", label.c_str(), module->benchmarkScores[i]).c_str(), nullptr);
 					}
 				}
 			}
 
 			// mode
 			nvgFillColor(args.vg, nvgRGBA(0, 255, 0, 255));
-			nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE );
+			nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_TOP );
 			std::string modeText = (module->params[Alias::VCO_MODE_SWITCH].getValue() > 0.5f) ? "VCO" : "FX";
-			nvgText(args.vg, panelWidth, 10, modeText.c_str(), nullptr);
+			nvgText(args.vg, panelWidth, 55, modeText.c_str(), nullptr);
 		}
 
 		// Line Graph
