@@ -253,7 +253,7 @@ struct Alias : Module {
 					float signalPower = 0.0f;
 					float binResolution = args.sampleRate / FFT_SIZE;
 
-					// Find the TRUE fundamental
+					// Find the fundamental
 					int expectedFundBin = (int)std::round(sweepFreq / binResolution);
 					int searchWidth = std::max(5, (int)(expectedFundBin * 0.05f)); // Search +/- 5% around expected pitch
 
@@ -271,31 +271,42 @@ struct Alias : Module {
 
 					// Mute Fundamental and Harmonics
 					for (int h = 1; (h * trueFundFreq) < (args.sampleRate / 2.0f); h++) {
-						float targetFreq = h * trueFundFreq;
-						int centerBin = (int)std::round(targetFreq / binResolution);
-
-						// Calculate +-5% musical width in bins
-						float hzWidth = targetFreq * 0.05f;
-						int dynamicNotch = (int)std::round(hzWidth / binResolution);
-
-						// Calculate the maximum safe width so we don't eat the next harmonic
-						// Harmonics are spaced apart by exactly `trueFundFreq`
-						int maxSafeNotch = (int)((trueFundFreq / binResolution) * 0.45f);
-
-						// Apply the limits! (Minimum 4 bins for the Blackman-Harris window)
-						dynamicNotch = std::max(7, dynamicNotch);// 4 for blackman-harris, 7 for flattop
-						dynamicNotch = std::min(dynamicNotch, maxSafeNotch);
-
-
+						float expectedHz = h * trueFundFreq;
+						int expectedBin = (int)std::round(expectedHz / binResolution);
+						// 1. SEARCH: Find the actual peak for THIS harmonic (h=1, 2, 3...)
+						// We look in a +-5% window to handle drifting VCOs
+						int searchRadius = (int)std::round((expectedHz * 0.05f) / binResolution);
+						// Safety: Don't look so far that we hit the next harmonic
+						int maxSearch = (int)((trueFundFreq / binResolution) * 0.45f);
+						searchRadius = std::min(std::max(searchRadius, 7), maxSearch);
+						int peakBin = expectedBin;
+						float maxMag = -1.0f;
+						// Search the window for the loudest bin
+						for (int i = expectedBin - searchRadius; i <= expectedBin + searchRadius; i++) {
+							if (i > 0 && i < numBins) {
+								if (magnitudes[i] > maxMag) {
+									maxMag = magnitudes[i];
+									peakBin = i;
+								}
+							}
+						}
+						// Now scoop exactly 7 bins for the Flat-top window power
+						int measureRadius = 7; // 4 for blackman-harris, 7 for flattop
 						float currentHarmonicPower = 0.0f;
-						for (int b = centerBin - dynamicNotch; b <= centerBin + dynamicNotch; b++) {
-							if (b > 0 && b < numBins) {
-								currentHarmonicPower += magnitudes[b];
-								magnitudes[b] = 0.0f;
+
+						for (int i = peakBin - measureRadius; i <= peakBin + measureRadius; i++) {
+							if (i > 0 && i < numBins) {
+								currentHarmonicPower += magnitudes[i];
+								magnitudes[i] = 0.0f; // Mute this harmonic so only noise remains
 							}
 						}
 
-						if (h == 1) signalPower = currentHarmonicPower;
+						// If this is the 1st harmonic, save the power and lock the frequency
+						if (h == 1) {
+							signalPower = currentHarmonicPower;
+							// This makes subsequent harmonics (h=2, 3...) much more accurate!
+							trueFundFreq = peakBin * binResolution;
+						}
 					}
 
 					// Calculate Noise and THD
