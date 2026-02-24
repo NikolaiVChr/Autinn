@@ -34,6 +34,9 @@ struct SpringTank {
     static constexpr int MAX_BUFFER_SIZE = 131072;
     float buffer[MAX_BUFFER_SIZE] = {};
     int writeHead = 0;
+    float coilDelays[MAX_COILS] = {};
+    float lastSampleRate = 0.0f;
+    bool legacyMode = false;
 
     dsp::RCFilter damper;
     AllPassFilter ap[MAX_COILS];
@@ -48,6 +51,25 @@ struct SpringTank {
         tensionOffset = t_off;
         lengthOffset = l_off;
         curr_coils = coils;
+
+        // Generate scatter delays for the coils
+        // Using irregular numbers prevents nasty metallic ringing
+        for(int i = 0; i < MAX_COILS; i++) {
+            coilDelays[i] = 0.0015f + (float(i) * 0.00047f) * (1.0f + lengthOffset);
+        }
+    }
+
+    void setSampleRate(const float sampleRate, const bool isLegacy) {
+        lastSampleRate = sampleRate;
+        legacyMode = isLegacy;
+
+        for (int i = 0; i < MAX_COILS; i++) {
+            if (legacyMode) {
+                ap[i].setDelayTime(0.0f, sampleRate); // Force 1-sample delay
+            } else {
+                ap[i].setDelayTime(coilDelays[i], sampleRate);
+            }
+        }
     }
 
     void setCoils(const int c) {
@@ -159,6 +181,9 @@ struct Coil : Module {
     // For the noise burst
     int pluckTimer = 0;
     int curr_coils = 9;
+
+    float lastSampleRate = 0.0f;
+    bool legacyMode = false;
     
     Coil() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -198,6 +223,7 @@ struct Coil : Module {
     json_t *dataToJson() override {
         json_t *root = json_object();
         json_object_set_new(root, "coils", json_integer(curr_coils));
+        json_object_set_new(root, "legacy", json_boolean(legacyMode));
         return root;
     }
 
@@ -207,6 +233,12 @@ struct Coil : Module {
             curr_coils = clamp((int)json_integer_value(ext), MIN_COILS ,MAX_COILS);
             tankL.setCoils(curr_coils);
             tankR.setCoils(curr_coils);
+        }
+        json_t *legJ = json_object_get(rootJ, "legacy");
+        if (legJ) {
+            legacyMode = json_boolean_value(legJ);
+        } else {
+            legacyMode = true;
         }
     }
 
@@ -243,6 +275,12 @@ struct Coil : Module {
 
         if (!outputs[SIGNAL_RIGHT_OUTPUT].isConnected() && !outputs[SIGNAL_LEFT_OUTPUT].isConnected()) {
             return;
+        }
+
+        if (args.sampleRate != lastSampleRate || tankL.legacyMode != legacyMode) {
+            lastSampleRate = args.sampleRate;
+            tankL.setSampleRate(args.sampleRate, legacyMode);
+            tankR.setSampleRate(args.sampleRate, legacyMode);
         }
 
         float drive = params[DRIVE_PARAM].getValue() + (inputs[DRIVE_CV].getVoltage() * 0.3f);
@@ -431,6 +469,7 @@ struct CoilWidget : ModuleWidget {
         menu->addChild(new CoilsNumberMenuItem(a, "More coils", 12));
         menu->addChild(new CoilsNumberMenuItem(a, "Many coils", 24));
         menu->addChild(new MenuLabel());
+        menu->addChild(createBoolPtrMenuItem("Legacy Mode (Delay)", "", &a->legacyMode));
     }
 };
 

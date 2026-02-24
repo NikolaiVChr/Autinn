@@ -53,10 +53,26 @@ inline float polyBLEP(float t, const float dt) {
 /** 1st order all-pass filter for dispersion */
 struct AllPassFilter {
 private:
-    float x1 = 0.0f; // Previous input
-    float y1 = 0.0f; // Previous output
-    float c = 0.0f;  // Coefficient (tension)
+    // 8192 is plenty for spring reverb scatters (typically 1ms - 15ms)
+    static constexpr int MAX_BUFFER = 8192;
+    float x_hist[MAX_BUFFER] = {};
+    float y_hist[MAX_BUFFER] = {};
+    int writeHead = 0;
+    int currentLength = 1;
+    float c = 0.0f; // Coefficient (tension)
 public:
+
+    /**
+     * Set the delay length in seconds.
+     * Pass 0.0f to lock it to 1-sample (Legacy Delay Mode).
+     */
+    void setDelayTime(const float delaySeconds, const float sampleRate) {
+        if (delaySeconds <= 0.0f) {
+            currentLength = 1; // Legacy Mode
+        } else {
+            currentLength = clamp((int)(delaySeconds * sampleRate), 1, MAX_BUFFER - 1);
+        }
+    }
 
     /**
      * Set dispersion coefficient
@@ -71,18 +87,34 @@ public:
     }
 
     void reset() {
-        x1 = 0.0f;
-        y1 = 0.0f;
+        for(int i = 0; i < MAX_BUFFER; i++) {
+            x_hist[i] = 0.0f;
+            y_hist[i] = 0.0f;
+        }
+        writeHead = 0;
     }
 
     float process(const float x) {
+        // Calculate read head position
+        int readHead = writeHead - currentLength;
+        if (readHead < 0) readHead += MAX_BUFFER;
+
+        float x_delayed = x_hist[readHead];
+        float y_delayed = y_hist[readHead];
+
         // y[n] = -c * x[n] + x[n-1] - c * y[n-1]
-        float y = x1 + c * (y1 - x);
+        float y = x_delayed + c * (y_delayed - x);
+
         // Denormal protection
         if (std::abs(y) < 1e-15f) y = 0.f;
 
-        x1 = x;
-        y1 = y;
+        // Write to buffers
+        x_hist[writeHead] = x;
+        y_hist[writeHead] = y;
+
+        writeHead++;
+        if (writeHead >= MAX_BUFFER) writeHead = 0;
+
         return y;
     }
 };
