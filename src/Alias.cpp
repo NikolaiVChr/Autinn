@@ -286,7 +286,7 @@ struct Alias : Module {
 						int expectedBin = (int)std::round(expectedHz / binResolution);
 						// 1. SEARCH: Find the actual peak for THIS harmonic (h=1, 2, 3...)
 						// We look in a +-5% window to handle drifting VCOs
-						int searchRadius = (int)std::round((expectedHz * 0.05f) / binResolution);
+						int searchRadius = (int)std::round((expectedHz * 0.15f) / binResolution);
 						// Safety: Don't look so far that we hit the next harmonic
 						int maxSearch = (int)((trueFundFreq / binResolution) * 0.45f);
 						searchRadius = std::min(std::max(searchRadius, 7), maxSearch);

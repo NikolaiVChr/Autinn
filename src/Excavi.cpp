@@ -416,13 +416,13 @@ struct Excavi : Module {
 
         for (int c = 0; c < channels; c++) {
 
-        	float shapeA = params[SHAPE_PARAM + 0].getValue();
+        	float shapeA = shapeA_knob;
         	if (inputs[CV_SHAPE_INPUT + 0].isConnected()) {
         		shapeA += shapeCVAChannels>c?inputs[CV_SHAPE_INPUT + 0].getPolyVoltage(c):inputs[CV_SHAPE_INPUT + 0].getVoltage();
         	}
         	shapeA = clamp(shapeA, -5.0f, 5.0f);
 
-        	float shapeB = params[SHAPE_PARAM + 1].getValue();
+        	float shapeB = shapeB_knob;
         	if (inputs[CV_SHAPE_INPUT + 1].isConnected()) {
         		shapeB += shapeCVBChannels>c?inputs[CV_SHAPE_INPUT + 1].getPolyVoltage(c):inputs[CV_SHAPE_INPUT + 1].getVoltage();
         	}
