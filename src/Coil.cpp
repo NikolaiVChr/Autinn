@@ -469,32 +469,34 @@ struct CoilWidget : ModuleWidget {
                 });
         addParam(dampKnob);
 
-        auto* scatterKnob = createParamCentered<AutinnArcSmallKnob>(Vec(div2*1.f, 125.f+down+hp), module, Coil::SCATTER_PARAM);
+
+
+        // Row 2.5:
+        auto* scatterKnob = createParamCentered<AutinnArcSmallKnob>(Vec(div2*1.f, 200.f), module, Coil::SCATTER_PARAM);
         scatterKnob->setModulation(Coil::SCATTER_CV, [](float cv, float val, float att) {
             return clamp(val + cv * 0.6f, 0.05f, 6.0f);
         });
         addParam(scatterKnob);
+        addInput(createInputCentered<InPortAutinn>(Vec(div2*2.f, 180.f), module, Coil::SCATTER_CV));
 
         // Row 3: CVs
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*1.f, 160.f+down+hp), module, Coil::DRIVE_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*2.f, 160.f+down+hp), module, Coil::FEEDBACK_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*3.f, 160.f+down+hp), module, Coil::MIX_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*1.f, 240.f), module, Coil::DRIVE_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*2.f, 240.f), module, Coil::FEEDBACK_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*3.f, 240.f), module, Coil::MIX_CV));
         
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*1.f, 195.f+down+hp), module, Coil::TENSION_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*2.f, 195.f+down+hp), module, Coil::INERTIA_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*3.f, 195.f+down+hp), module, Coil::DAMP_CV));
-
-        addInput(createInputCentered<InPortAutinn>(Vec(div2*2.f, 125.f+down+hp), module, Coil::SCATTER_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*1.f, 275.f), module, Coil::TENSION_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*2.f, 275.f), module, Coil::INERTIA_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*3.f, 275.f), module, Coil::DAMP_CV));
 
         // Row 4: Audio IO & Pluck
-        addInput(createInputCentered<InPortAutinn>(Vec(20, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_LEFT_INPUT));
-        addInput(createInputCentered<InPortAutinn>(Vec(55, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_RIGHT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(20, 315.f), module, Coil::SIGNAL_LEFT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(55, 315.f), module, Coil::SIGNAL_RIGHT_INPUT));
         
         //addInput(createInputCentered<PJ301MPort>(Vec(90, 250), module, Coil::PLUCK_INPUT));
         //addChild(createLightCentered<MediumLight<RedLight>>(Vec(115, 240), module, Coil::PLUCK_LIGHT)); // Light next to trigger
 
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(10.0f * RACK_GRID_WIDTH-55, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_LEFT_OUTPUT));
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(10.0f * RACK_GRID_WIDTH-20, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_RIGHT_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(10.0f * RACK_GRID_WIDTH-55, 315.f), module, Coil::SIGNAL_LEFT_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(10.0f * RACK_GRID_WIDTH-20, 315.f), module, Coil::SIGNAL_RIGHT_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
