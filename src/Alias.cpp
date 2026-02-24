@@ -327,11 +327,11 @@ struct Alias : Module {
 
 					float currentThd = -210.0f;
 					if (signalPower > 1e-5f && noisePower > 1e-20f) {
-						// Signal-to-Noise-and-Distortion (SINAD)
+						// AC-Coupled TNHD (Total Non-Harmonic Distortion)
 						currentThd = 10.0f * std::log10(noisePower / signalPower);
 					}
 
-					INFO("SINAD: %.2f dB, Signal Power: %.2f, Noise Power: %.2f, Sweep Freq: %.1f Hz, Fund Freq: %.1f Hz",currentThd, signalPower, noisePower, sweepFreq, trueFundFreq);
+					//INFO("TNHD: %.2f dB, Signal Power: %.2f, Noise Power: %.2f, Sweep Freq: %.1f Hz, Fund Freq: %.1f Hz",currentThd, signalPower, noisePower, sweepFreq, trueFundFreq);
 
 					// Save the score
 					thdCurve[currentStep] = currentThd;
@@ -371,6 +371,7 @@ struct AliasDisplay : TransparentWidget {
 
 	float panelHeight = 110.0f;
 	float panelWidth = 128.0f;
+	int frame = 0;
 
 	AliasDisplay() : module(nullptr) {
 		box.size = Vec(panelWidth, panelHeight);
@@ -396,7 +397,12 @@ struct AliasDisplay : TransparentWidget {
 			if (module->currentState == Alias::NOT_READY) statusText += "NOT READY";
 			else if (module->currentState == Alias::READY) statusText += "READY";
 			else if (module->currentState == Alias::FINISHED) statusText += "FINISHED";
-			else statusText += "WORKING...";
+			else {
+				statusText += "WORKING";
+				if (frame > 45) statusText += ".";
+				if (frame > 30) statusText += ".";
+				if (frame > 15) statusText += ".";
+			}
 			nvgText(args.vg, 0, 10, statusText.c_str(), nullptr);
 
 			// Benchmarks
@@ -404,8 +410,11 @@ struct AliasDisplay : TransparentWidget {
 				for (int i = 0; i < 3; i++) {
 					std::string label = module->benchmarkLabels[i];
 
-					if (module->benchmarkScores[i] <= -200.0f) {
+					if (!module->benchmarkRecorded[i]) {
 						nvgText(args.vg, 0, 25 + (i * 12), string::f("%s    --- dB", label.c_str()).c_str(), nullptr);
+					} else if (std::isinf(module->benchmarkScores[i])) {
+						// Perfect score (Noise was 0.0, so log10 hit negative infinity)
+						nvgText(args.vg, 0, 25 + (i * 12), string::f("%s   -inf dB", label.c_str()).c_str(), nullptr);
 					} else {
 						nvgText(args.vg, 0, 25 + (i * 12), string::f("%s %+6.1f dB", label.c_str(), module->benchmarkScores[i]).c_str(), nullptr);
 					}
@@ -473,6 +482,8 @@ struct AliasDisplay : TransparentWidget {
 			nvgStroke(args.vg);
 			nvgRestore(args.vg);
 		}
+		frame++;
+		if (frame >= 60) frame = 0;
 	}
 };
 
