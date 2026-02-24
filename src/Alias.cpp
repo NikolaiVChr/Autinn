@@ -35,7 +35,7 @@ struct Alias : Module {
 	dsp::SchmittTrigger startTrigger;
 	
 	float sweepPhase = 0.0f;
-	float sweepFreq = 20.0f;
+	volatile float sweepFreq = 20.0f;
 	
 	int currentStep = 0;
 	int settleCounter = 0;
@@ -268,16 +268,18 @@ struct Alias : Module {
 
 					int actualFundBin = expectedFundBin;
 					float maxMag = 0.0f;
+					debugValue = 0.0;
 					for (int b = std::max(1, expectedFundBin - searchWidth); b <= std::min(numBins - 1, expectedFundBin + searchWidth); b++) {
 						if (magnitudes[b] > maxMag) {
 							maxMag = magnitudes[b];
 							actualFundBin = b;
+							debugValue = b * binResolution;
 						}
 					}
 
 					// This is the actual frequency the VCO is outputting
 					float trueFundFreq = actualFundBin * binResolution;
-					debugValue = trueFundFreq;
+
 
 					// Mute Fundamental and Harmonics
 					for (int h = 1; (h * trueFundFreq) < (args.sampleRate / 2.0f); h++) {
@@ -408,7 +410,7 @@ struct AliasDisplay : TransparentWidget {
 					}
 				}
 			}
-			nvgText(args.vg, 0, 25 + (3 * 12), string::f("%+6.1f Hz", module->debugValue).c_str(), nullptr);
+			nvgText(args.vg, 0, 25 + (3 * 12), string::f("%+6.1f / %+6.1f", module->debugValue, module->sweepFreq).c_str(), nullptr);
 
 			// mode
 			nvgFillColor(args.vg, nvgRGBA(0, 255, 0, 255));
