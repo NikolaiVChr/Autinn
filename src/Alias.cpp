@@ -273,7 +273,6 @@ struct Alias : Module {
 						if (magnitudes[bin] > maxMag) {
 							maxMag = magnitudes[bin];
 							actualFundBin = bin;
-							debugValue = bin * binResolution;
 						}
 					}
 
