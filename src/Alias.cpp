@@ -62,6 +62,9 @@ struct Alias : Module {
 	alignas(16) float magnitudes[numBins] = {};
 	int bufferIndex = 0;
 
+	// debug
+	volatile float debugValue = 0.0f;
+
 	Alias() : fft(FFT_SIZE) { // Initialize the FFT size in the constructor initialization list
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(SETTLE_KNOB, 0.01f, 2.5f, 0.05f, "Settle Time", " s");
@@ -268,6 +271,7 @@ struct Alias : Module {
 
 					// This is the actual frequency the VCO is outputting
 					float trueFundFreq = actualFundBin * binResolution;
+					debugValue = trueFundFreq;
 
 					// Mute Fundamental and Harmonics
 					for (int h = 1; (h * trueFundFreq) < (args.sampleRate / 2.0f); h++) {
@@ -394,6 +398,7 @@ struct AliasDisplay : TransparentWidget {
 					}
 				}
 			}
+			nvgText(args.vg, 0, 25 + (3 * 12), string::f("%+6.1f Hz", module->debugValue).c_str(), nullptr);
 
 			// mode
 			nvgFillColor(args.vg, nvgRGBA(0, 255, 0, 255));
