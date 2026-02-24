@@ -472,12 +472,12 @@ struct CoilWidget : ModuleWidget {
 
 
         // Row 2.5:
-        auto* scatterKnob = createParamCentered<AutinnArcSmallKnob>(Vec(div2*1.f, 190.f), module, Coil::SCATTER_PARAM);
+        auto* scatterKnob = createParamCentered<AutinnArcSmallKnob>(Vec(div2*1.f, 195.f), module, Coil::SCATTER_PARAM);
         scatterKnob->setModulation(Coil::SCATTER_CV, [](float cv, float val, float att) {
             return clamp(val + cv * 0.6f, 0.05f, 6.0f);
         });
         addParam(scatterKnob);
-        addInput(createInputCentered<InPortAutinn>(Vec(div2*2.f, 190.f), module, Coil::SCATTER_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div2*2.f, 195.f), module, Coil::SCATTER_CV));
 
         // Row 3: CVs
         addInput(createInputCentered<InPortAutinn>(Vec(div3*1.f, 240.f), module, Coil::DRIVE_CV));
