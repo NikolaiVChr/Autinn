@@ -54,6 +54,7 @@ struct Alias : Module {
 	float targetFrequencies[3] = {100.0f, 997.0f, 10000.0f};// 997 is a prime and does not share a common factor with 44.1khz
 	std::string benchmarkLabels[3] = {"100 Hz", " 1K Hz", "10K Hz"};
 	float benchmarkScores[3] = {-210.0f, -210.0f, -210.0f};
+	bool benchmarkRecorded[3] = {false, false, false};
 
 	dsp::RealFFT fft;
 	alignas(16) float windowArray[FFT_SIZE];
@@ -74,6 +75,8 @@ struct Alias : Module {
 		configOutput(TEST_OUTPUT, "Test Send");
 
 		for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
+
+		benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
 
 		/*
 		// Pre-calculate the Blackman-Harris window
@@ -112,6 +115,7 @@ struct Alias : Module {
 		sweepFreq = getFreqForStep(0);
 		sweepPhase = 0.0f;
 		benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
+		benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
 		mode = false;
 		for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
 		Module::onReset(e);
@@ -183,6 +187,7 @@ struct Alias : Module {
 		} else if (currentState == NOT_READY) {
 			currentState = READY;
 			benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
+			benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
 			for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
 		}
 
@@ -194,6 +199,7 @@ struct Alias : Module {
 				activeSettleTime = params[SETTLE_KNOB].getValue();
 				sweepPhase = 0.0f;
 				benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
+				benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
 				for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
 			}
 		}
@@ -305,9 +311,10 @@ struct Alias : Module {
 							}
 						}
 
+						signalPower += currentHarmonicPower;
+
 						// If this is the 1st harmonic, save the power and lock the frequency
 						if (h == 1) {
-							signalPower = currentHarmonicPower;
 							// This makes subsequent harmonics (h=2, 3...) much more accurate!
 							trueFundFreq = peakBin * binResolution;
 						}
@@ -319,6 +326,7 @@ struct Alias : Module {
 
 					float currentThd = -210.0f;
 					if (signalPower > 1e-5f && noisePower > 1e-20f) {
+						// Signal-to-Noise-and-Distortion (SINAD)
 						currentThd = 10.0f * std::log10(noisePower / signalPower);
 					}
 
@@ -333,8 +341,10 @@ struct Alias : Module {
 						float targetLogP = std::log(target / startFreq) / std::log(END_HZ / startFreq);
 						int targetStep = std::round(targetLogP * (STEPS - 1));
 
-						if (benchmarkScores[i] <= -200.0f && currentStep >= targetStep) {
+						// If we reached the step and haven't locked it yet
+						if (!benchmarkRecorded[i] && currentStep >= targetStep) {
 							benchmarkScores[i] = currentThd;
+							benchmarkRecorded[i] = true;
 						}
 					}
 
