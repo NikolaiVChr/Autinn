@@ -51,7 +51,7 @@ struct Alias : Module {
 
 	// Graph Data
 	float thdCurve[STEPS];
-	float targetFrequencies[3] = {100.0f, 997.0f, 10000.0f};// 997 is a prime and does not share a common factor with 44.1khz
+	float targetFrequencies[3] = {100.0f, 997.0f, 9973.0f};// 997 is a prime and does not share a common factor with 44.1k or 48k
 	std::string benchmarkLabels[3] = {"100 Hz", " 1K Hz", "10K Hz"};
 	float benchmarkScores[3] = {-210.0f, -210.0f, -210.0f};
 	bool benchmarkRecorded[3] = {false, false, false};
@@ -60,7 +60,7 @@ struct Alias : Module {
 	alignas(16) float windowArray[FFT_SIZE];
 	alignas(16) float audioBuffer[FFT_SIZE];
 	alignas(16) float fftOutput[FFT_SIZE];
-	alignas(16) float magnitudes[numBins] = {};
+	alignas(16) float power[numBins] = {};
 	int bufferIndex = 0;
 
 	// debug
@@ -247,16 +247,25 @@ struct Alias : Module {
 
 				// When buffer is full, do the math!
 				if (bufferIndex >= FFT_SIZE) {
+					// remove DC offset, this must be done before FFT
 
-					// Apply Window and FFT
-					for (int i = 0; i < FFT_SIZE; i++) audioBuffer[i] *= windowArray[i];
+					// Calculate the DC of the raw samples
+					float sum = 0.0f;
+					for (int i = 0; i < FFT_SIZE; i++) sum += audioBuffer[i];
+					const float dcOffset = sum / (float)FFT_SIZE;
+
+					// Subtract DC and then apply window
+					for (int i = 0; i < FFT_SIZE; i++) {
+						audioBuffer[i] -= dcOffset;
+						audioBuffer[i] *= windowArray[i];
+					}
 					fft.rfft(audioBuffer, fftOutput);
 
-					magnitudes[0] = 0.0f;
+					power[0] = 0.0f;
 					for (int k = 1; k < numBins; k++) {
 						float re = fftOutput[2 * k];
 						float im = fftOutput[2 * k + 1];
-						magnitudes[k] = (re * re) + (im * im);
+						power[k] = (re * re) + (im * im);
 					}
 
 					float signalPower = 0.0f;
@@ -270,8 +279,8 @@ struct Alias : Module {
 					float maxMag = 0.0f;
 
 					for (int bin = std::max(1, expectedFundBin - searchWidth); bin <= std::min(numBins - 1, expectedFundBin + searchWidth); bin++) {
-						if (magnitudes[bin] > maxMag) {
-							maxMag = magnitudes[bin];
+						if (power[bin] > maxMag) {
+							maxMag = power[bin];
 							actualFundBin = bin;
 						}
 					}
@@ -284,10 +293,10 @@ struct Alias : Module {
 					for (int h = 1; (h * trueFundFreq) < (args.sampleRate / 2.0f); h++) {
 						float expectedHz = h * trueFundFreq;
 						int expectedBin = (int)std::round(expectedHz / binResolution);
-						// 1. SEARCH: Find the actual peak for THIS harmonic (h=1, 2, 3...)
-						// We look in a +-5% window to handle drifting VCOs
-						int searchRadius = (int)std::round((expectedHz * 0.15f) / binResolution);
-						// Safety: Don't look so far that we hit the next harmonic
+						// Find the actual peak for this harmonic (h=1, 2, 3 etc.)
+						// We look in a +-10% window to handle drifting VCOs
+						int searchRadius = (int)std::round((expectedHz * 0.10f) / binResolution);
+						// Don't look so far that we hit the next harmonic
 						int maxSearch = (int)((trueFundFreq / binResolution) * 0.45f);
 						searchRadius = std::min(std::max(searchRadius, 7), maxSearch);
 						int peakBin = expectedBin;
@@ -295,8 +304,8 @@ struct Alias : Module {
 						// Search the window for the loudest bin
 						for (int i = expectedBin - searchRadius; i <= expectedBin + searchRadius; i++) {
 							if (i > 0 && i < numBins) {
-								if (magnitudes[i] > maxMag2) {
-									maxMag2 = magnitudes[i];
+								if (power[i] > maxMag2) {
+									maxMag2 = power[i];
 									peakBin = i;
 								}
 							}
@@ -307,8 +316,8 @@ struct Alias : Module {
 
 						for (int i = peakBin - measureRadius; i <= peakBin + measureRadius; i++) {
 							if (i > 0 && i < numBins) {
-								currentHarmonicPower += magnitudes[i]*magnitudes[i];
-								magnitudes[i] = 0.0f; // Mute this harmonic so only noise remains
+								currentHarmonicPower += power[i];
+								power[i] = 0.0f; // Mute this harmonic so only noise remains
 							}
 						}
 
@@ -321,13 +330,13 @@ struct Alias : Module {
 						}
 					}
 
-					// Calculate Noise and THD
+					// Calculate noise and alias
 					float noisePower = 0.0f;
-					for (int k = 8; k < numBins; k++) noisePower += magnitudes[k]*magnitudes[k];
+					for (int k = 1; k < numBins; k++) noisePower += power[k];
 
 					float currentThd = -210.0f;
 					if (signalPower > 1e-5f && noisePower > 1e-20f) {
-						// AC-Coupled TNHD (Total Non-Harmonic Distortion)
+						// Signal to alias/noise ratio
 						currentThd = 10.0f * std::log10(noisePower / signalPower);
 					}
 
@@ -344,10 +353,14 @@ struct Alias : Module {
 						float targetLogP = std::log(target / startFreq) / std::log(END_HZ / startFreq);
 						int targetStep = std::round(targetLogP * (STEPS - 1));
 
-						// If we reached the step and haven't locked it yet
-						if (!benchmarkRecorded[i] && currentStep >= targetStep) {
-							benchmarkScores[i] = currentThd;
-							benchmarkRecorded[i] = true;
+						if (currentStep >= targetStep - 1 && currentStep <= targetStep + 1) {
+							// If this is the first time entering the window, or if we found a worse dB
+							if (!benchmarkRecorded[i] || currentThd > benchmarkScores[i]) {
+								benchmarkScores[i] = currentThd;
+							}
+							if (currentStep == targetStep + 1) {
+								benchmarkRecorded[i] = true;
+							}
 						}
 					}
 
