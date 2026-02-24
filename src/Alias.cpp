@@ -35,7 +35,7 @@ struct Alias : Module {
 	dsp::SchmittTrigger startTrigger;
 	
 	float sweepPhase = 0.0f;
-	volatile float sweepFreq = 20.0f;
+	float sweepFreq = 20.0f;
 	
 	int currentStep = 0;
 	int settleCounter = 0;
@@ -64,7 +64,7 @@ struct Alias : Module {
 	int bufferIndex = 0;
 
 	// debug
-	volatile float debugValue = 0.0f;
+	//volatile float debugValue = 0.0f;
 
 	Alias() : fft(FFT_SIZE) { // Initialize the FFT size in the constructor initialization list
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -268,12 +268,12 @@ struct Alias : Module {
 
 					int actualFundBin = expectedFundBin;
 					float maxMag = 0.0f;
-					debugValue = 0.0;
-					for (int b = std::max(1, expectedFundBin - searchWidth); b <= std::min(numBins - 1, expectedFundBin + searchWidth); b++) {
-						if (magnitudes[b] > maxMag) {
-							maxMag = magnitudes[b];
-							actualFundBin = b;
-							debugValue = b * binResolution;
+
+					for (int bin = std::max(1, expectedFundBin - searchWidth); bin <= std::min(numBins - 1, expectedFundBin + searchWidth); bin++) {
+						if (magnitudes[bin] > maxMag) {
+							maxMag = magnitudes[bin];
+							actualFundBin = bin;
+							debugValue = bin * binResolution;
 						}
 					}
 
@@ -331,6 +331,8 @@ struct Alias : Module {
 						// Signal-to-Noise-and-Distortion (SINAD)
 						currentThd = 10.0f * std::log10(noisePower / signalPower);
 					}
+
+					INFO("SINAD: %.2f dB, Signal Power: %.2f, Noise Power: %.2f, Sweep Freq: %.1f Hz, Fund Freq: %.1f Hz",currentThd, signalPower, noisePower, sweepFreq, trueFundFreq);
 
 					// Save the score
 					thdCurve[currentStep] = currentThd;
@@ -410,7 +412,7 @@ struct AliasDisplay : TransparentWidget {
 					}
 				}
 			}
-			nvgText(args.vg, 0, 25 + (3 * 12), string::f("%+6.1f / %+6.1f", module->debugValue, module->sweepFreq).c_str(), nullptr);
+			//nvgText(args.vg, 0, 25 + (3 * 12), string::f("%+6.1f / %+6.1f", module->debugValue, module->sweepFreq).c_str(), nullptr);
 
 			// mode
 			nvgFillColor(args.vg, nvgRGBA(0, 255, 0, 255));
