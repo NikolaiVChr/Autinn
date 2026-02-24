@@ -127,7 +127,8 @@
     {
       "slug": "Saw",
       "name": "Saw",
-      "description": "Oscillator with a sawish sound",
+      "description": "Oscillator with a sawish sound. Deprecated in favor of Axe.",
+      "hidden": true,
       "tags": [
         "Oscillator",
         "Polyphonic"
@@ -153,7 +154,8 @@
     {
       "slug": "Square",
       "name": "Square",
-      "description": "Oscillator with a squarish sound",
+      "description": "Oscillator with a squarish sound. Deprecated in favor of Axe.",
+      "hidden": true,
       "tags": [
         "Oscillator",
         "Polyphonic"
@@ -331,7 +333,7 @@
     {
       "slug": "Alias",
       "name": "Aliasmeter",
-      "description": "THD-N meter",
+      "description": "Alias/noise to signal meter",
       "keywords": "measure monitor analyse",
       "hidden": false,
       "tags": [
