@@ -62,7 +62,6 @@ struct Alias : Module {
 	alignas(16) float fftOutput[FFT_SIZE];
 	alignas(16) float power[numBins] = {};
 	int bufferIndex = 0;
-	float phase = 0.0f;
 
 	// debug
 	//volatile float debugValue = 0.0f;
@@ -243,11 +242,7 @@ struct Alias : Module {
 				}
 			} else if (currentState == RECORD) {
 				// Record the stable signal
-				phase += sweepFreq * args.sampleTime;
-				if (phase >= 1.0f) phase -= 1.0f;
-				float out = (phase * 2.0f - 1.0f);
-				audioBuffer[bufferIndex] = out;
-				//audioBuffer[bufferIndex] = inputs[RETURN_INPUT].getVoltage() * 0.2f;
+				audioBuffer[bufferIndex] = inputs[RETURN_INPUT].getVoltage() * 0.2f;
 				bufferIndex++;
 
 				// When buffer is full, do the math!
