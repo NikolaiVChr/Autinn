@@ -263,17 +263,17 @@ struct Alias : Module {
 
 					power[0] = 0.0f;
 					for (int k = 1; k < numBins; k++) {
-						float re = fftOutput[2 * k];
-						float im = fftOutput[2 * k + 1];
+						const float re = fftOutput[2 * k];
+						const float im = fftOutput[2 * k + 1];
 						power[k] = (re * re) + (im * im);
 					}
 
 					float signalPower = 0.0f;
-					float binResolution = args.sampleRate / FFT_SIZE;
+					const float binResolution = args.sampleRate / FFT_SIZE;
 
 					// Find the fundamental
-					int expectedFundBin = (int)std::round(sweepFreq / binResolution);
-					int searchWidth = std::max(5, (int)(expectedFundBin * 0.05f)); // Search +/- 5% around expected pitch
+					const int expectedFundBin = (int)std::round(sweepFreq / binResolution);
+					const int searchWidth = std::max(5, (int)(expectedFundBin * 0.05f)); // Search +/- 5% around expected pitch
 
 					int actualFundBin = expectedFundBin;
 					float maxMag = 0.0f;
@@ -291,8 +291,8 @@ struct Alias : Module {
 
 					// Mute Fundamental and Harmonics
 					for (int h = 1; (h * trueFundFreq) < (args.sampleRate / 2.0f); h++) {
-						float expectedHz = h * trueFundFreq;
-						int expectedBin = (int)std::round(expectedHz / binResolution);
+						const float expectedHz = h * trueFundFreq;
+						const int expectedBin = (int)std::round(expectedHz / binResolution);
 						// Find the actual peak for this harmonic (h=1, 2, 3 etc.)
 						// We look in a +-10% window to handle drifting VCOs
 						int searchRadius = (int)std::round((expectedHz * 0.10f) / binResolution);
@@ -311,7 +311,7 @@ struct Alias : Module {
 							}
 						}
 						// Now scoop exactly 7 bins for the Flat-top window power
-						int measureRadius = 7; // 4 for blackman-harris, 7 for flattop
+						constexpr int measureRadius = 7; // 4 for Blackman-Harris, 7 for flattop
 						float currentHarmonicPower = 0.0f;
 
 						for (int i = peakBin - measureRadius; i <= peakBin + measureRadius; i++) {
@@ -325,7 +325,7 @@ struct Alias : Module {
 
 						// If this is the 1st harmonic, save the power and lock the frequency
 						if (h == 1) {
-							// This makes subsequent harmonics (h=2, 3...) much more accurate!
+							// This makes later harmonics (h=2, 3...) much more accurate
 							trueFundFreq = peakBin * binResolution;
 						}
 					}
@@ -340,7 +340,7 @@ struct Alias : Module {
 						currentThd = 10.0f * std::log10(noisePower / signalPower);
 					}
 
-					//INFO("TNHD: %.2f dB, Signal Power: %.2f, Noise Power: %.2f, Sweep Freq: %.1f Hz, Fund Freq: %.1f Hz",currentThd, signalPower, noisePower, sweepFreq, trueFundFreq);
+					//INFO("Ratio: %.2f dB, Signal Power: %.2f, Noise Power: %.2f, Sweep Freq: %.1f Hz, Fund Freq: %.1f Hz",currentThd, signalPower, noisePower, sweepFreq, trueFundFreq);
 
 					// Save the score
 					thdCurve[currentStep] = currentThd;
@@ -349,9 +349,9 @@ struct Alias : Module {
 					float startFreq = std::round(START_HZ / binResolution) * binResolution;
 
 					for (int i = 0; i < 3; i++) {
-						float target = targetFrequencies[i];
-						float targetLogP = std::log(target / startFreq) / std::log(END_HZ / startFreq);
-						int targetStep = std::round(targetLogP * (STEPS - 1));
+						const float target = targetFrequencies[i];
+						const float targetLogP = std::log(target / startFreq) / std::log(END_HZ / startFreq);
+						const int targetStep = std::round(targetLogP * (STEPS - 1));
 
 						if (currentStep >= targetStep - 1 && currentStep <= targetStep + 1) {
 							// If this is the first time entering the window, or if we found a worse dB
@@ -529,8 +529,8 @@ struct AliasWidget : ModuleWidget {
 		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(centerX, 200.0f), module, Alias::START_BUTTON));
 		addParam(createParamCentered<RoundToggleButtonSmallAutinn>(Vec(centerX*1.5f, 250.0f), module, Alias::VCO_MODE_SWITCH));
 		
-		addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX - 25.0f, 300.0f), module, Alias::TEST_OUTPUT));
-		addInput(createInputCentered<InPortAutinn>(Vec(centerX + 25.0f, 300.0f), module, Alias::RETURN_INPUT));
+		addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX - 25.0f, 300.0f+HALF_PORT), module, Alias::TEST_OUTPUT));
+		addInput(createInputCentered<InPortAutinn>(Vec(centerX + 25.0f, 300.0f+HALF_PORT), module, Alias::RETURN_INPUT));
 	}
 };
 
