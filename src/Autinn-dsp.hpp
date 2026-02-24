@@ -58,7 +58,7 @@ private:
     float x_hist[MAX_BUFFER] = {};
     float y_hist[MAX_BUFFER] = {};
     int writeHead = 0;
-    int currentLength = 1;
+    float currentLength = 1.0f;
     float c = 0.0f; // Coefficient (tension)
 public:
 
@@ -68,9 +68,9 @@ public:
      */
     void setDelayTime(const float delaySeconds, const float sampleRate) {
         if (delaySeconds <= 0.0f) {
-            currentLength = 1; // Legacy Mode
+            currentLength = 1.f; // Legacy Mode
         } else {
-            currentLength = clamp((int)(delaySeconds * sampleRate), 1, MAX_BUFFER - 1);
+            currentLength = clamp((delaySeconds * sampleRate), 1.f, MAX_BUFFER - 2.f);
         }
     }
 
@@ -94,13 +94,23 @@ public:
         writeHead = 0;
     }
 
+    static float readSmooth(const float* buffer, float readPos) {
+        if (readPos < 0.0f) readPos += MAX_BUFFER;
+        if (readPos >= MAX_BUFFER) readPos -= MAX_BUFFER;
+
+        const int indexA = (int)readPos;
+        const float frac = readPos - (float)indexA;
+        const int indexB = (indexA + 1) & (MAX_BUFFER - 1);
+
+        return buffer[indexA] + frac * (buffer[indexB] - buffer[indexA]);
+    }
+
     float process(const float x) {
         // Calculate read head position
-        int readHead = writeHead - currentLength;
-        if (readHead < 0) readHead += MAX_BUFFER;
+        float readPos = (float)writeHead - currentLength;
 
-        float x_delayed = x_hist[readHead];
-        float y_delayed = y_hist[readHead];
+        float x_delayed = readSmooth(x_hist, readPos);
+        float y_delayed = readSmooth(y_hist, readPos);
 
         // y[n] = -c * x[n] + x[n-1] - c * y[n-1]
         float y = x_delayed + c * (y_delayed - x);

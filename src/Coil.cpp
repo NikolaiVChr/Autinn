@@ -34,7 +34,7 @@ struct SpringTank {
     static constexpr int MAX_BUFFER_SIZE = 131072;
     float buffer[MAX_BUFFER_SIZE] = {};
     int writeHead = 0;
-    float coilDelays[MAX_COILS] = {};
+    float currentSpacing = 1.0f;
     float lastSampleRate = 0.0f;
     bool legacyMode = false;
 
@@ -51,24 +51,41 @@ struct SpringTank {
         tensionOffset = t_off;
         lengthOffset = l_off;
         curr_coils = coils;
-
-        // Generate scatter delays for the coils
-        // Using irregular numbers prevents nasty metallic ringing
-        for(int i = 0; i < MAX_COILS; i++) {
-            coilDelays[i] = 0.0015f + (float(i) * 0.00047f) * (1.0f + lengthOffset);
-        }
     }
 
     void setSampleRate(const float sampleRate, const bool isLegacy) {
         lastSampleRate = sampleRate;
         legacyMode = isLegacy;
 
+        updateDelays(sampleRate);
+    }
+
+    void updateDelays(const float sampleRate) {
         for (int i = 0; i < MAX_COILS; i++) {
             if (legacyMode) {
-                ap[i].setDelayTime(0.0f, sampleRate); // Force 1-sample delay
+                ap[i].setDelayTime(0.0f, sampleRate);
             } else {
-                ap[i].setDelayTime(coilDelays[i], sampleRate);
+                const float delaySecs = 0.0015f + (float(i) * 0.00047f * currentSpacing) * (1.0f + lengthOffset);
+                ap[i].setDelayTime(delaySecs, sampleRate);
             }
+        }
+    }
+
+    void setSpacing(const float spacing, const float sampleRate) {
+
+        if (currentSpacing == spacing && sampleRate == lastSampleRate) return;
+
+        lastSampleRate = sampleRate;
+        currentSpacing = spacing;
+        updateDelays(sampleRate);
+    }
+
+    void setTension(const float t) {
+        // Apply dispersion (All-pass chain)
+        // Modulating this changes the tightness and creates pitch shifts
+        float clampedT = clamp(t + tensionOffset, 0.05f, 0.95f);
+        for (auto & filter : ap) {
+            filter.setTension(clampedT);
         }
     }
 
@@ -83,8 +100,8 @@ struct SpringTank {
         }
     }
 
-    float process(float input, float feedbackAmt, float tension, float inertia, float dampFreq, float sampleRate) {
-        
+    float process(float input, float feedbackAmt, float inertia, float dampFreq, float sampleRate) {
+
         // Determine delay length (Inertia)
         // Springs are usually 30ms to 70ms.
         // Apply small random variance for stereo width
@@ -92,14 +109,9 @@ struct SpringTank {
 
         float delayOut = readBufferSmooth(targetDelay * sampleRate);
 
-        // Apply dispersion (All-pass chain)
-        // Modulating this changes the tightness and creates pitch shifts
-        float t = clamp(tension + tensionOffset, 0.05f, 0.95f);
-
         float dispersed = delayOut;
 
         for (int i = 0; i < MAX_COILS && i < curr_coils; i++) {
-            ap[i].setTension(t);
             dispersed = ap[i].process(dispersed);
         }
 
@@ -124,7 +136,7 @@ struct SpringTank {
         return filtered;
     }
 
-    float readBufferSmooth(const float delaySamples) {
+    float readBufferSmooth(const float delaySamples) const {
         float readPos = (float)writeHead - delaySamples;
         if (readPos < 0) readPos += MAX_BUFFER_SIZE;
         if (readPos >= MAX_BUFFER_SIZE) readPos -= MAX_BUFFER_SIZE;
@@ -132,7 +144,7 @@ struct SpringTank {
         // Get the integer part and the fractional part
         int indexA = (int)readPos;
 
-        float frac = readPos - indexA;
+        const float frac = readPos - float(indexA);
 
         // Prevents segfaults if float logic drifts
         indexA &= (MAX_BUFFER_SIZE - 1);
@@ -150,6 +162,7 @@ struct Coil : Module {
         TENSION_PARAM,
         INERTIA_PARAM,
         DAMP_PARAM,
+        SCATTER_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
@@ -162,6 +175,7 @@ struct Coil : Module {
         TENSION_CV,
         INERTIA_CV,
         DAMP_CV,
+        SCATTER_CV,
         NUM_INPUTS
     };
     enum OutputIds {
@@ -184,6 +198,7 @@ struct Coil : Module {
 
     float lastSampleRate = 0.0f;
     bool legacyMode = false;
+    int stepCounter = 0;
     
     Coil() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -195,7 +210,9 @@ struct Coil : Module {
         configParam<Param3Digits>(TENSION_PARAM, 0.1f, 0.95f, 0.4f, "Tension", "");
         configParam<Param3Digits>(INERTIA_PARAM, 20.f, 160.f, 50.f, "Inertia", "");
         configParam(DAMP_PARAM, 0.f, 1.f, 0.75f, "Damp", "", FREQ_MAX/FREQ_MIN, FREQ_MIN);
+        configParam<Param3Digits>(SCATTER_PARAM, 0.1f, 4.0f, 1.0f, "Spacing");
 
+        configInput(SCATTER_CV, "Spacing CV");
         configInput(DRIVE_CV, "Drive CV");
         configInput(FEEDBACK_CV, "Reflection CV");
         configInput(MIX_CV, "Mix CV");
@@ -283,6 +300,7 @@ struct Coil : Module {
             tankR.setSampleRate(args.sampleRate, legacyMode);
         }
 
+
         float drive = params[DRIVE_PARAM].getValue() + (inputs[DRIVE_CV].getVoltage() * 0.3f);
         drive = clamp(drive, 0.f, 3.f);
 
@@ -292,15 +310,26 @@ struct Coil : Module {
         float mix = params[MIX_PARAM].getValue() + (inputs[MIX_CV].getVoltage() * 0.1f);
         mix = clamp(mix, 0.f, 1.f);
 
-        float tension = params[TENSION_PARAM].getValue() + (inputs[TENSION_CV].getVoltage() * 0.1f);
-        tension = clamp(tension, 0.05f, 0.95f);
-
         float inertiaMS = params[INERTIA_PARAM].getValue() + (inputs[INERTIA_CV].getVoltage() * 15.f);
         inertiaMS = clamp(inertiaMS, 10.f, 160.f); // Allow a wider range via CV
         float inertiaSeconds = inertiaMS / 1000.0f;
 
         float cv_damp =  std::exp2f(inputs[DAMP_CV].getVoltage());
-        float dampFreq = clamp(this->toExp(params[DAMP_PARAM].getValue())*cv_damp, 20.f, 10000.f);
+        float dampFreq = clamp(Coil::toExp(params[DAMP_PARAM].getValue())*cv_damp, 20.f, 10000.f);
+
+        if (++stepCounter >= 32) {
+            stepCounter = 0;
+
+            float spacing = params[SCATTER_PARAM].getValue() + (inputs[SCATTER_CV].getVoltage() * 0.6f);
+            spacing = clamp(spacing, 0.05f, 6.0f);
+            float tension = params[TENSION_PARAM].getValue() + (inputs[TENSION_CV].getVoltage() * 0.1f);
+            tension = clamp(tension, 0.05f, 0.95f);
+
+            tankL.setSpacing(spacing, args.sampleRate);
+            tankR.setSpacing(spacing, args.sampleRate);
+            tankL.setTension(tension);
+            tankR.setTension(tension);
+        }
 
         // --- Audio Input Processing ---
         float inL = inputs[SIGNAL_LEFT_INPUT].isConnected() ? inputs[SIGNAL_LEFT_INPUT].getVoltage() : inputs[SIGNAL_RIGHT_INPUT].getVoltage();
@@ -342,8 +371,8 @@ struct Coil : Module {
         */
 
         // --- Process tank models ---
-        float wetL = tankL.process(inL_scaled, feedback, tension, inertiaSeconds, dampFreq, args.sampleRate);
-        float wetR = tankR.process(inR_scaled, feedback, tension, inertiaSeconds, dampFreq, args.sampleRate);
+        float wetL = tankL.process(inL_scaled, feedback, inertiaSeconds, dampFreq, args.sampleRate);
+        float wetR = tankR.process(inR_scaled, feedback, inertiaSeconds, dampFreq, args.sampleRate);
 
         wetL *= 5.0f;
         wetR *= 5.0f;
@@ -391,6 +420,7 @@ struct CoilWidget : ModuleWidget {
 
         float down = 50;
         float div3 = 10.0f * RACK_GRID_WIDTH * 0.25f;
+        float div2 = 10.0f * RACK_GRID_WIDTH * 0.333f;
         float hp = RACK_GRID_WIDTH*0.5f;
 
         // --- Knobs ---
@@ -439,14 +469,22 @@ struct CoilWidget : ModuleWidget {
                 });
         addParam(dampKnob);
 
+        auto* scatterKnob = createParamCentered<AutinnArcSmallKnob>(Vec(div2*1.f, 125.f+down+hp), module, Coil::SCATTER_PARAM);
+        scatterKnob->setModulation(Coil::SCATTER_CV, [](float cv, float val, float att) {
+            return clamp(val + cv * 0.6f, 0.05f, 6.0f);
+        });
+        addParam(scatterKnob);
+
         // Row 3: CVs
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*1, 160+down), module, Coil::DRIVE_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*2, 160+down), module, Coil::FEEDBACK_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*3, 160+down), module, Coil::MIX_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*1.f, 160.f+down+hp), module, Coil::DRIVE_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*2.f, 160.f+down+hp), module, Coil::FEEDBACK_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*3.f, 160.f+down+hp), module, Coil::MIX_CV));
         
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*1, 195+down), module, Coil::TENSION_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*2, 195+down), module, Coil::INERTIA_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(div3*3, 195+down), module, Coil::DAMP_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*1.f, 195.f+down+hp), module, Coil::TENSION_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*2.f, 195.f+down+hp), module, Coil::INERTIA_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(div3*3.f, 195.f+down+hp), module, Coil::DAMP_CV));
+
+        addInput(createInputCentered<InPortAutinn>(Vec(div2*2.f, 125.f+down+hp), module, Coil::SCATTER_CV));
 
         // Row 4: Audio IO & Pluck
         addInput(createInputCentered<InPortAutinn>(Vec(20, 330-RACK_GRID_WIDTH*1.5f), module, Coil::SIGNAL_LEFT_INPUT));
