@@ -488,7 +488,7 @@ struct Scope : Module {
 						val = dcBlockers[c][polyCh].process(val);
 					}
 					buffer[c][polyCh][writeIndex] = val;
-					if (trigSource == c && polyCh == polyViewMask[c]) {
+					if (trigSource == c && polyCh == polyTrig[c]) {
 						in = val;
 					}
 				}
@@ -1038,36 +1038,76 @@ struct ScopeDisplay : OpaqueWidget {
 	}
 
 	void onButton(const ButtonEvent& e) override {
-		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-			if (!showPolyMenu) {
-				// Open the menu
-				showPolyMenu = true;
-				e.consume(this); // Stop the click from doing anything else
-				return;
-			} else {
-				// The menu is open.
-				// Determine what they clicked based on e.pos.x and e.pos.y
-
-				// Example: Did they click the header to exit?
-				if (e.pos.y < 16.0f) {
+		if (e.action == GLFW_PRESS) {
+			if (showPolyMenu) {
+				// Right-click or header-click to close menu
+				float headerHeight = box.size.y * 0.22f;
+				if (e.button == GLFW_MOUSE_BUTTON_RIGHT || (e.button == GLFW_MOUSE_BUTTON_LEFT && e.pos.y < headerHeight)) {
 					showPolyMenu = false;
 					e.consume(this);
 					return;
 				}
 
-				// Example: Did they click inside Column A (0 to 48.3)?
-				if (e.pos.x > 0 && e.pos.x < 48.3f) {
-					// Logic to check if they clicked the arrows or the 4x4 grid for Channel A
-					// ...
-					// If they clicked grid position 3 (which is index 2):
-					// uint16_t mask = module->polyViewMask[0].load();
-					// mask ^= (1 << 2); // Toggle bit 2
-					// module->polyViewMask[0].store(mask);
-				}
+				if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
+					float colWidth = box.size.x / 4.0f;
+					int ch = clamp((int)(e.pos.x / colWidth), 0, 3);
 
+					int activePoly = module->polyCount[ch].load();
+					if (activePoly <= 0) {
+						e.consume(this); // Channel unpatched, ignore click
+						return;
+					}
+
+					float gridY = headerHeight + (box.size.y * 0.25f);
+					float channelX = ch * colWidth;
+					float center = channelX + colWidth * 0.5f;
+
+					// Trigger Selection Row
+					if (e.pos.y >= headerHeight && e.pos.y < gridY) {
+						int currentTrig = module->polyTrig[ch].load();
+						if (e.pos.x < center) {
+							currentTrig--; // Left half clicked: decrement
+							if (currentTrig < 0) currentTrig = activePoly - 1;
+						} else {
+							currentTrig++; // Right half clicked: increment
+							if (currentTrig >= activePoly) currentTrig = 0;
+						}
+						module->polyTrig[ch].store(currentTrig);
+						e.consume(this);
+						return;
+					}
+
+					// 4x4 grid
+					float gridWidth = colWidth * 0.75f;
+					float gridHeight = box.size.y - gridY - 4.0f;
+					float offsetX = channelX + (colWidth - gridWidth) * 0.5f;
+
+					if (e.pos.y >= gridY && e.pos.y <= gridY + gridHeight &&
+						e.pos.x >= offsetX && e.pos.x <= offsetX + gridWidth) {
+
+						float cellW = gridWidth / 4.0f;
+						float cellH = gridHeight / 4.0f;
+
+						int col = int((e.pos.x - offsetX) / cellW);
+						int row = int((e.pos.y - gridY) / cellH);
+						int bit = row * 4 + col;
+
+						if (bit >= 0 && bit < activePoly) {
+							uint16_t mask = module->polyViewMask[ch].load();
+							mask ^= (1 << bit); // Toggle the state
+							module->polyViewMask[ch].store(mask);
+						}
+					}
+					e.consume(this);
+					return;
+				}
+			} else if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
+				showPolyMenu = true;
 				e.consume(this);
+				return;
 			}
 		}
+
 		OpaqueWidget::onButton(e);
 	}
 
