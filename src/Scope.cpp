@@ -46,6 +46,7 @@ static constexpr int STATS_DECIMATION_THRESHOLD = 24000;//   scanning up to 16,0
 static constexpr float STROKE_WAVE = 0.8f;
 static constexpr float STROKE_WAVE_POLY = 0.7f;
 static constexpr float PX_WAVE = 0.5f;
+static constexpr float PX_WAVE_POLY = 1.0f;
 static constexpr float STROKE_SCANLINE = 1.0f;
 static constexpr float STROKE_XY = 1.0f;
 static constexpr float STROKE_TRIGGER = 0.8f;
@@ -73,7 +74,9 @@ static const NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
 static const NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
 static const NVGcolor colorMenuUnpatched = nvgRGBA(85, 85, 85, 30);
 static const NVGcolor colorMenuUnpatchedText = nvgRGB(51, 51, 51);
+static const NVGcolor colorMenuPatchedText = nvgRGB(170, 170, 170);
 static const NVGcolor colorMenuActiveText = nvgRGB(255, 255, 255);
+static const NVGcolor colorMenuInactiveText = nvgRGB(20, 20, 20);
 static const NVGcolor colorMenuActiveHiddenText = nvgRGB(136, 136, 136);
 static const NVGcolor colorMenuGrayLight = nvgRGBA(170, 170, 170, 100);
 static const NVGcolor colorMenuGrayDark = nvgRGBA(51, 51, 51, 100);
@@ -1279,7 +1282,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 			// XY Routing Buttons
 			nvgFontSize(args.vg, 8.0f);
-			nvgFillColor(args.vg, patched ? nvgRGB(170, 170, 170) : colorMenuUnpatchedText);
+			nvgFillColor(args.vg, patched ? colorMenuPatchedText : colorMenuUnpatchedText);
 			nvgText(args.vg, center, xyY - (height * 0.02f), "XY ROUTING", nullptr);
 
 			float p1y = xyY;
@@ -1297,7 +1300,7 @@ struct ScopeDisplay : OpaqueWidget {
 				if (!patched) {
 					nvgFillColor(args.vg, colorMenuUnpatchedText);
 				} else {
-					nvgFillColor(args.vg, isActive ? nvgRGB(20, 20, 20) : colorMenuActiveText);
+					nvgFillColor(args.vg, isActive ? colorMenuInactiveText : colorMenuActiveText);
 				}
 				nvgText(args.vg, x + btnW * 0.5f, y + btnH * 0.5f + 1.0f, label, nullptr);
 			};
@@ -1378,22 +1381,22 @@ struct ScopeDisplay : OpaqueWidget {
 
 		for (int p = 0; p < activePoly; p++) {
 			if (p != trigP && (viewMask & (1 << p))) {
-				drawWaveform(args, ch, ghostColor, STROKE_WAVE_POLY, p);
+				drawWaveform(args, ch, ghostColor, STROKE_WAVE_POLY, p, PX_WAVE_POLY);
 			}
 		}
 
 		if (viewMask & (1 << trigP)) {
-			drawWaveform(args, ch, color, STROKE_WAVE, trigP);
+			drawWaveform(args, ch, color, STROKE_WAVE, trigP, PX_WAVE);
 		}
 	}
 
-	void drawWaveform(const DrawArgs& args, int ch, NVGcolor color, float strokeWidth, int poly) const {
+	void drawWaveform(const DrawArgs& args, int ch, NVGcolor color, float strokeWidth, int poly, float px_step) const {
 		float scale = module->scale[ch];
 		if (scale < -0.5f) return;
 		float offset = module->offset[ch];
 		float timePerDiv_s = module->getTimeDiv();
 
-		const float width_px = box.size.x/PX_WAVE;
+		const float width_px = box.size.x/px_step;
 		const float totalTime_s = DIVS_HORIZ * timePerDiv_s;
 		const float samplesToDraw = totalTime_s * module->sampleRate;
 
@@ -1563,7 +1566,7 @@ struct ScopeDisplay : OpaqueWidget {
 					yTop = clamp(yTop, -10000.0f, box.size.y+10000.0f);
 					yBottom = clamp(yBottom, -10000.0f, box.size.y+10000.0f);
 
-					auto px = float(curr_px)*PX_WAVE+WAVE_PX_OFFSET;
+					auto px = float(curr_px)*px_step+WAVE_PX_OFFSET;
 					if (first|| (wasNewData && !isNewData)) {
 						nvgMoveTo(args.vg, px, yTop);
 						nvgLineTo(args.vg, px, yBottom);
@@ -1677,7 +1680,7 @@ struct ScopeDisplay : OpaqueWidget {
 				// clamp unseen.
 				y = clamp(y, -10000.0f, box.size.y+10000.0f);
 
-				float px = float(curr_px)*PX_WAVE+WAVE_PX_OFFSET;
+				float px = float(curr_px)*px_step+WAVE_PX_OFFSET;
 				if (first) {
 					nvgMoveTo(args.vg, px, y);
 					first = false;
@@ -1698,8 +1701,8 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgBeginPath(args.vg);
 			nvgStrokeColor(args.vg, colorScanLine); // Faint white
 			nvgStrokeWidth(args.vg, STROKE_SCANLINE);
-			nvgMoveTo(args.vg, (float)drawLimit_px*PX_WAVE+WAVE_PX_OFFSET, 0);
-			nvgLineTo(args.vg, (float)drawLimit_px*PX_WAVE+WAVE_PX_OFFSET, box.size.y);
+			nvgMoveTo(args.vg, (float)drawLimit_px*px_step+WAVE_PX_OFFSET, 0);
+			nvgLineTo(args.vg, (float)drawLimit_px*px_step+WAVE_PX_OFFSET, box.size.y);
 			nvgStroke(args.vg);
 		}
 	}
@@ -2603,6 +2606,9 @@ struct ScopeWidget : ModuleWidget {
 
 		menu->addChild(new MenuLabel());
 
+		auto polyLabel = new MenuLabel();
+		polyLabel->text = "Polyphony";
+		menu->addChild(polyLabel);
 		for (int c = 0; c < 4; c++) {
 			auto item = new PolyChannelMenu();
 			item->text = string::f("Channel %c", 'A' + c);
@@ -2611,6 +2617,8 @@ struct ScopeWidget : ModuleWidget {
 			item->channel = c;
 			menu->addChild(item);
 		}
+
+		menu->addChild(new MenuSeparator());
 
 		auto xyLabel = new MenuLabel();
 		xyLabel->text = "X-Y Plot Routing";
@@ -2623,7 +2631,6 @@ struct ScopeWidget : ModuleWidget {
 			item->plotIndex = plot;
 			menu->addChild(item);
 		}
-		menu->addChild(new MenuSeparator());
 	}
 };
 
