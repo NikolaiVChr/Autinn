@@ -154,8 +154,8 @@ struct Excavi : Module {
 			dcBlockerA[c].cutoff_hz = 2.0f;
 			dcBlockerB[c].cutoff_hz = 2.0f;
 
-			roofLpfA[c].cutoff_hz = 20000.0f;
-			roofLpfB[c].cutoff_hz = 20000.0f;
+			roofLpfA[c].cutoff_hz = 18000.0f;
+			roofLpfB[c].cutoff_hz = 18000.0f;
 
 			lastAge[c] = -1.0f;
 			lastSampleRate[c] = 0.0f;
@@ -349,8 +349,10 @@ struct Excavi : Module {
 		outA = hp2A[c].process(hp1A[c].process(outA));
 		outB = hp2B[c].process(hp1B[c].process(outB));
 
-		// roof filters (1-Pole LP to kill IMD before saturation)
-		// 20.3 to 22.1khz cutoff, depending on rack samplerate
+		// roof filters (2-Pole LP to kill IMD before saturation)
+		outA = roofLpfA[c].process(outA);
+		outB = roofLpfB[c].process(outB);
+
 		outA = roofLpfA[c].process(outA);
 		outB = roofLpfB[c].process(outB);
 
