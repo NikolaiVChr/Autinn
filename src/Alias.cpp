@@ -50,7 +50,7 @@ struct Alias : Module {
 	static constexpr float END_HZ = 20000.0f;
 
 	// Graph Data
-	float thdCurve[STEPS];
+	float ratioCurve[STEPS];
 	float targetFrequencies[3] = {100.0f, 997.0f, 9973.0f};// 997 is a prime and does not share a common factor with 44.1k or 48k
 	std::string benchmarkLabels[3] = {"100 Hz", " 1K Hz", "10K Hz"};
 	float benchmarkScores[3] = {-210.0f, -210.0f, -210.0f};
@@ -74,7 +74,7 @@ struct Alias : Module {
 		configInput(RETURN_INPUT, "Audio Return");
 		configOutput(TEST_OUTPUT, "Test Send");
 
-		for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
+		for(int i = 0; i < STEPS; i++) ratioCurve[i] = -210.0f;
 
 		benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
 
@@ -117,7 +117,7 @@ struct Alias : Module {
 		benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
 		benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
 		mode = false;
-		for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
+		for(int i = 0; i < STEPS; i++) ratioCurve[i] = -210.0f;
 		Module::onReset(e);
 	}
 
@@ -188,7 +188,7 @@ struct Alias : Module {
 			currentState = READY;
 			benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
 			benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
-			for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
+			for(int i = 0; i < STEPS; i++) ratioCurve[i] = -210.0f;
 		}
 
 		if (startTrigger.process(params[START_BUTTON].getValue())) {
@@ -200,7 +200,7 @@ struct Alias : Module {
 				sweepPhase = 0.0f;
 				benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
 				benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
-				for(int i = 0; i < STEPS; i++) thdCurve[i] = -210.0f;
+				for(int i = 0; i < STEPS; i++) ratioCurve[i] = -210.0f;
 			}
 		}
 
@@ -334,16 +334,16 @@ struct Alias : Module {
 					float noisePower = 0.0f;
 					for (int k = 1; k < numBins; k++) noisePower += power[k];
 
-					float currentThd = -210.0f;
+					float currentRatio = -210.0f;
 					if (signalPower > 1e-5f && noisePower > 1e-20f) {
 						// Signal to alias/noise ratio
-						currentThd = 10.0f * std::log10(noisePower / signalPower);
+						currentRatio = 10.0f * std::log10(noisePower / signalPower);
 					}
 
 					//INFO("Ratio: %.2f dB, Signal Power: %.2f, Noise Power: %.2f, Sweep Freq: %.1f Hz, Fund Freq: %.1f Hz",currentThd, signalPower, noisePower, sweepFreq, trueFundFreq);
 
 					// Save the score
-					thdCurve[currentStep] = currentThd;
+					ratioCurve[currentStep] = currentRatio;
 
 					// Catch the Benchmarks (Check the current step's frequency)
 					float startFreq = std::round(START_HZ / binResolution) * binResolution;
@@ -355,8 +355,8 @@ struct Alias : Module {
 
 						if (currentStep >= targetStep - 1 && currentStep <= targetStep + 1) {
 							// If this is the first time entering the window, or if we found a worse dB
-							if (!benchmarkRecorded[i] || currentThd > benchmarkScores[i]) {
-								benchmarkScores[i] = currentThd;
+							if (!benchmarkRecorded[i] || currentRatio > benchmarkScores[i]) {
+								benchmarkScores[i] = currentRatio;
 							}
 							if (currentStep == targetStep + 1) {
 								benchmarkRecorded[i] = true;
@@ -481,8 +481,8 @@ struct AliasDisplay : TransparentWidget {
 				float x = graphX + (i / float(module->STEPS-1)) * graphWidth;
 				
 				// Map -120dB (bottom) to 0dB (top)
-				float normalizedY = (module->thdCurve[i] + 120.0f) / 120.0f; 
-				normalizedY = clamp(normalizedY, 0.0f, 1.0f);
+				float normalizedY = (module->ratioCurve[i] + 120.0f) / 120.0f;
+				normalizedY = clamp(normalizedY, -100.0f, 1.0f);// 1.0 is top
 				
 				float y = graphY + graphHeight - (normalizedY * graphHeight); 
 
