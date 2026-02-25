@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstdio>
 
-static constexpr int BUFFER_SIZE = 1 << 22;// 2^20 (5.4 seconds at 192khz) - 2^22 (22 seconds at 192khz)
+static constexpr int BUFFER_SIZE = 1 << 20;// 2^20 (5.4 seconds at 192khz) - 2^22 (22 seconds at 192khz)
 static constexpr int BUFFER_MASK = BUFFER_SIZE - 1;
 static constexpr float DIVS_VERT = 8.0f;// total vert divs (audio scope std)
 static constexpr float DIVS_HORIZ = 20.0f;// total horiz divs (approx effective 1:1)
@@ -44,6 +44,7 @@ static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
 static constexpr int STATS_DECIMATION_THRESHOLD = 24000;//   scanning up to 16000 before we bother optimizing.
 static constexpr float STROKE_WAVE = 0.8f;
+static constexpr float STROKE_WAVE_POLY = 0.7f;
 static constexpr float PX_WAVE = 0.5f;
 static constexpr float STROKE_SCANLINE = 1.0f;
 static constexpr float STROKE_XY = 1.0f;
@@ -70,6 +71,16 @@ static const NVGcolor colorXY1 = nvgRGBA(100, 255, 200, ALPHA_XY);//cyan
 static const NVGcolor colorXY2 = nvgRGBA(255, 100, 255, ALPHA_XY);//magenta
 static const NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
 static const NVGcolor colorCenterline = nvgRGBA(200, 200, 200, 100);//light gray
+static const NVGcolor colorMenuUnpatched = nvgRGBA(85, 85, 85, 30);
+static const NVGcolor colorMenuUnpatchedText = nvgRGB(51, 51, 51);
+static const NVGcolor colorMenuActiveText = nvgRGB(255, 255, 255);
+static const NVGcolor colorMenuActiveHiddenText = nvgRGB(136, 136, 136);
+static const NVGcolor colorMenuGrayLight = nvgRGBA(170, 170, 170, 100);
+static const NVGcolor colorMenuGrayDark = nvgRGBA(51, 51, 51, 100);
+static const NVGcolor colorMenuGridStroke = nvgRGBA(68, 68, 68, 255);
+static const NVGcolor colorMenuSeparators = nvgRGBA(68, 68, 68, 255);
+static const NVGcolor colorMenuBackground = nvgRGBA(20, 20, 20, 255);
+static const float colorMenuUnpatchedThemeAlpha = 0.3f;
 
 static std::vector<std::string> scales = {
 	"OFF","20 V/Div","10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
@@ -158,7 +169,7 @@ struct Scope : Module {
 	dsp::PulseGenerator trigOutPulse;
 
 	// transient
-	float buffer[4][BUFFER_SIZE] = {};
+	float* buffer[4][16]{};
 	std::atomic<int> writeIndex = {0};
 	std::atomic<int> triggerIndex = {0}; // last valid trigger
 	std::atomic<int> lastTriggerIndex = {0};
@@ -178,13 +189,19 @@ struct Scope : Module {
 	float autoTimeKnob = AUTO_TIME_KNOB_OFF;
 	float trigFoundTimer = 0.0f; // Remaining time for trigger light and stats TRIGGER to be shown.
 	std::atomic<bool> bufferFilled = {false}; // We wrapped the buffers at least once, so they has no garbage.
-	DCBlocker dcBlockers[4];
+	DCBlocker dcBlockers[4][16];
 	float lastSampleTime = 1.0f/44100.0f;
 	// for detecting freq:
 	float prevTrigSignal = 0.0f;
 	float prevFraction = 0.0f;
 	double periodHistory[16] = {};
 	int periodHistoryIndex = 0;
+
+	std::atomic<int> polyCount[4]{};// Number of poly channels
+    std::atomic<int> polyTrig[4]{};// Which poly channel is the trigger?
+	// Which poly channels are visible? (Bitmask: Bit 0 = Ch 1, Bit 15 = Ch 16)
+	// Default to 1 (Bit 0 high) so Channel 1 is visible by default.
+	std::atomic<uint16_t> polyViewMask[4]{};
 
 
 	// persisted
@@ -274,9 +291,28 @@ struct Scope : Module {
 		//configParam(DEBUG_2, 100.0f, 255.0f, ALPHA_WAVE, "DEBUG ALPHA", " ");
 
 		readControls();
-		for (auto & chDcBlocker : dcBlockers) {
-			chDcBlocker.cutoff_hz = 0.1f;
-			chDcBlocker.setSampleTime(lastSampleTime);
+		for (auto & filters : dcBlockers) {
+			for (auto & filter : filters) {
+				filter.cutoff_hz = 0.1f;
+				filter.setSampleTime(lastSampleTime);
+			}
+		}
+		for (int ch = 0; ch < 4; ch++) {
+			polyCount[ch].store(0);
+			polyTrig[ch].store(0);
+			polyViewMask[ch].store(0xFFFF);
+
+			for (int poly = 0; poly < 16; poly++) {
+				buffer[ch][poly] = new float[BUFFER_SIZE]{};
+			}
+		}
+	}
+
+	~Scope() override {
+		for (int ch = 0; ch < 4; ch++) {
+			for (int poly = 0; poly < 16; poly++) {
+				delete[] buffer[ch][poly];
+			}
 		}
 	}
 
@@ -284,9 +320,12 @@ struct Scope : Module {
 
 		for (int c = 0; c < 4; c++) {
 			cvModeTrig[c].reset();
-			dcBlockers[c].reset();
+			for (auto & filter : dcBlockers[c]) {
+				filter.reset();
+			}
 			cvMode[c] = false;
 			acCoupled[c] = false;
+			polyViewMask[c].store(0xFFFF);
 		}
 		trigSchmitt.reset();
 		trigPulse.reset();
@@ -425,37 +464,49 @@ struct Scope : Module {
 		*/
 
 		if (lastSampleTime != args.sampleTime) {
-			for (auto & chDcBlocker : dcBlockers) {
-				chDcBlocker.setSampleTime(args.sampleTime);
+			for (auto & filters : dcBlockers) {
+				for (auto & filter : filters) {
+					filter.setSampleTime(args.sampleTime);
+				}
 			}
 		}
 		lastSampleTime = args.sampleTime;
 
 		sampleRate = args.sampleRate;
 
-		float in[4] = {};
+		float in = 0.0f;
 
 		if (!frozen) {
 			period_s += args.sampleTime;
 
 
 			for (int c = 0; c < 4; c++) {
-				in[c] = inputs[A_INPUT + c].getVoltage();
-
-				if (acCoupled[c]) {
-					in[c] = dcBlockers[c].process(in[c]);
+				const int activeChannels = std::max(1, polyCount[c].load());
+				for (int polyCh = 0; polyCh < activeChannels; polyCh++) {
+					float val = inputs[A_INPUT + c].getPolyVoltage(polyCh);
+					if (acCoupled[c]) {
+						val = dcBlockers[c][polyCh].process(val);
+					}
+					buffer[c][polyCh][writeIndex] = val;
+					if (trigSource == c && polyCh == polyViewMask[c]) {
+						in = val;
+					}
 				}
-
-				buffer[c][writeIndex] = in[c];
 			}
 
 			writeIndex = (writeIndex + 1) & BUFFER_MASK;
 			if (writeIndex == 0) bufferFilled = true;
 		} else {
 			for (int c = 0; c < 4; c++) {
-				in[c] = inputs[A_INPUT + c].getVoltage();
-				if (acCoupled[c]) {
-					in[c] = dcBlockers[c].process(in[c]);
+				const int activeChannels = std::max(1, polyCount[c].load());
+				for (int polyCh = 0; polyCh < activeChannels; polyCh++) {
+					float val = inputs[A_INPUT + c].getPolyVoltage(polyCh);
+					if (acCoupled[c]) {
+						val = dcBlockers[c][polyCh].process(val);
+					}
+					if (trigSource == c && polyCh == polyTrig[c].load()) {
+						in = val;
+					}
 				}
 			}
 		}
@@ -473,6 +524,7 @@ struct Scope : Module {
 		if (dspFrame > 1000) {
 			dspFrame = 0;
 			if (period_s > 3600.0) period_s = 0.0;
+			readPolyphony();
 			updateLights();
 			readControls();
 			autoTime();
@@ -487,12 +539,12 @@ struct Scope : Module {
 	 *
 	 */
 
-	bool triggerDetect(const ProcessArgs& args, const float* in) {
+	bool triggerDetect(const ProcessArgs& args, const float in) {
 		// Get trigger signal
 		float trigSig = 0.0f;
 		float hysteresis = TRIG_HYSTERESIS; // Default for Ext (100mV)
 		if (trigSource < TRIG_SOURCE_EXT) {
-			trigSig = in[trigSource];
+			trigSig = in;
 			const float vPerDiv = scale[trigSource];
 			if (vPerDiv > -0.5f && vPerDiv < 1.0f) {
 				// We only scale it down. No reason it should ever get larger than 0.1V.
@@ -708,6 +760,16 @@ struct Scope : Module {
 		return timePerDiv;
 	}
 
+	void readPolyphony() {
+		for (int ch = 0; ch < 4; ch++) {
+			int chCount = inputs[A_INPUT + ch].getChannels();
+			polyCount[ch].store(chCount);
+			if (chCount > 0 && polyTrig[ch].load() >= chCount) {
+				polyTrig[ch].store(0);
+			}
+		}
+	}
+
 	void readControls() {
 		sourceBtn = (bool)params[TRIG_SOURCE_PARAM].getValue();
 		trigModeKnob = (bool)params[TRIG_MODE_PARAM].getValue();
@@ -883,6 +945,7 @@ static std::string fontPath;
 
 struct ScopeDisplay : OpaqueWidget {
 	Scope* module{};
+	bool showPolyMenu = false;
 	int frame = 0;
 
 	float lastTrigLevel = -999.0f;
@@ -974,10 +1037,196 @@ struct ScopeDisplay : OpaqueWidget {
 		nvgStroke(args.vg);
 	}
 
-	void drawWaveform(const DrawArgs& args, int ch) const {
+	void onButton(const ButtonEvent& e) override {
+		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+			if (!showPolyMenu) {
+				// Open the menu
+				showPolyMenu = true;
+				e.consume(this); // Stop the click from doing anything else
+				return;
+			} else {
+				// The menu is open.
+				// Determine what they clicked based on e.pos.x and e.pos.y
+
+				// Example: Did they click the header to exit?
+				if (e.pos.y < 16.0f) {
+					showPolyMenu = false;
+					e.consume(this);
+					return;
+				}
+
+				// Example: Did they click inside Column A (0 to 48.3)?
+				if (e.pos.x > 0 && e.pos.x < 48.3f) {
+					// Logic to check if they clicked the arrows or the 4x4 grid for Channel A
+					// ...
+					// If they clicked grid position 3 (which is index 2):
+					// uint16_t mask = module->polyViewMask[0].load();
+					// mask ^= (1 << 2); // Toggle bit 2
+					// module->polyViewMask[0].store(mask);
+				}
+
+				e.consume(this);
+			}
+		}
+		OpaqueWidget::onButton(e);
+	}
+
+	void drawPolyMenu(const DrawArgs& args) const {
+		if (!module) return;
+
+		const float width = box.size.x;
+		const float height = box.size.y;
+		const float colW = width / 4.0f;
+		const float headerH = height * 0.22f; // Approx 18px on an 80px screen
+
+		// Dim background
+		nvgBeginPath(args.vg);
+		nvgRect(args.vg, 0, 0, width, height);
+		nvgFillColor(args.vg, colorMenuBackground);
+		nvgFill(args.vg);
+
+		// Separators
+		nvgBeginPath(args.vg);
+		nvgStrokeWidth(args.vg, 1.0f);
+		nvgStrokeColor(args.vg, colorMenuSeparators);
+		// Vertical columns
+		for (int i = 1; i < 4; i++) {
+			nvgMoveTo(args.vg, i * colW, 0);
+			nvgLineTo(args.vg, i * colW, height);
+		}
+		// Horizontal header
+		nvgMoveTo(args.vg, 0, headerH);
+		nvgLineTo(args.vg, width, headerH);
+		nvgStroke(args.vg);
+
+		setupFont(args, 11.0f);
+		nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+
+		for (int channel = 0; channel < 4; channel++) {
+			const float channel_x = channel * colW;
+			const float center = channel_x + colW * 0.5f;
+
+			const int activePoly = module->polyCount[channel].load();
+			const int trigCh = module->polyTrig[channel].load();
+			const uint16_t viewMask = module->polyViewMask[channel].load();
+			const bool patched = activePoly > 0;
+
+			NVGcolor themeColor = getColor(channel);
+			NVGcolor themeColorUnpatched = getColor(channel);
+			themeColorUnpatched.a = colorMenuUnpatchedThemeAlpha;
+
+			// Header Row
+			nvgFontSize(args.vg, 11.0f);
+			nvgFillColor(args.vg, patched ? themeColor : themeColorUnpatched);
+
+			char headerText[8];
+			snprintf(headerText, sizeof(headerText), "CH %c", 'A' + channel);
+			nvgText(args.vg, center, headerH * 0.45f, headerText, nullptr);
+
+			// Trigger Row
+			nvgFontSize(args.vg, 9.0f);
+			if (!patched) {
+				nvgFillColor(args.vg, colorMenuUnpatched);
+				nvgText(args.vg, center, headerH + (height * 0.12f), "TRIG: ---", nullptr);
+				drawPolyMenuGrid(args.vg, channel_x, colW, height, headerH, 0, 0, false);
+				continue;
+			}
+
+			nvgFillColor(args.vg, colorMenuGrayLight);
+			char trigText[32];
+			if (activePoly == 1) {
+				snprintf(trigText, sizeof(trigText), "TRIG: - 1 -");
+			} else {
+				snprintf(trigText, sizeof(trigText), "TRIG: < %d >", trigCh + 1);
+			}
+			nvgText(args.vg, center, headerH + (height * 0.12f), trigText, nullptr);
+
+			// 4x4 grid
+			drawPolyMenuGrid(args.vg, channel_x, colW, height, headerH, activePoly, viewMask, true);
+		}
+	}
+
+	void drawPolyMenuGrid(NVGcontext* vg, float channel_x, float colWidth, float height, float headerHeight, int activePoly, uint16_t viewMask, bool active) const {
+		const float gridY = headerHeight + (height * 0.25f);
+		const float gridWidth = colWidth * 0.75f;
+		const float gridHeight = height - gridY - 4.0f;
+		const float cellW = gridWidth / 4.0f;
+		const float cellH = gridHeight / 4.0f;
+		const float offsetX = channel_x + (colWidth - gridWidth) * 0.5f;
+
+		// grid lines
+		nvgBeginPath(vg);
+		nvgStrokeWidth(vg, 0.5f);
+		nvgStrokeColor(vg, colorMenuGridStroke);
+		for (int i = 0; i <= 4; i++) {
+			nvgMoveTo(vg, offsetX, gridY + i * cellH);
+			nvgLineTo(vg, offsetX + gridWidth, gridY + i * cellH);
+			nvgMoveTo(vg, offsetX + i * cellW, gridY);
+			nvgLineTo(vg, offsetX + i * cellW, gridY + gridHeight);
+		}
+		nvgStroke(vg);
+
+		// numbers & highlight boxes
+		nvgFontSize(vg, 10.0f);
+		nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+
+		for (int i = 0; i < 16; i++) {
+			const int row = i / 4;
+			const int col = i % 4;
+			const float x = offsetX + col * cellW;
+			const float y = gridY + row * cellH;
+
+			const bool exists = (i < activePoly);
+			const bool viewed = (viewMask & (1 << i));
+
+			if (exists && viewed) {
+				nvgBeginPath(vg);
+				nvgRect(vg, x, y, cellW, cellH);
+				nvgFillColor(vg, colorMenuGrayDark);
+				nvgFill(vg);
+			}
+
+			NVGcolor textColor;
+			if (!active || !exists) {
+				textColor = colorMenuUnpatchedText;
+			} else if (viewed) {
+				textColor = colorMenuActiveText;
+			} else {
+				textColor = colorMenuActiveHiddenText;
+			}
+
+			nvgFillColor(vg, textColor);
+			char num[4];
+			snprintf(num, sizeof(num), "%d", i + 1);
+			nvgText(vg, x + cellW * 0.5f, y + cellH * 0.5f + 1.0f, num, nullptr);
+		}
+	}
+
+	void drawWaveforms(const DrawArgs& args, int ch) const {
 		if (!module) return;
 		if (!module->inputs[Scope::A_INPUT + ch].isConnected()) return;
 
+		int trigP = module->polyTrig[ch].load();
+		uint16_t viewMask = module->polyViewMask[ch].load();
+		int activePoly = module->polyCount[ch].load();
+
+		// poly traces
+		NVGcolor color = getColor(ch);
+		NVGcolor ghostColor = getColor(ch);
+		ghostColor.a = 0.3f;
+
+		for (int p = 0; p < activePoly; p++) {
+			if (p != trigP && (viewMask & (1 << p))) {
+				drawWaveform(args, ch, ghostColor, STROKE_WAVE_POLY, p);
+			}
+		}
+
+		if (viewMask & (1 << trigP)) {
+			drawWaveform(args, ch, color, STROKE_WAVE, trigP);
+		}
+	}
+
+	void drawWaveform(const DrawArgs& args, int ch, NVGcolor color, float strokeWidth, int poly) const {
 		float scale = module->scale[ch];
 		if (scale < -0.5f) return;
 		float offset = module->offset[ch];
@@ -1011,7 +1260,6 @@ struct ScopeDisplay : OpaqueWidget {
 		bool zoomedOut = samplesPerPixel > aliasingThreshold && !module->cvMode[ch];
 
 		nvgBeginPath(args.vg);
-		const NVGcolor color = getColor(ch);
 		nvgStrokeColor(args.vg, color);
 
 		int iteratorStep = 1;
@@ -1069,7 +1317,7 @@ struct ScopeDisplay : OpaqueWidget {
 		if (zoomedOut) {
 			nvgLineCap(args.vg, LINECAP_WAVE_ZOOM_OUT);
 			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_OUT);
-			nvgStrokeWidth(args.vg, STROKE_WAVE);
+			nvgStrokeWidth(args.vg, strokeWidth);
 			bool wasNewData = true;
 			for (int curr_px = int(WAVE_START_PX); curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
@@ -1141,7 +1389,7 @@ struct ScopeDisplay : OpaqueWidget {
 						break;
 					}
 					int readIndexRaw = (startIdx + readIndexOffset) & BUFFER_MASK;
-					const float v = module->buffer[ch][readIndexRaw];
+					const float v = module->buffer[ch][poly][readIndexRaw];
 					if (v < minV) minV = v;
 					if (v > maxV) maxV = v;
 					found = true;
@@ -1181,7 +1429,7 @@ struct ScopeDisplay : OpaqueWidget {
 			}
 		} else {
 			// zoomed in
-			nvgStrokeWidth(args.vg, STROKE_WAVE);
+			nvgStrokeWidth(args.vg, strokeWidth);
 			nvgLineCap(args.vg, LINECAP_WAVE_ZOOM_IN);
 			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_IN);
 
@@ -1262,7 +1510,7 @@ struct ScopeDisplay : OpaqueWidget {
 					}
 				}
 
-				const float v = module->buffer[ch][readIndex];
+				const float v = module->buffer[ch][poly][readIndex];
 				float y = volt2PxVert(v, offset, scale);
 
 				// clamp unseen.
@@ -1312,10 +1560,10 @@ struct ScopeDisplay : OpaqueWidget {
 		bool idxValid = module->triggerValid.load();
 		bool idxLastValid = module->prev_triggerValid.load();
 
-		const float* signalX = module->buffer[0]; // Channel A
-		const float* signalY = module->buffer[1]; // Channel B
-		const float* signalX2 = module->buffer[2]; // Channel C
-		const float* signalY2 = module->buffer[3]; // Channel D
+		const float* signalX = module->buffer[0][0]; // Channel A
+		const float* signalY = module->buffer[1][0]; // Channel B
+		const float* signalX2 = module->buffer[2][0]; // Channel C
+		const float* signalY2 = module->buffer[3][0]; // Channel D
 
 		const float timePerDiv = module->getTimeDiv();
 
@@ -1434,15 +1682,19 @@ struct ScopeDisplay : OpaqueWidget {
 			if (module) {// check if in plugin-browser or in rack.
 				nvgSave(args.vg);
 				nvgScissor(args.vg, 0, 0, box.size.x, box.size.y);
-				if (module->trigMode == TRIG_MODE_XY) {
-					drawXY(args);
+				if (showPolyMenu) {
+					drawPolyMenu(args);
 				} else {
-					for (int c = 0; c < 4; c++) {
-						drawWaveform(args, c);
+					if (module->trigMode == TRIG_MODE_XY) {
+						drawXY(args);
+					} else {
+						for (int c = 0; c < 4; c++) {
+							drawWaveforms(args, c);
+						}
 					}
+					drawStats(args);
+					drawTrigger(args);
 				}
-				drawStats(args);
-				drawTrigger(args);
 				nvgRestore(args.vg);
 			} else {
 				drawStaticWaveform(args);
@@ -1530,9 +1782,12 @@ struct ScopeDisplay : OpaqueWidget {
 			int step = 1;
 			if (samplesToScan > STATS_DECIMATION_THRESHOLD) step = (int)std::ceil(float(samplesToScan) / STATS_DECIMATION_THRESHOLD);
 
+			int activePoly = module->polyCount[ch].load();
+			int poly = module->polyTrig[ch].load();
+
 			for (int i = 0; i < samplesToScan; i += step) {
 				const int idx = (startIndex + i) & BUFFER_MASK;
-				const float v = module->buffer[ch][idx];
+				const float v = module->buffer[ch][poly][idx];;
 				if (v < minV) minV = v;
 				if (v > maxV) maxV = v;
 				sum += v;
@@ -1771,7 +2026,77 @@ struct ScopeDisplay : OpaqueWidget {
 
 
 
+struct PolyViewItem : MenuItem {
+	Scope* module{};
+	int channel{};
+	int polyChannel{};
 
+	void onAction(const event::Action& e) override {
+		uint16_t mask = module->polyViewMask[channel].load();
+		mask ^= (1 << polyChannel);
+		module->polyViewMask[channel].store(mask);
+	}
+
+	void step() override {
+		uint16_t mask = module->polyViewMask[channel].load();
+		rightText = (mask & (1 << polyChannel)) ? "✔" : "";
+		MenuItem::step();
+	}
+};
+
+struct PolyTrigItem : MenuItem {
+	Scope* module{};
+	int channel{};
+	int polyChannel{};
+
+	void onAction(const event::Action& e) override {
+		module->polyTrig[channel].store(polyChannel);
+	}
+
+	void step() override {
+		rightText = (module->polyTrig[channel].load() == polyChannel) ? "✔" : "";
+		MenuItem::step();
+	}
+};
+
+struct PolyChannelMenu : MenuItem {
+	Scope* module{};
+	int channel{};
+
+	Menu* createChildMenu() override {
+		Menu* menu = new Menu();
+
+		auto viewLabel = new MenuLabel();
+		viewLabel->text = "View Channels";
+		menu->addChild(viewLabel);
+
+		for (int p = 0; p < 16; p++) {
+			auto item = new PolyViewItem();
+			item->text = string::f("Poly %d", p + 1);
+			item->module = module;
+			item->channel = channel;
+			item->polyChannel = p;
+			menu->addChild(item);
+		}
+
+		menu->addChild(new MenuSeparator());
+
+		auto trigLabel = new MenuLabel();
+		trigLabel->text = "Trigger Source";
+		menu->addChild(trigLabel);
+
+		for (int p = 0; p < 16; p++) {
+			auto item = new PolyTrigItem();
+			item->text = string::f("Poly %d", p + 1);
+			item->module = module;
+			item->channel = channel;
+			item->polyChannel = p;
+			menu->addChild(item);
+		}
+
+		return menu;
+	}
+};
 
 struct ShowCenterItem : MenuItem {
 	Scope* _module;
@@ -2041,6 +2366,14 @@ struct ScopeWidget : ModuleWidget {
 			menu->addChild(item);
 		}
 		*/
+		for (int c = 0; c < 4; c++) {
+			auto item = new PolyChannelMenu();
+			item->text = string::f("Channel %c", 'A' + c);
+			item->rightText = RIGHT_ARROW;
+			item->module = a;
+			item->channel = c;
+			menu->addChild(item);
+		}
 	}
 };
 
