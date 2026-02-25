@@ -325,3 +325,48 @@ public:
         return out;
     }
 };
+
+struct ADAATanh {
+private:
+    float lastX = 0.0f;
+
+    // antiderivative of tanh_fast_low
+    inline float antiderivative(float x) const {
+        float absX = std::abs(x);
+
+        if (absX >= 3.0f) {
+            // Clamped region integral: F(3) + 1.0 * (absX - 3)
+            return absX + 0.813208866f;
+        }
+
+        // Padé region integral
+        float x2 = absX * absX;
+        return (1.0f / 18.0f) * x2 + (4.0f / 3.0f) * std::log(x2 + 3.0f);
+    }
+
+    inline float tanh_fast_low(const float x) const {
+        const float x_safe = clamp(x, -3.0f, 3.0f);
+        const float x2 = x_safe * x_safe;
+        return x_safe * (27.0f + x2) / (27.0f + 9.0f * x2);
+    }
+
+public:
+    inline float process(float x) {
+        float out;
+        float diff = x - lastX;
+
+        if (std::abs(diff) < 1e-4f) {
+            // Fallback for when delta is too small to avoid division by zero
+            out = tanh_fast_low((x + lastX) * 0.5f);
+        } else {
+            out = (antiderivative(x) - antiderivative(lastX)) / diff;
+        }
+
+        lastX = x;
+        return out;
+    }
+
+    void reset() {
+        lastX = 0.0f;
+    }
+};
