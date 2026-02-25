@@ -70,6 +70,7 @@ struct Fil : Module {
 	float th=1.0f/3.0f;
 
 	DCBlocker dcBlocker[16];
+	ADAATanh saturator[16];
 	float lastSampleTime = 1.0f/44100.0f;
 
 	dsp::Upsampler<oversample2, 10> upsampler2[16];
@@ -99,6 +100,7 @@ struct Fil : Module {
 		current_oversample = 4;
 		for (int ch = 0; ch < 16; ch++) {
 			dcBlocker[ch].reset();
+			saturator[ch].reset();
 		}
 		Module::onReset(e);
 	}
@@ -155,7 +157,7 @@ void Fil::process(const ProcessArgs &args) {
 
 			// Soft saturation (The tube limit)
 			// non_lin handles the clipping smoothly like a vacuum tube.
-			float saturated = tanh_fast_high(drive_amount);
+			float saturated = saturator[c].process(drive_amount);
 
 			// Safety Check
 			if (!std::isfinite(saturated)) {
