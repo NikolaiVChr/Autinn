@@ -155,7 +155,7 @@ void Fil::process(const ProcessArgs &args) {
 
 			// Soft saturation (The tube limit)
 			// non_lin handles the clipping smoothly like a vacuum tube.
-			float saturated = tanh_fast_low(drive_amount);
+			float saturated = tanh_fast_high(drive_amount);
 
 			// Safety Check
 			if (!std::isfinite(saturated)) {
@@ -227,19 +227,19 @@ struct FilWidget : ModuleWidget {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/FilModule.svg")));
 
-		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0.f)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2.f * RACK_GRID_WIDTH, 0.f)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2.f * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addParam(createParam<RoundMediumAutinnKnob>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_KNOB_MED, 130), module, Fil::DIAL_PARAM));
+		addParam(createParam<RoundMediumAutinnKnob>(Vec(3.f * RACK_GRID_WIDTH*0.5f-HALF_KNOB_MED, 130.f), module, Fil::DIAL_PARAM));
 
-		addInput(createInput<InPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 245), module, Fil::FIL_INPUT));
-		addOutput(createOutput<OutPortAutinn>(Vec(3 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Fil::FIL_OUTPUT));
+		addInput(createInput<InPortAutinn>(Vec(3.f * RACK_GRID_WIDTH*0.5f-HALF_PORT, 245.f), module, Fil::FIL_INPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(3.f * RACK_GRID_WIDTH*0.5f-HALF_PORT, 300.f), module, Fil::FIL_OUTPUT));
 
-		addChild(createLight<MediumLight<RedLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 65), module, Fil::HIGH_LIGHT));
-		addChild(createLight<MediumLight<GreenLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 75), module, Fil::MID_LIGHT));
-		addChild(createLight<MediumLight<BlueLight>>(Vec(3 * RACK_GRID_WIDTH*0.5-9.378*0.5, 85), module, Fil::LOW_LIGHT));
+		addChild(createLight<MediumLight<RedLight>>(Vec(3.f * RACK_GRID_WIDTH*0.5f-9.378f*0.5f, 65.f), module, Fil::HIGH_LIGHT));
+		addChild(createLight<MediumLight<GreenLight>>(Vec(3.f * RACK_GRID_WIDTH*0.5f-9.378f*0.5f, 75.f), module, Fil::MID_LIGHT));
+		addChild(createLight<MediumLight<BlueLight>>(Vec(3.f * RACK_GRID_WIDTH*0.5f-9.378f*0.5f, 85.f), module, Fil::LOW_LIGHT));
 	}
 
 	void appendContextMenu(Menu* menu) override {
