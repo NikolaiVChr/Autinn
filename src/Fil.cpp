@@ -99,7 +99,6 @@ struct Fil : Module {
 		current_oversample = 4;
 		for (int ch = 0; ch < 16; ch++) {
 			dcBlocker[ch].reset();
-			saturator[ch].reset();
 		}
 		Module::onReset(e);
 	}
