@@ -96,7 +96,6 @@ struct Excavi : Module {
 	float driftPhaseB2 = 0.0f;
 	float lastSampleRate[16]{};
 	float lastAge[16]{};
-	ADAATanh adaaA[16];
 
 	std::vector<dsp::Decimator<4, 16>> decimatorA4;
 	std::vector<dsp::Decimator<4, 16>> decimatorB4;
@@ -354,7 +353,7 @@ struct Excavi : Module {
 		outA = roofLpfA[c].process(outA);
 		outB = roofLpfB[c].process(outB);
 
-		outA = adaaA[c].process(outA * makeupGain);
+		outA = tanh_fast_high(outA * makeupGain);
 		outB = tanh_fast_high(outB * makeupGain);
 	}
 
