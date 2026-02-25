@@ -42,7 +42,7 @@ static constexpr float WAVE_START_PX = -1.0;
 static constexpr float WAVEFORM_SAMPLES_PER_PX = 64.0f;
 static constexpr float WAVEFORM_PX_PER_SAMPLE = 1.0f/WAVEFORM_SAMPLES_PER_PX;
 static constexpr int XY_SAMPLE_DECIMATION = 6000;// 6000 points is enough to look like a smooth curve on a 1080p screen.
-static constexpr int STATS_DECIMATION_THRESHOLD = 24000;//   scanning up to 16000 before we bother optimizing.
+static constexpr int STATS_DECIMATION_THRESHOLD = 24000;//   scanning up to 16,000 before we bother optimizing.
 static constexpr float STROKE_WAVE = 0.8f;
 static constexpr float STROKE_WAVE_POLY = 0.7f;
 static constexpr float PX_WAVE = 0.5f;
@@ -80,7 +80,7 @@ static const NVGcolor colorMenuGrayDark = nvgRGBA(51, 51, 51, 100);
 static const NVGcolor colorMenuGridStroke = nvgRGBA(68, 68, 68, 255);
 static const NVGcolor colorMenuSeparators = nvgRGBA(68, 68, 68, 255);
 static const NVGcolor colorMenuBackground = nvgRGBA(20, 20, 20, 255);
-static const float colorMenuUnpatchedThemeAlpha = 0.3f;
+static constexpr float colorMenuUnpatchedThemeAlpha = 0.3f;
 
 static std::vector<std::string> scales = {
 	"OFF","20 V/Div","10 V/Div","5 V/Div","2 V/Div", "1 V/Div","0.5 V/Div",
@@ -216,6 +216,8 @@ struct Scope : Module {
 	int autoTimePeriods = 3;
 	bool cvMode[4] = {false, false, false, false};
 	bool acCoupled[4] = {false, false, false, false};
+	std::vector<int> xySourceX = {0, 2};
+	std::vector<int> xySourceY = {1, 3};
 
 	// controls
 	bool sourceBtn = false;
@@ -391,6 +393,30 @@ struct Scope : Module {
 			json_array_append_new(modesJ, json_boolean(cvMode[i]));
 		}
 		json_object_set_new(rootJ, "renderModes", modesJ);
+
+		json_t* xyX = json_array();
+		json_t* xyY = json_array();
+		for (size_t i = 0; i < xySourceX.size(); i++) {
+			json_array_append_new(xyX, json_integer(xySourceX[i]));
+		}
+		for (size_t i = 0; i < xySourceY.size(); i++) {
+			json_array_append_new(xyY, json_integer(xySourceY[i]));
+		}
+		json_object_set_new(rootJ, "xySourceX", xyX);
+		json_object_set_new(rootJ, "xySourceY", xyY);
+
+		json_t* triggerPoly = json_array();
+		for (size_t i = 0; i < 4; i++) {
+			json_array_append_new(triggerPoly, json_integer(polyTrig[i].load()));
+		}
+		json_object_set_new(rootJ, "polyTrig", triggerPoly);
+
+		json_t* viewPoly = json_array();
+		for (size_t i = 0; i < 4; i++) {
+			json_array_append_new(viewPoly, json_integer(polyViewMask[i].load()));
+		}
+		json_object_set_new(rootJ, "viewPoly", viewPoly);
+
 		return rootJ;
 	}
 
@@ -451,6 +477,34 @@ struct Scope : Module {
 				if (cvJ) cvMode[i] = json_is_true(cvJ);
 			}
 		}
+
+		json_t* xyX = json_object_get(rootJ, "xySourceX");
+		json_t* xyY = json_object_get(rootJ, "xySourceY");
+		if (xyX && xyY) {
+			size_t len = std::min(json_array_size(xyX), json_array_size(xyY));
+			xySourceX.resize(len);
+			xySourceY.resize(len);
+			for (size_t i = 0; i < len; i++) {
+				xySourceX[i] = json_integer_value(json_array_get(xyX, i));
+				xySourceY[i] = json_integer_value(json_array_get(xyY, i));
+			}
+		}
+
+		json_t* triggerPoly = json_object_get(rootJ, "polyTrig");
+		if (triggerPoly) {
+			for (size_t i = 0; i < 4; i++) {
+				json_t* item = json_array_get(triggerPoly, i);
+				if (item) polyTrig[i].store(json_integer_value(item));
+			}
+		}
+
+		json_t* viewPoly = json_object_get(rootJ, "viewPoly");
+		if (viewPoly) {
+			for (size_t i = 0; i < 4; i++) {
+				json_t* item = json_array_get(viewPoly, i);
+				if (item) polyViewMask[i].store(json_integer_value(item));
+			}
+		}
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -476,39 +530,39 @@ struct Scope : Module {
 
 		float in = 0.0f;
 
-		if (!frozen) {
+		bool isFrozen = frozen.load();
+		if (!isFrozen) {
 			period_s += args.sampleTime;
+		}
 
-
-			for (int c = 0; c < 4; c++) {
-				const int activeChannels = std::max(1, polyCount[c].load());
-				for (int polyCh = 0; polyCh < activeChannels; polyCh++) {
-					float val = inputs[A_INPUT + c].getPolyVoltage(polyCh);
-					if (acCoupled[c]) {
-						val = dcBlockers[c][polyCh].process(val);
-					}
-					buffer[c][polyCh][writeIndex] = val;
-					if (trigSource == c && polyCh == polyTrig[c]) {
-						in = val;
-					}
-				}
+		for (int c = 0; c < 4; c++) {
+			const int activeChannels = std::max(1, polyCount[c].load());
+			const bool isTrigChannel = (trigSource == c);
+			int activeTrig = -1;
+			if (isTrigChannel) {
+				activeTrig = polyTrig[c].load();
 			}
 
+			for (int polyCh = 0; polyCh < activeChannels; polyCh++) {
+				float val = inputs[A_INPUT + c].getPolyVoltage(polyCh);
+
+				if (acCoupled[c]) {
+					val = dcBlockers[c][polyCh].process(val);
+				}
+
+				if (!isFrozen) {
+					buffer[c][polyCh][writeIndex] = val;
+				}
+
+				if (polyCh == activeTrig) {
+					in = val;
+				}
+			}
+		}
+
+		if (!isFrozen) {
 			writeIndex = (writeIndex + 1) & BUFFER_MASK;
 			if (writeIndex == 0) bufferFilled = true;
-		} else {
-			for (int c = 0; c < 4; c++) {
-				const int activeChannels = std::max(1, polyCount[c].load());
-				for (int polyCh = 0; polyCh < activeChannels; polyCh++) {
-					float val = inputs[A_INPUT + c].getPolyVoltage(polyCh);
-					if (acCoupled[c]) {
-						val = dcBlockers[c][polyCh].process(val);
-					}
-					if (trigSource == c && polyCh == polyTrig[c].load()) {
-						in = val;
-					}
-				}
-			}
 		}
 
 		const bool edgeFound = triggerDetect(args, in);
@@ -558,7 +612,7 @@ struct Scope : Module {
 
 		// Holdoff
 		if (holdoffTime_s > 0.0f) {
-			// its fine that this counts down while being frozen, as unfreezing will reset it anyways.
+			// its fine that this counts down while being frozen, as unfreezing will reset it anyway.
 			holdoffTime_s -= args.sampleTime;
 		}
 		const bool holdoff_active = holdoffTime_s > 0.0f;
@@ -1040,17 +1094,27 @@ struct ScopeDisplay : OpaqueWidget {
 	void onButton(const ButtonEvent& e) override {
 		if (e.action == GLFW_PRESS) {
 			if (showPolyMenu) {
+				const float height = box.size.y;
+				const float width = box.size.x;
+				const float colW = width / 4.0f;
+
+				const float headerH = height * 0.18f;
+				const float gridY = height * 0.35f;
+				const float gridH = height * 0.38f;
+				const float xyY = gridY + gridH + (height * 0.05f);
+				const float btnH = height * 0.08f;
+				const float btnW = colW * 0.25f;
+				const float space = colW * 0.04f;
+
 				// Right-click or header-click to close menu
-				float headerHeight = box.size.y * 0.22f;
-				if (e.button == GLFW_MOUSE_BUTTON_RIGHT || (e.button == GLFW_MOUSE_BUTTON_LEFT && e.pos.y < headerHeight)) {
+				if (e.button == GLFW_MOUSE_BUTTON_RIGHT || (e.button == GLFW_MOUSE_BUTTON_LEFT && e.pos.y < headerH)) {
 					showPolyMenu = false;
 					e.consume(this);
 					return;
 				}
 
 				if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
-					float colWidth = box.size.x / 4.0f;
-					int ch = clamp((int)(e.pos.x / colWidth), 0, 3);
+					int ch = clamp((int)(e.pos.x / colW), 0, 3);
 
 					int activePoly = module->polyCount[ch].load();
 					if (activePoly <= 0) {
@@ -1058,12 +1122,11 @@ struct ScopeDisplay : OpaqueWidget {
 						return;
 					}
 
-					float gridY = headerHeight + (box.size.y * 0.25f);
-					float channelX = ch * colWidth;
-					float center = channelX + colWidth * 0.5f;
+					float channelX = ch * colW;
+					float center = channelX + colW * 0.5f;
 
 					// Trigger Selection Row
-					if (e.pos.y >= headerHeight && e.pos.y < gridY) {
+					if (e.pos.y >= headerH && e.pos.y < gridY) {
 						int currentTrig = module->polyTrig[ch].load();
 						if (e.pos.x < center) {
 							currentTrig--; // Left half clicked: decrement
@@ -1077,16 +1140,15 @@ struct ScopeDisplay : OpaqueWidget {
 						return;
 					}
 
-					// 4x4 grid
-					float gridWidth = colWidth * 0.75f;
-					float gridHeight = box.size.y - gridY - 4.0f;
-					float offsetX = channelX + (colWidth - gridWidth) * 0.5f;
+					// 4x4 Grid
+					float gridWidth = colW * 0.75f;
+					float offsetX = channelX + (colW - gridWidth) * 0.5f;
 
-					if (e.pos.y >= gridY && e.pos.y <= gridY + gridHeight &&
+					if (e.pos.y >= gridY && e.pos.y <= gridY + gridH &&
 						e.pos.x >= offsetX && e.pos.x <= offsetX + gridWidth) {
 
 						float cellW = gridWidth / 4.0f;
-						float cellH = gridHeight / 4.0f;
+						float cellH = gridH / 4.0f;
 
 						int col = int((e.pos.x - offsetX) / cellW);
 						int row = int((e.pos.y - gridY) / cellH);
@@ -1094,10 +1156,41 @@ struct ScopeDisplay : OpaqueWidget {
 
 						if (bit >= 0 && bit < activePoly) {
 							uint16_t mask = module->polyViewMask[ch].load();
-							mask ^= (1 << bit); // Toggle the state
+							mask ^= (1 << bit);
 							module->polyViewMask[ch].store(mask);
 						}
+						e.consume(this);
+						return;
 					}
+
+					// XY Routing Buttons
+					float p1y = xyY;
+					float p2y = xyY + btnH + 4.0f;
+
+					if (e.pos.y >= p1y && e.pos.y <= p2y + btnH) {
+						int plotIdx = (e.pos.y < p2y) ? 0 : 1;
+						float yTarget = (plotIdx == 0) ? p1y : p2y;
+
+						if (e.pos.y >= yTarget && e.pos.y <= yTarget + btnH) {
+							float xLeft = center - btnW - space;
+							float xRight = center + space;
+
+							int axis = -1;
+							if (e.pos.x >= xLeft && e.pos.x <= xLeft + btnW) axis = 0;
+							else if (e.pos.x >= xRight && e.pos.x <= xRight + btnW) axis = 1;
+
+							if (axis != -1) {
+								if (axis == 0) {
+									module->xySourceX[plotIdx] = (module->xySourceX[plotIdx] == ch) ? 4 : ch;
+								} else {
+									module->xySourceY[plotIdx] = (module->xySourceY[plotIdx] == ch) ? 4 : ch;
+								}
+							}
+						}
+						e.consume(this);
+						return;
+					}
+
 					e.consume(this);
 					return;
 				}
@@ -1117,7 +1210,15 @@ struct ScopeDisplay : OpaqueWidget {
 		const float width = box.size.x;
 		const float height = box.size.y;
 		const float colW = width / 4.0f;
-		const float headerH = height * 0.22f; // Approx 18px on an 80px screen
+
+		const float headerH = height * 0.18f;
+		const float trigY = headerH + (height * 0.08f);
+		const float gridY = height * 0.35f;
+		const float gridH = height * 0.38f;
+		const float xyY = gridY + gridH + (height * 0.05f);
+		const float btnH = height * 0.08f;
+		const float btnW = colW * 0.25f;
+		const float space = colW * 0.04f;
 
 		// Dim background
 		nvgBeginPath(args.vg);
@@ -1129,12 +1230,10 @@ struct ScopeDisplay : OpaqueWidget {
 		nvgBeginPath(args.vg);
 		nvgStrokeWidth(args.vg, 1.0f);
 		nvgStrokeColor(args.vg, colorMenuSeparators);
-		// Vertical columns
 		for (int i = 1; i < 4; i++) {
 			nvgMoveTo(args.vg, i * colW, 0);
 			nvgLineTo(args.vg, i * colW, height);
 		}
-		// Horizontal header
 		nvgMoveTo(args.vg, 0, headerH);
 		nvgLineTo(args.vg, width, headerH);
 		nvgStroke(args.vg);
@@ -1158,7 +1257,6 @@ struct ScopeDisplay : OpaqueWidget {
 			// Header Row
 			nvgFontSize(args.vg, 11.0f);
 			nvgFillColor(args.vg, patched ? themeColor : themeColorUnpatched);
-
 			char headerText[8];
 			snprintf(headerText, sizeof(headerText), "CH %c", 'A' + channel);
 			nvgText(args.vg, center, headerH * 0.45f, headerText, nullptr);
@@ -1167,29 +1265,52 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgFontSize(args.vg, 9.0f);
 			if (!patched) {
 				nvgFillColor(args.vg, colorMenuUnpatched);
-				nvgText(args.vg, center, headerH + (height * 0.12f), "TRIG: ---", nullptr);
-				drawPolyMenuGrid(args.vg, channel_x, colW, height, headerH, 0, 0, false);
-				continue;
-			}
-
-			nvgFillColor(args.vg, colorMenuGrayLight);
-			char trigText[32];
-			if (activePoly == 1) {
-				snprintf(trigText, sizeof(trigText), "TRIG: - 1 -");
+				nvgText(args.vg, center, trigY, "TRIG: ---", nullptr);
 			} else {
-				snprintf(trigText, sizeof(trigText), "TRIG: < %d >", trigCh + 1);
+				nvgFillColor(args.vg, colorMenuGrayLight);
+				char trigText[32];
+				if (activePoly == 1) snprintf(trigText, sizeof(trigText), "TRIG: - 1 -");
+				else snprintf(trigText, sizeof(trigText), "TRIG: < %d >", trigCh + 1);
+				nvgText(args.vg, center, trigY, trigText, nullptr);
 			}
-			nvgText(args.vg, center, headerH + (height * 0.12f), trigText, nullptr);
 
-			// 4x4 grid
-			drawPolyMenuGrid(args.vg, channel_x, colW, height, headerH, activePoly, viewMask, true);
+			// 4x4 Grid
+			drawPolyMenuGrid(args.vg, channel_x, colW, gridY, gridH, activePoly, viewMask, patched);
+
+			// XY Routing Buttons
+			nvgFontSize(args.vg, 8.0f);
+			nvgFillColor(args.vg, patched ? nvgRGB(170, 170, 170) : colorMenuUnpatchedText);
+			nvgText(args.vg, center, xyY - (height * 0.02f), "XY ROUTING", nullptr);
+
+			float p1y = xyY;
+			float p2y = xyY + btnH + 4.0f;
+
+			auto drawXYBtn = [&](float y, int plotIdx, int axis, const char* label, NVGcolor activeColor) {
+				float x = center + (axis == 0 ? -btnW - space : space);
+				bool isActive = patched && ((axis == 0) ? (module->xySourceX[plotIdx] == channel) : (module->xySourceY[plotIdx] == channel));
+
+				nvgBeginPath(args.vg);
+				nvgRoundedRect(args.vg, x, y, btnW, btnH, 2.0f);
+				nvgFillColor(args.vg, isActive ? activeColor : colorMenuGrayDark);
+				nvgFill(args.vg);
+
+				if (!patched) {
+					nvgFillColor(args.vg, colorMenuUnpatchedText);
+				} else {
+					nvgFillColor(args.vg, isActive ? nvgRGB(20, 20, 20) : colorMenuActiveText);
+				}
+				nvgText(args.vg, x + btnW * 0.5f, y + btnH * 0.5f + 1.0f, label, nullptr);
+			};
+
+			drawXYBtn(p1y, 0, 0, "X1", colorXY1);
+			drawXYBtn(p1y, 0, 1, "Y1", colorXY1);
+			drawXYBtn(p2y, 1, 0, "X2", colorXY2);
+			drawXYBtn(p2y, 1, 1, "Y2", colorXY2);
 		}
 	}
 
-	void drawPolyMenuGrid(NVGcontext* vg, float channel_x, float colWidth, float height, float headerHeight, int activePoly, uint16_t viewMask, bool active) const {
-		const float gridY = headerHeight + (height * 0.25f);
+	static void drawPolyMenuGrid(NVGcontext* vg, float channel_x, float colWidth, float gridY, float gridHeight, int activePoly, uint16_t viewMask, bool active) {
 		const float gridWidth = colWidth * 0.75f;
-		const float gridHeight = height - gridY - 4.0f;
 		const float cellW = gridWidth / 4.0f;
 		const float cellH = gridHeight / 4.0f;
 		const float offsetX = channel_x + (colWidth - gridWidth) * 0.5f;
@@ -1583,16 +1704,38 @@ struct ScopeDisplay : OpaqueWidget {
 		}
 	}
 
-	void drawXY(const DrawArgs& args) const {
+	void drawAllXY(const DrawArgs& args) const {
 		if (!module) return;
 
-		bool AB = module->inputs[Scope::A_INPUT].isConnected() &&
-		module->inputs[Scope::B_INPUT].isConnected() && module->scale[0] > -0.5f && module->scale[1] > -0.5f;
-		bool CD = module->inputs[Scope::C_INPUT].isConnected() &&
-		module->inputs[Scope::D_INPUT].isConnected() && module->scale[2] > -0.5f && module->scale[3] > -0.5f;
+		for (int plot = 0; plot < 2; plot++) {
+			int chX = module->xySourceX[plot];
+			int chY = module->xySourceY[plot];
 
-		// Check connections
-		if (!AB && !CD) return;
+			if (chX >= 4 || chY >= 4) continue;
+
+			// Connected and scaling valid?
+			if (!module->inputs[Scope::A_INPUT + chX].isConnected() || module->scale[chX] < -0.5f) continue;
+			if (!module->inputs[Scope::A_INPUT + chY].isConnected() || module->scale[chY] < -0.5f) continue;
+
+			NVGcolor color = (plot == 0) ? colorXY1 : colorXY2;
+
+			// X is the trigger source
+			int polyX = module->polyTrig[chX].load();
+
+			// Y uses the context mask (4x4 Grid)
+			uint16_t maskY = module->polyViewMask[chY].load();
+			int activeY = module->polyCount[chY].load();
+
+			// Draw Lissajous pair for every Y the user enabled in the grid
+			for (int polyY = 0; polyY < activeY; polyY++) {
+				if (maskY & (1 << polyY)) {
+					drawXY(args, chX, chY, polyX, polyY, color);
+				}
+			}
+		}
+	}
+
+	void drawXY(const DrawArgs& args, int chX, int chY, int polyX, int polyY, NVGcolor color) const {
 
 		int idxWrite = module->writeIndex.load();
 		int idxTrigger = module->triggerIndex.load();
@@ -1600,10 +1743,8 @@ struct ScopeDisplay : OpaqueWidget {
 		bool idxValid = module->triggerValid.load();
 		bool idxLastValid = module->prev_triggerValid.load();
 
-		const float* signalX = module->buffer[0][0]; // Channel A
-		const float* signalY = module->buffer[1][0]; // Channel B
-		const float* signalX2 = module->buffer[2][0]; // Channel C
-		const float* signalY2 = module->buffer[3][0]; // Channel D
+		const float* signalX = module->buffer[chX][polyX]; // Channel A
+		const float* signalY = module->buffer[chY][polyY]; // Channel B
 
 		const float timePerDiv = module->getTimeDiv();
 
@@ -1625,27 +1766,18 @@ struct ScopeDisplay : OpaqueWidget {
 		bool enoughNew = (samplesRecorded >= samplesToDraw);
 		int samplesRecorded2 = (idxWrite - idxLastTrig) & BUFFER_MASK;
 		bool enoughOld = (samplesRecorded2 >= samplesToDraw);
-		/*
-		const int startIdx = module->triggerValid && enough?module->triggerIndex
-									:(module->prev_triggerValid?module->lastTriggerIndex
-									:((module->writeIndex - samplesToDraw) & BUFFER_MASK));
-		*/
+
 		int startIdx;
 		int endIdx;
 		int countMax = samplesToDraw;
 		if (idxValid && enoughNew) {
 			// Draw newest data from trigger forward
 			startIdx = idxTrigger;
-			//endIdx = (startIdx + samplesToDraw) & BUFFER_MASK;
 		} else if (idxLastValid && idxValid && enoughOld) {
 			// Draw old data from prev trigger till new trigger
 			startIdx = idxLastTrig;
-			//endIdx = (startIdx + samplesToDraw) & BUFFER_MASK;
 		} else {
 			// Just draw latest data, ignoring triggers
-
-			//startIdx = (module->writeIndex - samplesToDraw) & BUFFER_MASK;
-			//endIdx = module->writeIndex;
 
 			// If buffer hasn't wrapped yet, we only have 'writeIndex' amount of data.
 			// Don't draw past what we have recorded.
@@ -1655,21 +1787,14 @@ struct ScopeDisplay : OpaqueWidget {
 
 			startIdx = (idxWrite - countMax) & BUFFER_MASK;
 		}
-		/*
-		 Is okay, but countMax is always samplesToDraw so I simplified it
-		if (endIdx < startIdx) {
-			countMax = endIdx + (BUFFER_MASK - startIdx);
-		} else {
-			countMax = endIdx - startIdx;
-		}
-		*/
-		auto drawPair = [&](const float* sigX, const float* sigY, const int scaleIdxX, const int scaleIdxY, const NVGcolor color) {
+
+		auto drawPair = [&](const float* sigX, const float* sigY, const int scaleIdxX, const int scaleIdxY, const NVGcolor coloring) {
 			bool first = true;
 			nvgBeginPath(args.vg);
 			nvgStrokeWidth(args.vg, STROKE_XY);
 			nvgLineCap(args.vg, LINECAP_XY);
 			nvgLineJoin(args.vg, LINEJOIN_XY);
-			nvgStrokeColor(args.vg, color);
+			nvgStrokeColor(args.vg, coloring);
 			for (int i = 0; i < countMax; i += step) {
 				int idx = (startIdx + i) & BUFFER_MASK;
 
@@ -1688,8 +1813,7 @@ struct ScopeDisplay : OpaqueWidget {
 			}
 			nvgStroke(args.vg);
 		};
-		if (AB) drawPair(signalX, signalY, 0, 1, colorXY1);
-		if (CD) drawPair(signalX2, signalY2, 2, 3, colorXY2);
+		drawPair(signalX, signalY, chX, chY, color);
 	}
 
 	float volt2PxVert(float voltage, float offset_divs, float vPerDiv) const {
@@ -1726,7 +1850,7 @@ struct ScopeDisplay : OpaqueWidget {
 					drawPolyMenu(args);
 				} else {
 					if (module->trigMode == TRIG_MODE_XY) {
-						drawXY(args);
+						drawAllXY(args);
 					} else {
 						for (int c = 0; c < 4; c++) {
 							drawWaveforms(args, c);
@@ -1822,7 +1946,6 @@ struct ScopeDisplay : OpaqueWidget {
 			int step = 1;
 			if (samplesToScan > STATS_DECIMATION_THRESHOLD) step = (int)std::ceil(float(samplesToScan) / STATS_DECIMATION_THRESHOLD);
 
-			int activePoly = module->polyCount[ch].load();
 			int poly = module->polyTrig[ch].load();
 
 			for (int i = 0; i < samplesToScan; i += step) {
@@ -2065,6 +2188,68 @@ struct ScopeDisplay : OpaqueWidget {
 
 
 
+struct XYSourceItem : MenuItem {
+	Scope* module{};
+	int plotIndex{};  // 0 for Plot 1, 1 for Plot 2
+	int axis{};       // 0 for X, 1 for Y
+	int channel{};    // 0=A, 1=B, 2=C, 3=D, 4=Off
+
+	void onAction(const event::Action& e) override {
+		if (axis == 0) module->xySourceX[plotIndex] = channel;
+		else           module->xySourceY[plotIndex] = channel;
+	}
+
+	void step() override {
+		int current = (axis == 0) ? module->xySourceX[plotIndex] : module->xySourceY[plotIndex];
+		rightText = (current == channel) ? "✔" : "";
+		MenuItem::step();
+	}
+};
+
+struct XYPlotMenu : MenuItem {
+	Scope* module{};
+	int plotIndex{};
+
+	void step() override {
+		if (module) {
+			int xSrc = module->xySourceX[plotIndex];
+			int ySrc = module->xySourceY[plotIndex];
+			const char* chNames[] = {"A", "B", "C", "D", "Off"};
+
+			if (xSrc >= 4 || ySrc >= 4) {
+				text = string::f("Plot %d (Off)", plotIndex + 1);
+			} else {
+				text = string::f("Plot %d (X:%s vs Y:%s)", plotIndex + 1, chNames[xSrc], chNames[ySrc]);
+			}
+		}
+		MenuItem::step();
+	}
+
+	Menu* createChildMenu() override {
+		Menu* menu = new Menu();
+
+		const char* axes[] = {"X-Axis Source", "Y-Axis Source"};
+		const char* channels[] = {"Channel A", "Channel B", "Channel C", "Channel D", "Off"};
+
+		for (int a = 0; a < 2; a++) {
+			auto label = new MenuLabel();
+			label->text = axes[a];
+			menu->addChild(label);
+
+			for (int c = 0; c < 5; c++) {
+				auto item = new XYSourceItem();
+				item->text = channels[c];
+				item->module = module;
+				item->plotIndex = plotIndex;
+				item->axis = a;
+				item->channel = c;
+				menu->addChild(item);
+			}
+			if (a == 0) menu->addChild(new MenuSeparator());
+		}
+		return menu;
+	}
+};
 
 struct PolyViewItem : MenuItem {
 	Scope* module{};
@@ -2153,6 +2338,7 @@ struct ShowCenterItem : MenuItem {
 
 	void step() override {
 		rightText = _module->showCenterline == true ? "✔" : "";
+		MenuItem::step();
 	}
 };
 
@@ -2171,6 +2357,7 @@ struct ShowBaseItem : MenuItem {
 
 	void step() override {
 		rightText = _module->showBaselines == true ? "✔" : "";
+		MenuItem::step();
 	}
 };
 
@@ -2189,6 +2376,7 @@ struct ShowGridItem : MenuItem {
 
 	void step() override {
 		rightText = _module->showGrid == true ? "✔" : "";
+		MenuItem::step();
 	}
 };
 
@@ -2208,6 +2396,7 @@ struct PeriodsMenuItem : MenuItem {
 
 	void step() override {
 		rightText = _module->autoTimePeriods == _os ? "✔" : "";
+		MenuItem::step();
 	}
 };
 
@@ -2226,8 +2415,21 @@ struct ACItem : MenuItem {
 	}
 
 	void step() override {
-		rightText = _module->acCoupled[_os] ? "✔" : "";
+		rightText = _module->acCoupled[_os] ? "AC" : "DC";
 		MenuItem::step();
+	}
+};
+
+struct ACCouplingMenu : MenuItem {
+	Scope* module{};
+
+	Menu* createChildMenu() override {
+		Menu* menu = new Menu();
+		menu->addChild(new ACItem(module, "Channel A", 0));
+		menu->addChild(new ACItem(module, "Channel B", 1));
+		menu->addChild(new ACItem(module, "Channel C", 2));
+		menu->addChild(new ACItem(module, "Channel D", 3));
+		return menu;
 	}
 };
 
@@ -2382,30 +2584,25 @@ struct ScopeWidget : ModuleWidget {
 		menu->addChild(new ShowGridItem(a, "Show grid"));
 		menu->addChild(new ShowBaseItem(a, "Show baselines"));
 		menu->addChild(new ShowCenterItem(a, "Show centerline"));
+
 		menu->addChild(new MenuLabel());
+
 		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods  1", 1));
 		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods  3", 3));
 		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods 10", 10));
 		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods 25", 25));
 		menu->addChild(new PeriodsMenuItem(a, "Auto-time periods 50", 50));
-		menu->addChild(new MenuLabel());
-		menu->addChild(new ACItem(a, "Ch A - AC Coupled (Block DC)", 0));
-		menu->addChild(new ACItem(a, "Ch B - AC Coupled (Block DC)", 1));
-		menu->addChild(new ACItem(a, "Ch C - AC Coupled (Block DC)", 2));
-		menu->addChild(new ACItem(a, "Ch D - AC Coupled (Block DC)", 3));
 
 		menu->addChild(new MenuLabel());
-		/*
-		for (int i = 0; i < 4; i++) {
-			char label[32];
-			snprintf(label, sizeof(label), "Channel %c Input", 'A' + i);
-			auto* item = new RenderModeItem();
-			item->text = label;
-			item->module = a;
-			item->channel = i;
-			menu->addChild(item);
-		}
-		*/
+
+		auto acMenu = new ACCouplingMenu();
+		acMenu->text = "AC Coupling (Block DC)";
+		acMenu->rightText = RIGHT_ARROW;
+		acMenu->module = a;
+		menu->addChild(acMenu);
+
+		menu->addChild(new MenuLabel());
+
 		for (int c = 0; c < 4; c++) {
 			auto item = new PolyChannelMenu();
 			item->text = string::f("Channel %c", 'A' + c);
@@ -2414,6 +2611,19 @@ struct ScopeWidget : ModuleWidget {
 			item->channel = c;
 			menu->addChild(item);
 		}
+
+		auto xyLabel = new MenuLabel();
+		xyLabel->text = "X-Y Plot Routing";
+		menu->addChild(xyLabel);
+
+		for (int plot = 0; plot < 2; plot++) {
+			auto item = new XYPlotMenu();
+			item->rightText = RIGHT_ARROW;
+			item->module = a;
+			item->plotIndex = plot;
+			menu->addChild(item);
+		}
+		menu->addChild(new MenuSeparator());
 	}
 };
 
