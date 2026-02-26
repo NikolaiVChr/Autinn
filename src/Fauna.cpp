@@ -30,6 +30,7 @@
 
 static const int oversample2 = 2;
 static const int oversample4 = 4;
+static const int oversample8 = 8;
 
 struct Fauna : Module {
 	enum ParamIds {
@@ -83,6 +84,8 @@ struct Fauna : Module {
 	dsp::Decimator<oversample2, 10> decimator2;
 	dsp::Upsampler<oversample4, 10> upsampler4;
 	dsp::Decimator<oversample4, 10> decimator4;
+	dsp::Upsampler<oversample8, 10> upsampler8;
+	dsp::Decimator<oversample8, 10> decimator8;
 
 	// RIGHT
 
@@ -92,6 +95,8 @@ struct Fauna : Module {
 	dsp::Decimator<oversample2, 10> decimator2_right;
 	dsp::Upsampler<oversample4, 10> upsampler4_right;
 	dsp::Decimator<oversample4, 10> decimator4_right;
+	dsp::Upsampler<oversample8, 10> upsampler8_right;
+	dsp::Decimator<oversample8, 10> decimator8_right;
 
 	
 
@@ -135,7 +140,7 @@ struct Fauna : Module {
 		json_t *ext3 = json_object_get(rootJ, "oversample");
 		if (ext3) {
 			current_oversample = json_integer_value(ext3);
-			if (current_oversample != 2 and current_oversample != 4) {
+			if (current_oversample != 2 and current_oversample != 4 and current_oversample != 8) {
 				current_oversample = 4;
 			}
 		}
@@ -231,37 +236,19 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 	float outBuf  [oversample_protected];
 	if (oversample_protected == oversample2) {
 		upsampler2.process(in, inInter);
-	} else {
+	} else if (oversample_protected == oversample4) {
 		upsampler4.process(in, inInter);
+	} else {
+		upsampler8.process(in, inInter);
 	}
 
 	for (int i = 0; i < oversample_protected; i++) {
 		float k = 4.0f * r;
 		float drive_in = inInter[i] * inv_Vt;
 
-		// Estimate the instantaneous compression of each stage based on its capacitor state
-		float g1 = g * get_sat_gain(s1);
-		float g2 = g * get_sat_gain(s2);
-		float g3 = g * get_sat_gain(s3);
-		float g4 = g * get_sat_gain(s4);
-
-		// Calculate dynamic solver variables that know about the compression
-		float G1 = g1 / (1.0f + g1);
-		float G2 = g2 / (1.0f + g2);
-		float G3 = g3 / (1.0f + g3);
-		float G4 = g4 / (1.0f + g4);
-
-		float S1 = s1 / (1.0f + g1);
-		float S2 = s2 / (1.0f + g2);
-		float S3 = s3 / (1.0f + g3);
-		float S4 = s4 / (1.0f + g4);
-
-		// 1-Pass Solver (Calculates phase, scaled for high drive)
-		float gamma = G1 * G2 * G3 * G4;
-		float feedback = (gamma * drive_in + G2*G3*G4 * S1 + G3*G4 * S2 + G4 * S3 + S4) / (1.0f + k * gamma);
-
-		// The Audio Path (high-quality forward pass)
-		float x = drive_in - k * feedback;
+		// Use the 4th capacitor state from the previous tick.
+		// Zero prediction math, zero phantom feedback, super light on CPU.
+		float x = drive_in - k * s4;
 
 		// Stage 1
 		float in1 = tanh_fast_high(x);
@@ -293,8 +280,10 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 	float out;
 	if (oversample_protected == oversample2) {
 		out = decimator2.process(outBuf);
-	} else {
+	} else if (oversample_protected == oversample4) {
 		out = decimator4.process(outBuf);
+	} else {
+		out = decimator8.process(outBuf);
 	}
 	if(!std::isfinite(out) || out > 100.0f || out < -100.0f) {
 		out = 0.0f;
@@ -309,9 +298,11 @@ void Fauna::process_right(const ProcessArgs &args, int oversample_protected, flo
 	float inInter [oversample_protected];
 	float outBuf  [oversample_protected];
 	if (oversample_protected == oversample2) {
-		upsampler2_right.process(in, inInter);
+		upsampler2.process(in, inInter);
+	} else if (oversample_protected == oversample4) {
+		upsampler4.process(in, inInter);
 	} else {
-		upsampler4_right.process(in, inInter);
+		upsampler8.process(in, inInter);
 	}
 
 	for (int i = 0; i < oversample_protected; i++) {
@@ -379,9 +370,11 @@ void Fauna::process_right(const ProcessArgs &args, int oversample_protected, flo
 	}
 	float out;
 	if (oversample_protected == oversample2) {
-		out = decimator2_right.process(outBuf);
+		out = decimator2.process(outBuf);
+	} else if (oversample_protected == oversample4) {
+		out = decimator4.process(outBuf);
 	} else {
-		out = decimator4_right.process(outBuf);
+		out = decimator8.process(outBuf);
 	}
 	if(!std::isfinite(out) || out > 100.0f || out < -100.0f) {
 		out = 0.0f;
@@ -493,6 +486,7 @@ struct FaunaWidget : ModuleWidget {
 		menu->addChild(new MenuLabel());
 		menu->addChild(new OversampleFaunaMenuItem(a, "Oversample x2", 2));
 		menu->addChild(new OversampleFaunaMenuItem(a, "Oversample x4", 4));
+		menu->addChild(new OversampleFaunaMenuItem(a, "Oversample x8", 8));
 		menu->addChild(new MenuLabel());
 		menu->addChild(new AutoLevelMenuItem(a, "Auto level"));
 	}
