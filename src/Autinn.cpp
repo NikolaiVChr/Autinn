@@ -47,6 +47,7 @@ void init(rack::Plugin *p) {
 //	p->addModel(modelDirt);
 	p->addModel(modelFlopper);
 	p->addModel(modelFlora);
+	p->addModel(modelFauna);
 	p->addModel(modelJette);
 	p->addModel(modelBoomerang);
 	p->addModel(modelOxcart);

@@ -448,6 +448,7 @@ inline float slew(const float input, float input_prev, const float maxChangePerS
 
 extern Model *modelJette;
 extern Model *modelFlora;
+extern Model *modelFauna;
 extern Model *modelOxcart;
 extern Model *modelDeadband;
 extern Model *modelDigi;

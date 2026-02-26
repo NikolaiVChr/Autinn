@@ -39,6 +39,7 @@ Module       Oversampling              Notes
 -------------------------------------------------------------------------------
 Fil          Selectable (2x, 4x, 8x)   Defaults to 4x
 Nap          Selectable (2x, 4x)       Defaults to 2x
+Fauna        Selectable (2x, 4x)       Defaults to 2x
 Flora        Selectable (2x, 4x)       Defaults to 2x
 Bass         Selectable (2x, 4x)       Defaults to 2x
 Zod          4x (Fixed)
@@ -70,7 +71,7 @@ Flora, Non, Zod
 
 Mono
 ----
-Bass, Mera, Flopper, Sjip, Scope
+Bass, Mera, Flopper, Sjip
 
 Polyphony
 ----
