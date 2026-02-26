@@ -177,7 +177,7 @@ struct Flora : Module {
 			autoLevel = json_boolean_value(ext2);
 		json_t *ext3 = json_object_get(rootJ, "oversample");
 		if (ext3) {
-			current_oversample = json_integer_value(ext3);
+			current_oversample = int(json_integer_value(ext3));
 			if (current_oversample != 2 and current_oversample != 4 and current_oversample != 8) {
 				current_oversample = 4;
 			}
@@ -247,11 +247,11 @@ void Flora::process(const ProcessArgs &args) {
 	
 	r     = clamp(params[RESONANCE_PARAM].getValue()+(inputs[RESONANCE_INPUT].getVoltage()*params[RESONANCE_INFL_PARAM].getValue()), 0.0f, RESONANCE_MAX);
 	input_cutoff =  std::exp2f(inputs[CUTOFF_INPUT].getVoltage()*params[CUTOFF_INFL_PARAM].getValue());
-	float F_c   = clamp(this->toExp(params[CUTOFF_PARAM].getValue())*input_cutoff, FREQ_MIN, FREQ_MAX);
-	F_s   = args.sampleRate*oversample_protected;
+	float F_c   = clamp(Flora::toExp(params[CUTOFF_PARAM].getValue())*input_cutoff, FREQ_MIN, FREQ_MAX);
+	F_s   = args.sampleRate*float(oversample_protected);
 
 	if (F_c != F_c_prev || F_s != F_s_prev) {
-		double w_c = double(2.0f*M_PI*F_c/F_s);// cutoff in radians per sample.
+		auto w_c = double(2.0f*M_PI*F_c/F_s);// cutoff in radians per sample.
 		g = V_t * (0.0008116984 + 0.9724111*w_c - 0.5077766*w_c*w_c + 0.1534058*w_c*w_c*w_c);// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
 		Gres = 1.037174 + 3.606925*w_c + 7.074555*w_c*w_c - 18.14674*w_c*w_c*w_c + 9.364587*w_c*w_c*w_c*w_c;
 	}
@@ -479,19 +479,19 @@ struct FloraWidget : ModuleWidget {
 		addParam(drvKnob);
 
 
-		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-275-HALF_PORT), module, Flora::CUTOFF_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-205-HALF_PORT), module, Flora::RESONANCE_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-135-HALF_PORT), module, Flora::DRIVE_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10.f, RACK_GRID_HEIGHT-275.f-HALF_PORT), module, Flora::CUTOFF_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10.f, RACK_GRID_HEIGHT-205.f-HALF_PORT), module, Flora::RESONANCE_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10.f, RACK_GRID_HEIGHT-135.f-HALF_PORT), module, Flora::DRIVE_INPUT));
 
-		addInput(createInput<InPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.15-HALF_PORT, 300), module, Flora::FLORA_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.35-HALF_PORT, 300), module, Flora::FLORA_INPUT2));
-		addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.60-HALF_PORT, 300), module, Flora::FLORA_OUTPUT));
-		addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.85-HALF_PORT, 300), module, Flora::FLORA_OUTPUT2));
+		addInput(createInput<InPortAutinn>(Vec(9.f * RACK_GRID_WIDTH*0.15f-HALF_PORT, 300.f), module, Flora::FLORA_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(9.f * RACK_GRID_WIDTH*0.35f-HALF_PORT, 300.f), module, Flora::FLORA_INPUT2));
+		addOutput(createOutput<OutPortAutinn>(Vec(9.f * RACK_GRID_WIDTH*0.60f-HALF_PORT, 300.f), module, Flora::FLORA_OUTPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(9.f * RACK_GRID_WIDTH*0.85f-HALF_PORT, 300.f), module, Flora::FLORA_OUTPUT2));
 		//addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Flora::OUTPUT_W));
 	}
 	
 	void appendContextMenu(Menu* menu) override {
-		Flora* a = dynamic_cast<Flora*>(module);
+		auto* a = dynamic_cast<Flora*>(module);
 		assert(a);
 
 		//menu->addChild(new MenuLabel());
