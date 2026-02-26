@@ -116,9 +116,8 @@
     {
       "slug": "Retri",
       "name": "Flora",
-      "description": "A 24dB low-pass filter emulating a 4-pole transistor ladder. Deprecated in favor of Fauna.",
+      "description": "A 24dB low-pass filter emulating a 4-pole transistor ladder.",
       "keywords": "24db ladder",
-      "hidden": true,
       "tags": [
         "Filter",
         "Physical modeling",
@@ -130,6 +129,7 @@
       "name": "Fauna",
       "description": "A 24dB low-pass filter emulating a 4-pole transistor ladder",
       "keywords": "24db ladder",
+      "hidden": true,
       "tags": [
         "Filter",
         "Physical modeling",

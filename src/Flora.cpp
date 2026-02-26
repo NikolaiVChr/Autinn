@@ -64,6 +64,7 @@ struct Flora : Module {
 	//float V_t = 2.0f * t * Boltzman; // thermal voltage * 2 (should be divided by q also). Thermal V should be around 0.026V, times 2 its 0.052. Something divided by that gets multiplied by 19.23.
 	const float V_t = 2.0f * 0.026f;// more standard 2xthermalvoltage.
 	const float inv_Vt = 1.0f / V_t;
+	const float analog_offset = 1e-4f;
 
 	float r = 0.0f;
 	float Gres = 1.0f;
@@ -273,7 +274,7 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 
 	for (int i = 0; i < oversample_protected; i++) {
 		// x is the voltage over the capacitor in the first stage:
-		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev+y_d_prev_prev);//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
+		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev+y_d_prev_prev) + analog_offset;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
@@ -334,7 +335,7 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 
 	for (int i = 0; i < oversample_protected; i++) {
 		// x is the voltage over the capacitor in the first stage:
-		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev_right+y_d_prev_prev_right);//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
+		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev_right+y_d_prev_prev_right) + analog_offset;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
