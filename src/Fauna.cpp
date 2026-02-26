@@ -244,37 +244,46 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 
 	for (int i = 0; i < oversample_protected; i++) {
 		float G = g / (1.0f + g);
+		float S1 = s1 / (1.0f + g);
+		float S2 = s2 / (1.0f + g);
+		float S3 = s3 / (1.0f + g);
+		float S4 = s4 / (1.0f + g);
+
 		float k = 4.0f * r;
 		float drive_in = inInter[i] * inv_Vt;
+		float x = drive_in - k * s4;
 
-		// Solve the feedback loop using the current state of the filters
-		// but limit the feedback gain slightly to prevent the Notch overshoot.
-		float feedback = tanh_fast_low(s4);
-		float x = drive_in - k * feedback;
+		float t1 = 0.0f, t2 = 0.0f, t3 = 0.0f, t4 = 0.0f;
+		float y1 = 0.0f, y2 = 0.0f, y3 = 0.0f, y4 = 0.0f;
 
-		// Process each stage with Trapezoidal Integration (TPT)
-		// Stage 1
-		float y0 = tanh_fast_high(x);
-		float v1 = (y0 - s1) * G;
-		float y1 = s1 + v1;
+		// 3 Iterations to resolve the zero-delay loop
+		for (int iter = 0; iter < 3; iter++) {
+			t1 = tanh_fast_high(x);
+			y1 = t1 * G + S1;
+
+			t2 = tanh_fast_high(y1);
+			y2 = t2 * G + S2;
+
+			t3 = tanh_fast_high(y2);
+			y3 = t3 * G + S3;
+
+			t4 = tanh_fast_high(y3);
+			y4 = t4 * G + S4;
+
+			float fx = x - drive_in + k * y4;
+
+			float dt1 = 1.0f - t1 * t1;
+			float dt2 = 1.0f - t2 * t2;
+			float dt3 = 1.0f - t3 * t3;
+			float dt4 = 1.0f - t4 * t4;
+
+			float dfx = 1.0f + k * G * G * G * G * dt1 * dt2 * dt3 * dt4;
+			x -= fx / dfx;
+		}
+
 		s1 = 2.0f * y1 - s1;
-
-		// Stage 2
-		float y1_sat = tanh_fast_high(y1);
-		float v2 = (y1_sat - s2) * G;
-		float y2 = s2 + v2;
 		s2 = 2.0f * y2 - s2;
-
-		// Stage 3
-		float y2_sat = tanh_fast_high(y2);
-		float v3 = (y2_sat - s3) * G;
-		float y3 = s3 + v3;
 		s3 = 2.0f * y3 - s3;
-
-		// Stage 4
-		float y3_sat = tanh_fast_high(y3);
-		float v4 = (y3_sat - s4) * G;
-		float y4 = s4 + v4;
 		s4 = 2.0f * y4 - s4;
 
 		outBuf[i] = y4 * V_t;
@@ -309,47 +318,31 @@ void Fauna::process_right(const ProcessArgs &args, int oversample_protected, flo
 
 	for (int i = 0; i < oversample_protected; i++) {
 		float G = g / (1.0f + g);
-		float S1 = s1_r / (1.0f + g);
-		float S2 = s2_r / (1.0f + g);
-		float S3 = s3_r / (1.0f + g);
-		float S4 = s4_r / (1.0f + g);
-
 		float k = 4.0f * r;
 		float drive_in = inInter[i] * inv_Vt;
 
-		float x = drive_in - k * s4_r;
+		// 1-Pass feedback saturated immediately to prevent the linear notch
+		float feedback = tanh_fast_low(s4_r);
+		float x = drive_in - k * feedback;
 
-		float t1 = 0.0f, t2 = 0.0f, t3 = 0.0f, t4 = 0.0f;
-		float y1 = 0.0f, y2 = 0.0f, y3 = 0.0f, y4 = 0.0f;
-
-		for (int iter = 0; iter < 3; iter++) {
-			t1 = tanh_fast_high(x);
-			y1 = t1 * G + S1;
-
-			t2 = tanh_fast_high(y1);
-			y2 = t2 * G + S2;
-
-			t3 = tanh_fast_high(y2);
-			y3 = t3 * G + S3;
-
-			t4 = tanh_fast_high(y3);
-			y4 = t4 * G + S4;
-
-			float fx = x - drive_in + k * y4;
-
-			float dt1 = 1.0f - t1 * t1;
-			float dt2 = 1.0f - t2 * t2;
-			float dt3 = 1.0f - t3 * t3;
-			float dt4 = 1.0f - t4 * t4;
-
-			float dfx = 1.0f + k * G * G * G * G * dt1 * dt2 * dt3 * dt4;
-
-			x -= fx / dfx;
-		}
-
+		float y0 = tanh_fast_high(x);
+		float v1 = (y0 - s1_r) * G;
+		float y1 = s1_r + v1;
 		s1_r = 2.0f * y1 - s1_r;
+
+		float y1_sat = tanh_fast_high(y1);
+		float v2 = (y1_sat - s2_r) * G;
+		float y2 = s2_r + v2;
 		s2_r = 2.0f * y2 - s2_r;
+
+		float y2_sat = tanh_fast_high(y2);
+		float v3 = (y2_sat - s3_r) * G;
+		float y3 = s3_r + v3;
 		s3_r = 2.0f * y3 - s3_r;
+
+		float y3_sat = tanh_fast_high(y3);
+		float v4 = (y3_sat - s4_r) * G;
+		float y4 = s4_r + v4;
 		s4_r = 2.0f * y4 - s4_r;
 
 		outBuf[i] = y4 * V_t;
