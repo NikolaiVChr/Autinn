@@ -251,39 +251,37 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 
 		float k = 4.0f * r;
 		float drive_in = inInter[i] * inv_Vt;
-		float x = drive_in - k * s4;
 
-		float t1 = 0.0f, t2 = 0.0f, t3 = 0.0f, t4 = 0.0f;
-		float y1 = 0.0f, y2 = 0.0f, y3 = 0.0f, y4 = 0.0f;
+		// Pure Linear ZDF Feedback Prediction
+		float G2 = G * G;
+		float G3 = G2 * G;
+		float G4 = G3 * G;
+		float feedback_linear = (G4 * drive_in + G3 * S1 + G2 * S2 + G * S3 + S4) / (1.0f + k * G4);
 
-		// 3 Iterations to resolve the zero-delay loop
-		for (int iter = 0; iter < 3; iter++) {
-			t1 = tanh_fast_high(x);
-			y1 = t1 * G + S1;
+		// Saturate the prediction to prevent the Notch overshoot
+		float feedback = tanh_fast_high(feedback_linear);
 
-			t2 = tanh_fast_high(y1);
-			y2 = t2 * G + S2;
+		float x = drive_in - k * feedback;
 
-			t3 = tanh_fast_high(y2);
-			y3 = t3 * G + S3;
-
-			t4 = tanh_fast_high(y3);
-			y4 = t4 * G + S4;
-
-			float fx = x - drive_in + k * y4;
-
-			float dt1 = 1.0f - t1 * t1;
-			float dt2 = 1.0f - t2 * t2;
-			float dt3 = 1.0f - t3 * t3;
-			float dt4 = 1.0f - t4 * t4;
-
-			float dfx = 1.0f + k * G * G * G * G * dt1 * dt2 * dt3 * dt4;
-			x -= fx / dfx;
-		}
-
+		// Audio path (1-pass explicit TPT updates)
+		float y0 = tanh_fast_high(x);
+		float v1 = (y0 - s1) * G;
+		float y1 = s1 + v1;
 		s1 = 2.0f * y1 - s1;
+
+		float y1_sat = tanh_fast_high(y1);
+		float v2 = (y1_sat - s2) * G;
+		float y2 = s2 + v2;
 		s2 = 2.0f * y2 - s2;
+
+		float y2_sat = tanh_fast_high(y2);
+		float v3 = (y2_sat - s3) * G;
+		float y3 = s3 + v3;
 		s3 = 2.0f * y3 - s3;
+
+		float y3_sat = tanh_fast_high(y3);
+		float v4 = (y3_sat - s4) * G;
+		float y4 = s4 + v4;
 		s4 = 2.0f * y4 - s4;
 
 		outBuf[i] = y4 * V_t;
