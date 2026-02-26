@@ -242,7 +242,10 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 		float drive_in = inInter[i] * inv_Vt;
 
 		// Calculate what the feedback will be right now
-		float feedback = (G*G*G*G * drive_in + G*G*G * S1 + G*G * S2 + G * S3 + S4) / (1.0f + k * G*G*G*G);
+		float linear_feedback = (G*G*G*G * drive_in + G*G*G * S1 + G*G * S2 + G * S3 + S4) / (1.0f + k * G*G*G*G);
+
+		// Process the non-linear stages once using the saturated feedback
+		float feedback = tanh_fast_low(linear_feedback);
 
 		// Process the non-linear stages using the instantaneous feedback
 		float x = drive_in - k * feedback;
@@ -313,7 +316,10 @@ void Fauna::process_right(const ProcessArgs &args, int oversample_protected, flo
 		float drive_in = inInter[i] * inv_Vt;
 
 		// Calculate what the feedback will be right now
-		float feedback = (G*G*G*G * drive_in + G*G*G * S1 + G*G * S2 + G * S3 + S4) / (1.0f + k * G*G*G*G);
+		float linear_feedback = (G*G*G*G * drive_in + G*G*G * S1 + G*G * S2 + G * S3 + S4) / (1.0f + k * G*G*G*G);
+
+		// Process the non-linear stages once using the saturated feedback
+		float feedback = tanh_fast_low(linear_feedback);
 
 		// Process the non-linear stages using the instantaneous feedback
 		float x = drive_in - k * feedback;
