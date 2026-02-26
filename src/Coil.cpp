@@ -210,7 +210,7 @@ struct Coil : Module {
         configParam<Param3Digits>(TENSION_PARAM, 0.1f, 0.95f, 0.4f, "Tension", "");
         configParam<Param3Digits>(INERTIA_PARAM, 20.f, 160.f, 50.f, "Inertia", "");
         configParam(DAMP_PARAM, 0.f, 1.f, 0.75f, "Damp", "", FREQ_MAX/FREQ_MIN, FREQ_MIN);
-        configParam<Param3Digits>(SCATTER_PARAM, 0.1f, 4.0f, 1.0f, "Spacing");
+        configParam<Param3Digits>(SCATTER_PARAM, 0.1f, 2.0f, 1.0f, "Spacing");
 
         configInput(SCATTER_CV, "Spacing CV");
         configInput(DRIVE_CV, "Drive CV");
@@ -320,8 +320,8 @@ struct Coil : Module {
         if (++stepCounter >= 32) {
             stepCounter = 0;
 
-            float spacing = params[SCATTER_PARAM].getValue() + (inputs[SCATTER_CV].getVoltage() * 0.6f);
-            spacing = clamp(spacing, 0.05f, 6.0f);
+            float spacing = params[SCATTER_PARAM].getValue() + (inputs[SCATTER_CV].getVoltage() * 0.4f);
+            spacing = clamp(spacing, 0.05f, 4.0f);
             float tension = params[TENSION_PARAM].getValue() + (inputs[TENSION_CV].getVoltage() * 0.1f);
             tension = clamp(tension, 0.05f, 0.95f);
 
@@ -474,7 +474,7 @@ struct CoilWidget : ModuleWidget {
         // Row 2.5:
         auto* scatterKnob = createParamCentered<AutinnArcSmallKnob>(Vec(div2*1.f, 195.f), module, Coil::SCATTER_PARAM);
         scatterKnob->setModulation(Coil::SCATTER_CV, [](float cv, float val, float att) {
-            return clamp(val + cv * 0.6f, 0.05f, 6.0f);
+            return clamp(val + cv * 0.4f, 0.05f, 4.0f);
         });
         addParam(scatterKnob);
         addInput(createInputCentered<InPortAutinn>(Vec(div2*2.f, 195.f), module, Coil::SCATTER_CV));
