@@ -1129,18 +1129,10 @@ struct ScopeDisplay : OpaqueWidget {
 				const float btnW = colW * 0.25f;
 				const float space = colW * 0.04f;
 
-				// Right-click or header-click to close menu
-				if (e.button == GLFW_MOUSE_BUTTON_RIGHT || (e.button == GLFW_MOUSE_BUTTON_LEFT && e.pos.y < headerH)) {
-					showPolyMenu = false;
-					e.consume(this);
-					return;
-				}
-
-				if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
+				if (e.button == GLFW_MOUSE_BUTTON_LEFT && e.pos.y < headerH) {
 					const int ch = clamp((int)(e.pos.x / colW), 0, 3);
 					float channelX = float(ch) * colW;
 
-					// AC/DC toggle
 					float acW = colW * 0.22f;
 					float acH = headerH * 0.45f;
 					float acX = channelX + colW - acW - (colW * 0.05f);
@@ -1151,7 +1143,19 @@ struct ScopeDisplay : OpaqueWidget {
 						module->acCoupled[ch].store(!module->acCoupled[ch].load());
 						e.consume(this);
 						return;
-						}
+					}
+				}
+
+				// Right-click or header-click to close menu
+				if (e.button == GLFW_MOUSE_BUTTON_RIGHT || (e.button == GLFW_MOUSE_BUTTON_LEFT && e.pos.y < headerH)) {
+					showPolyMenu = false;
+					e.consume(this);
+					return;
+				}
+
+				if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
+					const int ch = clamp((int)(e.pos.x / colW), 0, 3);
+					float channelX = float(ch) * colW;
 
 					int activePoly = module->polyCount[ch].load();
 					if (activePoly <= 0) {
