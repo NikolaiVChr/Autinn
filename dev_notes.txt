@@ -39,7 +39,7 @@ Module       Oversampling              Notes
 -------------------------------------------------------------------------------
 Fil          Selectable (2x, 4x, 8x)   Defaults to 4x
 Nap          Selectable (2x, 4x)       Defaults to 2x
-Fauna        Selectable (2x, 4x)       Defaults to 2x
+Fauna        2x (Fixed)
 Flora        8x (Dynamic)
 Bass         Selectable (2x, 4x)       Defaults to 2x
 Zod          4x (Fixed)
