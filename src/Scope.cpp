@@ -164,8 +164,6 @@ struct Scope : Module {
 
 	dsp::SchmittTrigger trigSchmitt;
 	dsp::BooleanTrigger trigPulse;
-	dsp::BooleanTrigger modeBtnTrig;
-	dsp::BooleanTrigger edgeBtnTrig;
 	dsp::BooleanTrigger freezeBtnTrig;
 	dsp::BooleanTrigger autoTimeBtnTrig;
 	dsp::BooleanTrigger statsBtnTrig;
@@ -224,8 +222,6 @@ struct Scope : Module {
 	std::vector<int> xySourceY = {1, 3};
 
 	// controls
-	bool trigModeKnob = false;
-	bool trigEdgeBtn = false;
 	bool autotimeBtn = false;
 	bool freezeBtn = false;
 	bool statsBtn = false;
@@ -258,8 +254,8 @@ struct Scope : Module {
 		// Trigger
 		configParam(TRIG_LEVEL_PARAM, -10.0f, 10.0f, 0.0f, "Trigger threshold", " V");
 		configSwitch(TRIG_SOURCE_PARAM, 0.0f, 4.0f, 0.0f, "Trigger source", {"Channel A", "Channel B", "Channel C", "Channel D", "Ext. trigger"});
-		configButton(TRIG_MODE_PARAM, "Trigger mode");
-		configButton(TRIG_EDGE_PARAM, "Trigger edge");
+		configSwitch(TRIG_MODE_PARAM, 0.0f, 3.0f, 0.0f, "Trigger mode", {"Auto", "Norm", "Single", "X-Y"});
+		configSwitch(TRIG_EDGE_PARAM, 0.0f, 1.0f, 0.0f, "Trigger edge", {"Rising edge", "Falling edge"});
 		configButton(FREEZE_PARAM, "Freeze");
 		configButton(AUTO_TIME_PARAM, "Auto time");
 		configButton(STATS_PARAM, "Cycle stats");
@@ -338,8 +334,6 @@ struct Scope : Module {
 		}
 		trigSchmitt.reset();
 		trigPulse.reset();
-		modeBtnTrig.reset();
-		edgeBtnTrig.reset();
 		freezeBtnTrig.reset();
 		autoTimeBtnTrig.reset();
 		statsBtnTrig.reset();
@@ -378,8 +372,6 @@ struct Scope : Module {
 
 	json_t* dataToJson() override {
 		json_t* rootJ = json_object();
-		json_object_set_new(rootJ, "trigMode", json_integer(trigMode));
-		json_object_set_new(rootJ, "trigEdge", json_boolean(trigEdge));
 		json_object_set_new(rootJ, "autoTimeMode", json_boolean(autoTimeMode));
 		json_object_set_new(rootJ, "showStats", json_integer(showStats));
 		json_object_set_new(rootJ, "showGrid", json_boolean(showGrid));
@@ -434,10 +426,18 @@ struct Scope : Module {
 		}
 
 		json_t* mJ = json_object_get(rootJ, "trigMode");
-		if (mJ) trigMode = int(json_integer_value(mJ));
+		if (mJ) {
+			// backwards compat
+			trigMode = int(json_integer_value(mJ));
+			params[TRIG_MODE_PARAM].setValue(trigMode);
+		}
 
 		json_t* eJ = json_object_get(rootJ, "trigEdge");
-		if (eJ) trigEdge = json_is_true(eJ);
+		if (eJ) {
+			// backwards compat
+			trigEdge = json_is_true(eJ);
+			params[TRIG_EDGE_PARAM].setValue(trigEdge==TRIG_EDGE_RISE?0.0f:1.0f);
+		}
 
 		json_t* aJ = json_object_get(rootJ, "autoTimeMode");
 		if (aJ) autoTimeMode = json_is_true(aJ);
@@ -849,8 +849,8 @@ struct Scope : Module {
 
 	void readControls() {
 		const int sourceBtn = (int)std::round(params[TRIG_SOURCE_PARAM].getValue());
-		trigModeKnob = (bool)params[TRIG_MODE_PARAM].getValue();
-		trigEdgeBtn = (bool)params[TRIG_EDGE_PARAM].getValue();
+		const int trigModeKnob = (int)std::round(params[TRIG_MODE_PARAM].getValue());
+		const int trigEdgeBtn = (int)std::round(params[TRIG_EDGE_PARAM].getValue());
 		freezeBtn = (bool)params[FREEZE_PARAM].getValue();
 		autotimeBtn = (bool)params[AUTO_TIME_PARAM].getValue();
 		statsBtn = (bool)params[STATS_PARAM].getValue();
@@ -883,8 +883,8 @@ struct Scope : Module {
 			recording = false;
 			clearFreqHistory();
 		}
-		if (modeBtnTrig.process(trigModeKnob)) {
-			trigMode = (trigMode + 1) % 4;
+		if (trigModeKnob != trigMode) {
+			trigMode = trigModeKnob;
 			if (trigMode == TRIG_MODE_XY) frozen = false;
 			prev_triggerValid = false;
 			triggerValid = false;
@@ -892,8 +892,8 @@ struct Scope : Module {
 			recording = false;
 			clearFreqHistory();
 		}
-		if (edgeBtnTrig.process(trigEdgeBtn)) {
-			trigEdge = !trigEdge;
+		if ((trigEdgeBtn == 0 && trigEdge == TRIG_EDGE_FALL) || (trigEdgeBtn == 1 && trigEdge == TRIG_EDGE_RISE)) {
+			trigEdge = trigEdgeBtn == 1?TRIG_EDGE_FALL:TRIG_EDGE_RISE;
 			clearFreqHistory();
 		}
 		if (autoTimeBtnTrig.process(autotimeBtn)) {
@@ -2609,13 +2609,13 @@ struct ScopeWidget : ModuleWidget {
 		addParam(createParamCentered<RoundCycleButtonSmallAutinn>(Vec(xTrigBtns, yRow1), module, Scope::TRIG_SOURCE_PARAM));
 		addChild(createLightCentered<LargeLight<RedGreenBlueLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1), module, Scope::TRIG_SOURCE_LIGHT_RGB));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow1 + btnSpacingY*2.0f), module, Scope::TRIG_MODE_PARAM));
+		addParam(createParamCentered<RoundCycleButtonSmallAutinn>(Vec(xTrigBtns, yRow1 + btnSpacingY*2.0f), module, Scope::TRIG_MODE_PARAM));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f - lightSpacingY), module, Scope::TRIG_MODE_AUTO_LIGHT));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f), module, Scope::TRIG_MODE_NORM_LIGHT));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f + lightSpacingY), module, Scope::TRIG_MODE_SOLO_LIGHT));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow1 + btnSpacingY*2.0f + lightSpacingY*2.0f), module, Scope::TRIG_MODE_XY_LIGHT));
 
-		addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xTrigBtns, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_PARAM));
+		addParam(createParamCentered<RoundCycleButtonSmallAutinn>(Vec(xTrigBtns, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_PARAM));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + btnSpacingY), module, Scope::TRIG_EDGE_RISE_LIGHT));
 		addChild(createLightCentered<SmallLight<WhiteLight>>(Vec(xTrigBtns + btnLightOffsetX, yRow2 + lightSpacingY + btnSpacingY), module, Scope::TRIG_EDGE_FALL_LIGHT));
 
