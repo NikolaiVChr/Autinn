@@ -247,34 +247,36 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 		float k = 4.0f * r;
 		float drive_in = inInter[i] * inv_Vt;
 
-		/// Use the 4th capacitor state from the previous tick.
-		float x = drive_in - k * s4;
+		// Solve the feedback loop using the current state of the filters
+		// but limit the feedback gain slightly to prevent the Notch overshoot.
+		float feedback = tanh_fast_low(s4);
+		float x = drive_in - k * feedback;
 
+		// Process each stage with Trapezoidal Integration (TPT)
 		// Stage 1
-		float in1 = tanh_fast_high(x);
-		float v1 = (in1 - s1) * G;
+		float y0 = tanh_fast_high(x);
+		float v1 = (y0 - s1) * G;
 		float y1 = s1 + v1;
-		s1 += 2.0f * v1;
+		s1 = 2.0f * y1 - s1;
 
 		// Stage 2
-		float in2 = tanh_fast_high(y1);
-		float v2 = (in2 - s2) * G;
+		float y1_sat = tanh_fast_high(y1);
+		float v2 = (y1_sat - s2) * G;
 		float y2 = s2 + v2;
-		s2 += 2.0f * v2;
+		s2 = 2.0f * y2 - s2;
 
 		// Stage 3
-		float in3 = tanh_fast_high(y2);
-		float v3 = (in3 - s3) * G;
+		float y2_sat = tanh_fast_high(y2);
+		float v3 = (y2_sat - s3) * G;
 		float y3 = s3 + v3;
-		s3 += 2.0f * v3;
+		s3 = 2.0f * y3 - s3;
 
 		// Stage 4
-		float in4 = tanh_fast_high(y3);
-		float v4 = (in4 - s4) * G;
+		float y3_sat = tanh_fast_high(y3);
+		float v4 = (y3_sat - s4) * G;
 		float y4 = s4 + v4;
-		s4 += 2.0f * v4;
+		s4 = 2.0f * y4 - s4;
 
-		// Convert unitless tanh domain back to Moog voltages
 		outBuf[i] = y4 * V_t;
 	}
 	float out;
