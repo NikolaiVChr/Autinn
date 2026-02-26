@@ -28,9 +28,9 @@
 #define FREQ_MAX 20000.0f         // beyond 18000 it does not react well and g is very out of tune at higher frequencies anyway.
 #define RESONANCE_MAX 1.0f
 
-static const int oversample2 = 2;
-static const int oversample4 = 4;
-static const int oversample8 = 8;
+static constexpr int oversample2 = 2;
+static constexpr int oversample4 = 4;
+static constexpr int oversample8 = 8;
 
 struct Fauna : Module {
 	enum ParamIds {
@@ -124,7 +124,7 @@ struct Fauna : Module {
 	void process(const ProcessArgs &args) override;
 	void process_left(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive);
 	void process_right(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive);
-	float toExp(float x);
+	static float toExp(float x);
 
 	json_t *dataToJson() override {
 		json_t *root = json_object();
@@ -243,34 +243,34 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 	}
 
 	for (int i = 0; i < oversample_protected; i++) {
+		float G = g / (1.0f + g);
 		float k = 4.0f * r;
 		float drive_in = inInter[i] * inv_Vt;
 
-		// Use the 4th capacitor state from the previous tick.
-		// Zero prediction math, zero phantom feedback, super light on CPU.
+		/// Use the 4th capacitor state from the previous tick.
 		float x = drive_in - k * s4;
 
 		// Stage 1
 		float in1 = tanh_fast_high(x);
-		float v1 = (in1 - s1) * G1;
+		float v1 = (in1 - s1) * G;
 		float y1 = s1 + v1;
 		s1 += 2.0f * v1;
 
 		// Stage 2
 		float in2 = tanh_fast_high(y1);
-		float v2 = (in2 - s2) * G2;
+		float v2 = (in2 - s2) * G;
 		float y2 = s2 + v2;
 		s2 += 2.0f * v2;
 
 		// Stage 3
 		float in3 = tanh_fast_high(y2);
-		float v3 = (in3 - s3) * G3;
+		float v3 = (in3 - s3) * G;
 		float y3 = s3 + v3;
 		s3 += 2.0f * v3;
 
 		// Stage 4
 		float in4 = tanh_fast_high(y3);
-		float v4 = (in4 - s4) * G4;
+		float v4 = (in4 - s4) * G;
 		float y4 = s4 + v4;
 		s4 += 2.0f * v4;
 
@@ -306,67 +306,51 @@ void Fauna::process_right(const ProcessArgs &args, int oversample_protected, flo
 	}
 
 	for (int i = 0; i < oversample_protected; i++) {
-		// Calculate the instantaneous feedback (Linear resolution)
 		float G = g / (1.0f + g);
 		float S1 = s1_r / (1.0f + g);
 		float S2 = s2_r / (1.0f + g);
 		float S3 = s3_r / (1.0f + g);
 		float S4 = s4_r / (1.0f + g);
 
-		// Resonance factor (4.0 = self oscillation)
 		float k = 4.0f * r;
-
-		// Convert input to thermal voltage domain
 		float drive_in = inInter[i] * inv_Vt;
 
-		float y4 = S4;
-		float in1 = 0.0f, in2 = 0.0f, in3 = 0.0f, in4 = 0.0f;
-		float out1 = 0.0f, out2 = 0.0f, out3 = 0.0f;
+		float x = drive_in - k * s4_r;
+
+		float t1 = 0.0f, t2 = 0.0f, t3 = 0.0f, t4 = 0.0f;
+		float y1 = 0.0f, y2 = 0.0f, y3 = 0.0f, y4 = 0.0f;
 
 		for (int iter = 0; iter < 3; iter++) {
-			float x = drive_in - k * y4;
-			in1 = tanh_fast_low(x);
-			out1 = in1 * G + S1;
+			t1 = tanh_fast_high(x);
+			y1 = t1 * G + S1;
 
-			in2 = tanh_fast_low(out1);
-			out2 = in2 * G + S2;
+			t2 = tanh_fast_high(y1);
+			y2 = t2 * G + S2;
 
-			in3 = tanh_fast_low(out2);
-			out3 = in3 * G + S3;
+			t3 = tanh_fast_high(y2);
+			y3 = t3 * G + S3;
 
-			in4 = tanh_fast_low(out3);
-			y4 = in4 * G + S4;
+			t4 = tanh_fast_high(y3);
+			y4 = t4 * G + S4;
+
+			float fx = x - drive_in + k * y4;
+
+			float dt1 = 1.0f - t1 * t1;
+			float dt2 = 1.0f - t2 * t2;
+			float dt3 = 1.0f - t3 * t3;
+			float dt4 = 1.0f - t4 * t4;
+
+			float dfx = 1.0f + k * G * G * G * G * dt1 * dt2 * dt3 * dt4;
+
+			x -= fx / dfx;
 		}
 
-		// Now that we have the exact feedback (y4), do a high-quality pass for the audio
-		float x_final = drive_in - k * y4;
+		s1_r = 2.0f * y1 - s1_r;
+		s2_r = 2.0f * y2 - s2_r;
+		s3_r = 2.0f * y3 - s3_r;
+		s4_r = 2.0f * y4 - s4_r;
 
-		// Stage 1
-		float in1_final = tanh_fast_high(x_final);
-		float v1 = (in1_final - s1_r) * G;
-		float y1_final = s1_r + v1;
-		s1_r += 2.0f * v1;
-
-		// Stage 2
-		float in2_final = tanh_fast_high(y1_final);
-		float v2 = (in2_final - s2_r) * G;
-		float y2_final = s2_r + v2;
-		s2_r += 2.0f * v2;
-
-		// Stage 3
-		float in3_final = tanh_fast_high(y2_final);
-		float v3 = (in3_final - s3_r) * G;
-		float y3_final = s3_r + v3;
-		s3_r += 2.0f * v3;
-
-		// Stage 4
-		float in4_final = tanh_fast_high(y3_final);
-		float v4 = (in4_final - s4_r) * G;
-		float final_out = s4_r + v4;
-		s4_r += 2.0f * v4;
-
-		// Convert unitless tanh domain back to Moog voltages
-		outBuf[i] = final_out * V_t;
+		outBuf[i] = y4 * V_t;
 	}
 	float out;
 	if (oversample_protected == oversample2) {
