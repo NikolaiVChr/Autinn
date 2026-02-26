@@ -292,7 +292,8 @@ struct InPortAutinn : ThemedSvgPort {
 struct AutinnCycleButton : app::SvgSwitch {
 	int framesDown = 0;
 	AutinnCycleButton() {
-		momentary = true; // Prevents the widget from resetting the multi-state param to 0
+		momentary = false; // Prevents the widget from resetting the multi-state param to 0
+		latch = true;
 	}
 };
 
