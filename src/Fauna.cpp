@@ -242,41 +242,54 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 		// Convert input to thermal voltage domain
 		float drive_in = inInter[i] * inv_Vt;
 
-		// Calculate what the feedback will be right now
-		float linear_feedback = (G*G*G*G * drive_in + G*G*G * S1 + G*G * S2 + G * S3 + S4) / (1.0f + k * G*G*G*G);
+		float y4 = S4;
+		float in1 = 0.0f, in2 = 0.0f, in3 = 0.0f, in4 = 0.0f;
+		float out1 = 0.0f, out2 = 0.0f, out3 = 0.0f;
 
-		// Process the non-linear stages once using the saturated feedback
-		float feedback = tanh_fast_low(linear_feedback);
+		for (int iter = 0; iter < 3; iter++) {
+			float x = drive_in - k * y4;
+			in1 = tanh_fast_low(x);
+			out1 = in1 * G + S1;
 
-		// Process the non-linear stages using the instantaneous feedback
-		float x = drive_in - k * feedback;
+			in2 = tanh_fast_low(out1);
+			out2 = in2 * G + S2;
+
+			in3 = tanh_fast_low(out2);
+			out3 = in3 * G + S3;
+
+			in4 = tanh_fast_low(out3);
+			y4 = in4 * G + S4;
+		}
+
+		// 3. Now that we have the exact feedback (y4), do ONE high-quality pass for the audio
+		float x_final = drive_in - k * y4;
 
 		// Stage 1
-		float in1 = tanh_fast_high(x);
-		float v1 = (in1 - s1) * G;
-		float y1 = s1 + v1;
+		float in1_final = tanh_fast_high(x_final);
+		float v1 = (in1_final - s1) * G;
+		float y1_final = s1 + v1;
 		s1 += 2.0f * v1;
 
 		// Stage 2
-		float in2 = tanh_fast_high(y1);
-		float v2 = (in2 - s2) * G;
-		float y2 = s2 + v2;
+		float in2_final = tanh_fast_high(y1_final);
+		float v2 = (in2_final - s2) * G;
+		float y2_final = s2 + v2;
 		s2 += 2.0f * v2;
 
 		// Stage 3
-		float in3 = tanh_fast_high(y2);
-		float v3 = (in3 - s3) * G;
-		float y3 = s3 + v3;
+		float in3_final = tanh_fast_high(y2_final);
+		float v3 = (in3_final - s3) * G;
+		float y3_final = s3 + v3;
 		s3 += 2.0f * v3;
 
 		// Stage 4
-		float in4 = tanh_fast_high(y3);
-		float v4 = (in4 - s4) * G;
-		float y4 = s4 + v4;
+		float in4_final = tanh_fast_high(y3_final);
+		float v4 = (in4_final - s4) * G;
+		float final_out = s4 + v4;
 		s4 += 2.0f * v4;
 
 		// Convert unitless tanh domain back to Moog voltages
-		outBuf[i] = y4 * V_t;
+		outBuf[i] = final_out * V_t;
 	}
 	float out;
 	if (oversample_protected == oversample2) {
