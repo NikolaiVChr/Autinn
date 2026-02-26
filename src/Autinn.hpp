@@ -289,6 +289,52 @@ struct InPortAutinn : ThemedSvgPort {
 	}
 };
 
+struct AutinnCycleButton : app::SvgSwitch {
+	int framesDown = 0;
+	AutinnCycleButton() {
+		momentary = false; // Prevents the widget from resetting the multi-state param to 0
+	}
+	void onDragStart(const event::DragStart& e) override {
+		if (e.button != GLFW_MOUSE_BUTTON_LEFT) return;
+
+		// Manually step the parameter value forward and wrap around
+		if (getParamQuantity()) {
+			float val = std::round(getParamQuantity()->getValue());
+			float max = getParamQuantity()->getMaxValue();
+			float min = getParamQuantity()->getMinValue();
+
+			val += 1.0f;
+			if (val > max) val = min;
+
+			getParamQuantity()->setValue(val);
+		}
+
+		// Set visual depressed state for a few frames
+		framesDown = 6;
+		e.consume(this);
+	}
+	void step() override {
+		ParamWidget::step(); // Updates the param normally
+		if (!sw || frames.empty()) return;
+		if (framesDown > 0) {
+			framesDown--;
+			if (frames.size() > 1) {
+				sw->setSvg(frames[1]); // Force depressed visual
+			}
+		} else {
+			sw->setSvg(frames[0]); // Force un-depressed visual
+		}
+	}
+};
+
+struct RoundCycleButtonSmallAutinn : AutinnCycleButton {
+	RoundCycleButtonSmallAutinn() {
+		if (!pluginInstance) return;
+		addFrame(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinn.svg")));
+		addFrame(Svg::load(asset::plugin(pluginInstance, "res/ComponentLibrary/RoundButtonSmallAutinnDown.svg")));
+	}
+};
+
 struct RoundButtonAutinn : app::SvgSwitch {
 	RoundButtonAutinn() {
 		if (!pluginInstance) return;
