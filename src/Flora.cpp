@@ -28,8 +28,9 @@
 #define FREQ_MAX 18000.0f         // beyond 18000 it does not react well and g is very out of tune at higher frequencies anyway.
 #define RESONANCE_MAX 1.0f
 
-static const int oversample2 = 2;
-static const int oversample4 = 4;
+static constexpr int oversample2 = 2;
+static constexpr int oversample4 = 4;
+static constexpr int oversample8 = 8;
 
 struct Flora : Module {
 	enum ParamIds {
@@ -64,7 +65,6 @@ struct Flora : Module {
 	//float V_t = 2.0f * t * Boltzman; // thermal voltage * 2 (should be divided by q also). Thermal V should be around 0.026V, times 2 its 0.052. Something divided by that gets multiplied by 19.23.
 	const float V_t = 2.0f * 0.026f;// more standard 2xthermalvoltage.
 	const float inv_Vt = 1.0f / V_t;
-	const float analog_offset = 1e-4f;
 
 	float r = 0.0f;
 	float Gres = 1.0f;
@@ -102,6 +102,8 @@ struct Flora : Module {
 	dsp::Decimator<oversample2, 10> decimator2;
 	dsp::Upsampler<oversample4, 10> upsampler4;
 	dsp::Decimator<oversample4, 10> decimator4;
+	dsp::Upsampler<oversample8, 10> upsampler8;
+	dsp::Decimator<oversample8, 10> decimator8;
 
 	// RIGHT
 	
@@ -127,6 +129,8 @@ struct Flora : Module {
 	dsp::Decimator<oversample2, 10> decimator2_right;
 	dsp::Upsampler<oversample4, 10> upsampler4_right;
 	dsp::Decimator<oversample4, 10> decimator4_right;
+	dsp::Upsampler<oversample8, 10> upsampler8_right;
+	dsp::Decimator<oversample8, 10> decimator8_right;
 
 	
 
@@ -154,7 +158,7 @@ struct Flora : Module {
 	void process(const ProcessArgs &args) override;
 	void process_left(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive);
 	void process_right(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive);
-	float toExp(float x);
+	static float toExp(float x);
 
 	json_t *dataToJson() override {
 		json_t *root = json_object();
@@ -174,7 +178,7 @@ struct Flora : Module {
 		json_t *ext3 = json_object_get(rootJ, "oversample");
 		if (ext3) {
 			current_oversample = json_integer_value(ext3);
-			if (current_oversample != 2 and current_oversample != 4) {
+			if (current_oversample != 2 and current_oversample != 4 and current_oversample != 8) {
 				current_oversample = 4;
 			}
 		}
@@ -188,11 +192,11 @@ struct Flora : Module {
 	}
 };
 
-static const float LOG_FREQ_RANGE = float(log(FREQ_MAX/FREQ_MIN));
+static const float LOG_FREQ_RANGE = logf(FREQ_MAX/FREQ_MIN);
 
-float Flora::toExp(float x) {
+float Flora::toExp(const float x) {
 	// 0 to 1 to exp range
-	return FREQ_MIN * exp( x*LOG_FREQ_RANGE );
+	return FREQ_MIN * expf( x*LOG_FREQ_RANGE );
 }
 
 
@@ -268,13 +272,15 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 	float outBuf  [oversample_protected];
 	if (oversample_protected == oversample2) {
 		upsampler2.process(in, inInter);
-	} else {
+	} else if (oversample_protected == oversample4) {
 		upsampler4.process(in, inInter);
+	} else {
+		upsampler8.process(in, inInter);
 	}
 
 	for (int i = 0; i < oversample_protected; i++) {
 		// x is the voltage over the capacitor in the first stage:
-		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev+y_d_prev_prev) + analog_offset;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
+		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev+y_d_prev_prev);//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
@@ -305,8 +311,10 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 	float out;
 	if (oversample_protected == oversample2) {
 		out = decimator2.process(outBuf);
-	} else {
+	} else if (oversample_protected == oversample4) {
 		out = decimator4.process(outBuf);
+	} else {
+		out = decimator8.process(outBuf);
 	}
 	if(!std::isfinite(out) || out > 100.0f || out < -100.0f) {
 		out = 0.0f;
@@ -327,15 +335,18 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 	float in = inputs[FLORA_INPUT2].getVoltage()*drive*VCV_TO_MOOG*INPUT_TO_CAPACITOR;
 	float inInter [oversample_protected];
 	float outBuf  [oversample_protected];
+
 	if (oversample_protected == oversample2) {
 		upsampler2_right.process(in, inInter);
-	} else {
+	} else if (oversample_protected == oversample4) {
 		upsampler4_right.process(in, inInter);
+	} else {
+		upsampler8_right.process(in, inInter);
 	}
 
 	for (int i = 0; i < oversample_protected; i++) {
 		// x is the voltage over the capacitor in the first stage:
-		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev_right+y_d_prev_prev_right) + analog_offset;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
+		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev_right+y_d_prev_prev_right);//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
@@ -366,8 +377,10 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 	float out;
 	if (oversample_protected == oversample2) {
 		out = decimator2_right.process(outBuf);
-	} else {
+	} else if (oversample_protected == oversample4) {
 		out = decimator4_right.process(outBuf);
+	} else {
+		out = decimator8_right.process(outBuf);
 	}
 	if(!std::isfinite(out) || out > 100.0f || out < -100.0f) {
 		out = 0.0f;
@@ -504,6 +517,7 @@ struct FloraWidget : ModuleWidget {
 		menu->addChild(new MenuLabel());
 		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x2", 2));
 		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x4", 4));
+		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x8", 8));
 		menu->addChild(new MenuLabel());
 		menu->addChild(new AutoLevelMenuItem(a, "Auto level"));
 	}

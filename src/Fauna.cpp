@@ -300,11 +300,11 @@ void Fauna::process_right(const ProcessArgs &args, int oversample_protected, flo
 	float inInter [oversample_protected];
 	float outBuf  [oversample_protected];
 	if (oversample_protected == oversample2) {
-		upsampler2.process(in, inInter);
+		upsampler2_right.process(in, inInter);
 	} else if (oversample_protected == oversample4) {
-		upsampler4.process(in, inInter);
+		upsampler4_right.process(in, inInter);
 	} else {
-		upsampler8.process(in, inInter);
+		upsampler8_right.process(in, inInter);
 	}
 
 	for (int i = 0; i < oversample_protected; i++) {
@@ -356,11 +356,11 @@ void Fauna::process_right(const ProcessArgs &args, int oversample_protected, flo
 	}
 	float out;
 	if (oversample_protected == oversample2) {
-		out = decimator2.process(outBuf);
+		out = decimator2_right.process(outBuf);
 	} else if (oversample_protected == oversample4) {
-		out = decimator4.process(outBuf);
+		out = decimator4_right.process(outBuf);
 	} else {
-		out = decimator8.process(outBuf);
+		out = decimator8_right.process(outBuf);
 	}
 	if(!std::isfinite(out) || out > 100.0f || out < -100.0f) {
 		out = 0.0f;
