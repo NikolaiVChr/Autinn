@@ -224,8 +224,8 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 		// Pure Linear ZDF Feedback Prediction
 		const float feedback_linear = (G4 * drive_in + G3 * S1 + G2 * S2 + G * S3 + S4) / (1.0f + k * G4);
 
-		// Saturate the prediction to prevent the Notch overshoot
-		const float feedback = tanh_fast_high(feedback_linear);
+		// Use a hard clamp strictly to prevent NaN blowouts under heavy drive.
+		const float feedback = clamp(feedback_linear, -2.0f, 2.0f);
 
 		const float x = drive_in - k * feedback;
 
@@ -285,8 +285,8 @@ void Fauna::process_right(const ProcessArgs &args, int oversample_protected, flo
 		// Pure Linear ZDF Feedback Prediction
 		const float feedback_linear = (G4 * drive_in + G3 * S1 + G2 * S2 + G * S3 + S4) / (1.0f + k * G4);
 
-		// Saturate the prediction to prevent the Notch overshoot
-		const float feedback = feedback_linear;
+		// Use a hard clamp strictly to prevent NaN blowouts under heavy drive.
+		const float feedback = clamp(feedback_linear, -2.0f, 2.0f);
 
 		const float x = drive_in - k * feedback;
 

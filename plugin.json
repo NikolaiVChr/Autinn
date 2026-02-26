@@ -127,9 +127,8 @@
     {
       "slug": "Fauna",
       "name": "Fauna",
-      "description": "A 24dB low-pass filter emulating a 4-pole transistor ladder",
+      "description": "A 24dB low-pass filter emulating a 4-pole transistor ladder (ZDF)",
       "keywords": "24db ladder",
-      "hidden": true,
       "tags": [
         "Filter",
         "Physical modeling",
