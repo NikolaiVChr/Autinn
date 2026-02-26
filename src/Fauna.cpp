@@ -4,7 +4,7 @@
 /*
 
     Autinn VCV Rack Plugin
-    Copyright (C) 2021  Nikolai V. Chr.
+    Copyright (C) 2026  Nikolai V. Chr.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 #define INPUT_TO_CAPACITOR 0.05f  // factor for input voltage to voltage over capacitor in first stage. 0.035 is when +-5V input, will match the g tuning, but a little higher for effect.
 #define DRIVE_MAX 4.0f
 #define FREQ_MIN 20.0f            // standard Moog minimum cutoff
-#define FREQ_MAX 18000.0f         // beyond 18000 it does not react well and g is very out of tune at higher frequencies anyway.
+#define FREQ_MAX 20000.0f         // beyond 18000 it does not react well and g is very out of tune at higher frequencies anyway.
 #define RESONANCE_MAX 1.0f
 
 static const int oversample2 = 2;
@@ -179,6 +179,7 @@ void Fauna::process(const ProcessArgs &args) {
 	// TODO: Higher pole decimation filters. [done]
 	// TODO: Switch decimation and upsampling filters to Rack API. [done]
 	// TODO: Add auto level option in context menu to counter low drive settings. [done]
+	// TODO: Implement zero-delay feedback [done]
 
 
 	if (!outputs[FAUNA_OUTPUT].isConnected()) {
@@ -407,7 +408,7 @@ struct OversampleFaunaMenuItem : MenuItem {
 struct FaunaWidget : ModuleWidget {
 	FaunaWidget(Fauna *module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/RetriModule.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/FaunaModule.svg")));
 
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
