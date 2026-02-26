@@ -295,23 +295,12 @@ struct AutinnCycleButton : app::SvgSwitch {
 		momentary = false; // Prevents the widget from resetting the multi-state param to 0
 	}
 	void onDragStart(const event::DragStart& e) override {
-		if (e.button != GLFW_MOUSE_BUTTON_LEFT) return;
+		// Let Rack natively handle all the value incrementing and wrap-around math!
+		app::SvgSwitch::onDragStart(e);
 
-		// Manually step the parameter value forward and wrap around
-		if (getParamQuantity()) {
-			float val = std::round(getParamQuantity()->getValue());
-			float max = getParamQuantity()->getMaxValue();
-			float min = getParamQuantity()->getMinValue();
-
-			val += 1.0f;
-			if (val > max) val = min;
-
-			getParamQuantity()->setValue(val);
+		if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
+			framesDown = 6; // Trigger our visual bounce animation
 		}
-
-		// Set visual depressed state for a few frames
-		framesDown = 6;
-		e.consume(this);
 	}
 	void step() override {
 		ParamWidget::step(); // Updates the param normally
