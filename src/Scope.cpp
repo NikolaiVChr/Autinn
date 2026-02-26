@@ -218,7 +218,7 @@ struct Scope : Module {
 	int showStats = STATS_ONE;
 	int autoTimePeriods = 3;
 	bool cvMode[4] = {false, false, false, false};
-	bool acCoupled[4] = {false, false, false, false};
+	std::atomic<bool> acCoupled[4]{};
 	std::vector<int> xySourceX = {0, 2};
 	std::vector<int> xySourceY = {1, 3};
 
@@ -329,7 +329,7 @@ struct Scope : Module {
 				filter.reset();
 			}
 			cvMode[c] = false;
-			acCoupled[c] = false;
+			acCoupled[c].store(false);
 			polyViewMask[c].store(0xFFFF);
 		}
 		trigSchmitt.reset();
@@ -387,7 +387,7 @@ struct Scope : Module {
 
 		json_t* acdcJ = json_array();
 		for (int i = 0; i < 4; i++) {
-			json_array_append_new(acdcJ, json_boolean(acCoupled[i]));
+			json_array_append_new(acdcJ, json_boolean(acCoupled[i].load()));
 		}
 		json_object_set_new(rootJ, "acCoupling", acdcJ);
 
@@ -459,16 +459,16 @@ struct Scope : Module {
 		json_t* acJ = json_object_get(rootJ, "acCoupled");
 		if (acJ) {
 			bool b = json_is_true(acJ);
-			acCoupled[0] = b;
-			acCoupled[1] = b;
-			acCoupled[2] = b;
-			acCoupled[3] = b;
+			acCoupled[0].store(b);
+			acCoupled[1].store(b);
+			acCoupled[2].store(b);
+			acCoupled[3].store(b);
 		} else {
 			json_t* modesJ = json_object_get(rootJ, "acCoupling");
 			if (modesJ) {
 				for (int i = 0; i < 4; i++) {
 					const json_t* ac2J = json_array_get(modesJ, i);
-					if (ac2J) acCoupled[i] = json_is_true(ac2J);
+					if (ac2J) acCoupled[i].store(json_is_true(ac2J));
 				}
 			}
 		}
@@ -549,7 +549,7 @@ struct Scope : Module {
 			for (int polyCh = 0; polyCh < activeChannels; polyCh++) {
 				float val = inputs[A_INPUT + c].getPolyVoltage(polyCh);
 
-				if (acCoupled[c]) {
+				if (acCoupled[c].load()) {
 					val = dcBlockers[c][polyCh].process(val);
 				}
 
@@ -1117,7 +1117,21 @@ struct ScopeDisplay : OpaqueWidget {
 				}
 
 				if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
-					int ch = clamp((int)(e.pos.x / colW), 0, 3);
+					const int ch = clamp((int)(e.pos.x / colW), 0, 3);
+					float channelX = float(ch) * colW;
+
+					// AC/DC toggle
+					float acW = colW * 0.22f;
+					float acH = headerH * 0.45f;
+					float acX = channelX + colW - acW - (colW * 0.05f);
+					float acY = headerH * 0.25f;
+
+					if (e.pos.x >= acX && e.pos.x <= acX + acW &&
+						e.pos.y >= acY && e.pos.y <= acY + acH) {
+						module->acCoupled[ch].store(!module->acCoupled[ch].load());
+						e.consume(this);
+						return;
+						}
 
 					int activePoly = module->polyCount[ch].load();
 					if (activePoly <= 0) {
@@ -1125,7 +1139,7 @@ struct ScopeDisplay : OpaqueWidget {
 						return;
 					}
 
-					float channelX = ch * colW;
+
 					float center = channelX + colW * 0.5f;
 
 					// Trigger Selection Row
@@ -1263,6 +1277,22 @@ struct ScopeDisplay : OpaqueWidget {
 			char headerText[8];
 			snprintf(headerText, sizeof(headerText), "CH %c", 'A' + channel);
 			nvgText(args.vg, center, headerH * 0.45f, headerText, nullptr);
+
+			// AC coupling
+			float acW = colW * 0.22f;
+			float acH = headerH * 0.45f;
+			float acX = channel_x + colW - acW - (colW * 0.05f);
+			float acY = headerH * 0.25f;
+			bool isAC = module->acCoupled[channel].load();
+
+			nvgBeginPath(args.vg);
+			nvgRoundedRect(args.vg, acX, acY, acW, acH, 2.0f);
+			nvgFillColor(args.vg, isAC ? themeColor : colorMenuGrayDark);
+			nvgFill(args.vg);
+
+			nvgFontSize(args.vg, 9.0f);
+			nvgFillColor(args.vg, isAC ? colorMenuInactiveText : colorMenuActiveText);
+			nvgText(args.vg, acX + acW * 0.5f, acY + acH * 0.5f + 1.0f, isAC ? "AC" : "DC", nullptr);
 
 			// Trigger Row
 			nvgFontSize(args.vg, 9.0f);
@@ -2414,11 +2444,11 @@ struct ACItem : MenuItem {
 	}
 
 	void onAction(const event::Action& e) override {
-		_module->acCoupled[_os] = !_module->acCoupled[_os];
+		_module->acCoupled[_os].store(!_module->acCoupled[_os].load());
 	}
 
 	void step() override {
-		rightText = _module->acCoupled[_os] ? "AC" : "DC";
+		rightText = _module->acCoupled[_os].load() ? "AC" : "DC";
 		MenuItem::step();
 	}
 };
