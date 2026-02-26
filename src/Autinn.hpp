@@ -294,26 +294,6 @@ struct AutinnCycleButton : app::SvgSwitch {
 	AutinnCycleButton() {
 		momentary = false; // Prevents the widget from resetting the multi-state param to 0
 	}
-	void onDragStart(const event::DragStart& e) override {
-		// Let Rack natively handle all the value incrementing and wrap-around math!
-		app::SvgSwitch::onDragStart(e);
-
-		if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
-			framesDown = 6; // Trigger our visual bounce animation
-		}
-	}
-	void step() override {
-		ParamWidget::step(); // Updates the param normally
-		if (!sw || frames.empty()) return;
-		if (framesDown > 0) {
-			framesDown--;
-			if (frames.size() > 1) {
-				sw->setSvg(frames[1]); // Force depressed visual
-			}
-		} else {
-			sw->setSvg(frames[0]); // Force un-depressed visual
-		}
-	}
 };
 
 struct RoundCycleButtonSmallAutinn : AutinnCycleButton {
