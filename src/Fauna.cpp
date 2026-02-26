@@ -316,13 +316,26 @@ void Fauna::process_right(const ProcessArgs &args, int oversample_protected, flo
 
 	for (int i = 0; i < oversample_protected; i++) {
 		float G = g / (1.0f + g);
+		float S1 = s1 / (1.0f + g);
+		float S2 = s2 / (1.0f + g);
+		float S3 = s3 / (1.0f + g);
+		float S4 = s4 / (1.0f + g);
+
 		float k = 4.0f * r;
 		float drive_in = inInter[i] * inv_Vt;
 
-		// 1-Pass feedback saturated immediately to prevent the linear notch
-		float feedback = tanh_fast_low(s4_r);
+		// Pure Linear ZDF Feedback Prediction
+		float G2 = G * G;
+		float G3 = G2 * G;
+		float G4 = G3 * G;
+		float feedback_linear = (G4 * drive_in + G3 * S1 + G2 * S2 + G * S3 + S4) / (1.0f + k * G4);
+
+		// Saturate the prediction to prevent the "Notch" overshoot
+		float feedback = tanh_fast_high(feedback_linear);
+
 		float x = drive_in - k * feedback;
 
+		// Audio path (1-pass explicit TPT updates)
 		float y0 = tanh_fast_high(x);
 		float v1 = (y0 - s1_r) * G;
 		float y1 = s1_r + v1;
