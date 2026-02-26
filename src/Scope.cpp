@@ -1,3 +1,5 @@
+#include <array>
+
 #include "Autinn.hpp"
 #include "Autinn-dsp.hpp"
 #include <cmath>
@@ -179,12 +181,12 @@ struct Scope : Module {
 	std::atomic<bool> recording = {false}; // We found trigger, we are now filling enough data into buffer to fill display.
 	std::atomic<bool> triggerValid = {false};       // triggerIndex is valid
 	std::atomic<bool> prev_triggerValid = {false};       // lastTriggerIndex is valid
-	float sampleRate = 44100.0f;
 	std::atomic<bool> frozen = {false};
 	bool freezePending = false;
 	double period_s = 0.0; // time since last actual trigger event. Does not count up during freeze.
 	std::atomic<int> samplesSinceTrigger = {0};  // samples since last trigger. Trigger as in, triggered outside holdoff durations.
-	float holdoffTime_s = 0.0f;     // Remaining holdoff in seconds
+	std::atomic<float> sampleRate = {44100.0f};
+	std::atomic<float> holdoffTime_s = {0.0f};  // Remaining holdoff in seconds
 	float autoTrigTimer_s = 0.0f;   // Time since we in AUTO saw a trigger
 	int dspFrame = 1001; // 1000 of these and we do lights and controls.
 	std::atomic<float> autoTimeFrequency_hz = {0.0f};
@@ -209,14 +211,14 @@ struct Scope : Module {
 
 	// persisted
 	bool autoTimeMode = false;
-	int trigSource = 0; // 0-3: Channel, 4: Ext
 	std::atomic<int> trigMode = {TRIG_MODE_AUTO};
 	bool trigEdge = TRIG_EDGE_RISE;
 	bool showBaselines = false;
 	bool showCenterline = false;
 	bool showGrid = true;
 	int showStats = STATS_ONE;
-	int autoTimePeriods = 3;
+	std::atomic<int> trigSource = {0}; // 0-3: Channel, 4: Ext
+	std::atomic<int> autoTimePeriods = {3};
 	bool cvMode[4] = {false, false, false, false};
 	std::atomic<bool> acCoupled[4]{};
 	std::vector<int> xySourceX = {0, 2};
@@ -229,11 +231,11 @@ struct Scope : Module {
 	bool autotimeBtn = false;
 	bool freezeBtn = false;
 	bool statsBtn = false;
-	float offset[4]{};
-	float scale[4]{};
-	float thresholdKnob = 0.0f;
-	float threshold2 = 0.1f;
-	float holdoffKnob = -3.0f;
+	std::array<std::atomic<float>, 4> offset{};
+	std::array<std::atomic<float>, 4> scale{};
+	std::atomic<float> thresholdKnob = {0.0f};
+	std::atomic<float> threshold2 = {0.1f};
+	std::atomic<float> holdoffKnob = {-3.0f};
 
 
 	Scope() {
@@ -307,9 +309,13 @@ struct Scope : Module {
 			polyTrig[ch].store(0);
 			polyViewMask[ch].store(0xFFFF);
 
-			for (int poly = 0; poly < 16; poly++) {
-				buffer[ch][poly] = new float[BUFFER_SIZE]{};
+			// Pre-allocate only poly-voice 1. Leave the rest empty.
+			buffer[ch][0] = new float[BUFFER_SIZE]{};
+			for (int poly = 1; poly < 16; poly++) {
+				buffer[ch][poly] = nullptr;
 			}
+
+			scale[ch].store(getScale(SCALE_DEFAULT_KNOB));
 		}
 	}
 
@@ -541,6 +547,8 @@ struct Scope : Module {
 		for (int c = 0; c < 4; c++) {
 			const int activeChannels = std::max(1, polyCount[c].load());
 			const bool isTrigChannel = (trigSource == c);
+			const bool isAC = acCoupled[c].load();
+
 			int activeTrig = -1;
 			if (isTrigChannel) {
 				activeTrig = polyTrig[c].load();
@@ -549,12 +557,14 @@ struct Scope : Module {
 			for (int polyCh = 0; polyCh < activeChannels; polyCh++) {
 				float val = inputs[A_INPUT + c].getPolyVoltage(polyCh);
 
-				if (acCoupled[c].load()) {
+				if (isAC) {
 					val = dcBlockers[c][polyCh].process(val);
 				}
 
 				if (!isFrozen) {
-					buffer[c][polyCh][writeIndex] = val;
+					if (buffer[c][polyCh] != nullptr) {
+						buffer[c][polyCh][writeIndex] = val;
+					}
 				}
 
 				if (polyCh == activeTrig) {
@@ -564,8 +574,12 @@ struct Scope : Module {
 		}
 
 		if (!isFrozen) {
-			writeIndex = (writeIndex + 1) & BUFFER_MASK;
-			if (writeIndex == 0) bufferFilled = true;
+			//writeIndex.store((writeIndex + 1) & BUFFER_MASK);
+			//if (writeIndex == 0) bufferFilled = true;
+
+			// std::memory_order_relaxed avoids a heavy CPU sync fence here
+			writeIndex.store((writeIndex.load(std::memory_order_relaxed) + 1) & BUFFER_MASK, std::memory_order_relaxed);
+			if (writeIndex.load(std::memory_order_relaxed) == 0) bufferFilled.store(true);
 		}
 
 		const bool edgeFound = triggerDetect(args, in);
@@ -616,7 +630,7 @@ struct Scope : Module {
 		// Holdoff
 		if (holdoffTime_s > 0.0f) {
 			// its fine that this counts down while being frozen, as unfreezing will reset it anyway.
-			holdoffTime_s -= args.sampleTime;
+			holdoffTime_s.store(holdoffTime_s.load() - args.sampleTime);
 		}
 		const bool holdoff_active = holdoffTime_s > 0.0f;
 
@@ -717,7 +731,7 @@ struct Scope : Module {
 				recording = false;
 
 				// Set holdoff
-				holdoffTime_s = holdoffKnob > 0.00011f?holdoffKnob:0.0f;
+				holdoffTime_s.store(holdoffKnob.load() > 0.00011f?holdoffKnob.load():0.0f);
 
 				if (trigMode == TRIG_MODE_SOLO || freezePending) {
 					frozen = true;
@@ -823,6 +837,12 @@ struct Scope : Module {
 			polyCount[ch].store(chCount);
 			if (chCount > 0 && polyTrig[ch].load() >= chCount) {
 				polyTrig[ch].store(0);
+			}
+			// Lazy allocation: Only create buffers if the cable demands it
+			for (int poly = 0; poly < chCount; poly++) {
+				if (buffer[ch][poly] == nullptr) {
+					buffer[ch][poly] = new float[BUFFER_SIZE]{};
+				}
 			}
 		}
 	}
@@ -1411,12 +1431,15 @@ struct ScopeDisplay : OpaqueWidget {
 
 		for (int p = 0; p < activePoly; p++) {
 			if (p != trigP && (viewMask & (1 << p))) {
+				if (module->buffer[ch][p] == nullptr) continue;
 				drawWaveform(args, ch, ghostColor, STROKE_WAVE_POLY, p, PX_WAVE_POLY);
 			}
 		}
 
 		if (viewMask & (1 << trigP)) {
-			drawWaveform(args, ch, color, STROKE_WAVE, trigP, PX_WAVE);
+			if (module->buffer[ch][trigP] != nullptr) {
+				drawWaveform(args, ch, color, STROKE_WAVE, trigP, PX_WAVE);
+			}
 		}
 	}
 
@@ -1754,6 +1777,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 			// X is the trigger source
 			int polyX = module->polyTrig[chX].load();
+			if (module->buffer[chX][polyX] == nullptr) continue;
 
 			// Y uses the context mask (4x4 Grid)
 			uint16_t maskY = module->polyViewMask[chY].load();
@@ -1762,6 +1786,7 @@ struct ScopeDisplay : OpaqueWidget {
 			// Draw Lissajous pair for every Y the user enabled in the grid
 			for (int polyY = 0; polyY < activeY; polyY++) {
 				if (maskY & (1 << polyY)) {
+					if (module->buffer[chY][polyY] == nullptr) continue;
 					drawXY(args, chX, chY, polyX, polyY, color);
 				}
 			}
@@ -1980,6 +2005,7 @@ struct ScopeDisplay : OpaqueWidget {
 			if (samplesToScan > STATS_DECIMATION_THRESHOLD) step = (int)std::ceil(float(samplesToScan) / STATS_DECIMATION_THRESHOLD);
 
 			int poly = module->polyTrig[ch].load();
+			if (module->buffer[ch][poly] == nullptr) continue;
 
 			for (int i = 0; i < samplesToScan; i += step) {
 				const int idx = (startIndex + i) & BUFFER_MASK;
