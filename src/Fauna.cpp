@@ -25,12 +25,8 @@
 #define INPUT_TO_CAPACITOR 0.05f  // factor for input voltage to voltage over capacitor in first stage. 0.035 is when +-5V input, will match the g tuning, but a little higher for effect.
 #define DRIVE_MAX 4.0f
 #define FREQ_MIN 20.0f            // standard Moog minimum cutoff
-#define FREQ_MAX 20000.0f         // beyond 18000 it does not react well and g is very out of tune at higher frequencies anyway.
+#define FREQ_MAX 20000.0f         // beyond 18,000 it does not react well and g is very out of tune at higher frequencies anyway.
 #define RESONANCE_MAX 1.0f
-
-static constexpr int oversample2 = 2;
-static constexpr int oversample4 = 4;
-static constexpr int oversample8 = 8;
 
 struct Fauna : Module {
 	enum ParamIds {
@@ -70,7 +66,7 @@ struct Fauna : Module {
 	float input_cutoff = 0.0f;
 	float F_s = 0.0f;
 	float g = 0.0f; // tuning parameter
-	int current_oversample = 2;
+	const int current_oversample = 2;
 	bool autoLevel = false;// This adjusts the output gain to compensate for drive.
 	float F_c_prev = 0.0f;
 	float F_s_prev = 0.0f;
@@ -80,23 +76,15 @@ struct Fauna : Module {
 
 	float s1 = 0.0f, s2 = 0.0f, s3 = 0.0f, s4 = 0.0f;
 	
-	dsp::Upsampler<oversample2, 10> upsampler2;
-	dsp::Decimator<oversample2, 10> decimator2;
-	dsp::Upsampler<oversample4, 10> upsampler4;
-	dsp::Decimator<oversample4, 10> decimator4;
-	dsp::Upsampler<oversample8, 10> upsampler8;
-	dsp::Decimator<oversample8, 10> decimator8;
+	dsp::Upsampler<2, 8> upsampler2;
+	dsp::Decimator<2, 8> decimator2;
 
 	// RIGHT
 
 	float s1_r = 0.0f, s2_r = 0.0f, s3_r = 0.0f, s4_r = 0.0f;
 
-	dsp::Upsampler<oversample2, 10> upsampler2_right;
-	dsp::Decimator<oversample2, 10> decimator2_right;
-	dsp::Upsampler<oversample4, 10> upsampler4_right;
-	dsp::Decimator<oversample4, 10> decimator4_right;
-	dsp::Upsampler<oversample8, 10> upsampler8_right;
-	dsp::Decimator<oversample8, 10> decimator8_right;
+	dsp::Upsampler<2, 8> upsampler2_right;
+	dsp::Decimator<2, 8> decimator2_right;
 
 	
 
@@ -128,7 +116,6 @@ struct Fauna : Module {
 
 	json_t *dataToJson() override {
 		json_t *root = json_object();
-		json_object_set_new(root, "oversample", json_integer(current_oversample));
 		json_object_set_new(root, "autoLevel", json_boolean(autoLevel));
 		return root;
 	}
@@ -137,30 +124,21 @@ struct Fauna : Module {
 		json_t *ext2 = json_object_get(rootJ, "autoLevel");
 		if (ext2)
 			autoLevel = json_boolean_value(ext2);
-		json_t *ext3 = json_object_get(rootJ, "oversample");
-		if (ext3) {
-			current_oversample = json_integer_value(ext3);
-			if (current_oversample != 2 and current_oversample != 4 and current_oversample != 8) {
-				current_oversample = 4;
-			}
-		}
+
 	}
 
 	void onReset(const ResetEvent& e) override {
 		autoLevel = false;
-		current_oversample = 2;
 		Module::onReset(e);
 	}
 };
 
-static const float LOG_FREQ_RANGE = float(log(FREQ_MAX/FREQ_MIN));
+static const float LOG_FREQ_RANGE = float(logf(FREQ_MAX/FREQ_MIN));
 
 float Fauna::toExp(float x) {
 	// 0 to 1 to exp range
-	return FREQ_MIN * exp( x*LOG_FREQ_RANGE );
+	return FREQ_MIN * expf( x*LOG_FREQ_RANGE );
 }
-
-
 
 void Fauna::process(const ProcessArgs &args) {
 	// Implements a 4-Pole transistor ladder LP filter
@@ -196,13 +174,12 @@ void Fauna::process(const ProcessArgs &args) {
 	if (!outputs[FAUNA_OUTPUT].isConnected() and !outputs[FAUNA_OUTPUT2].isConnected()) {
 		return;
 	}
-	int oversample_protected = current_oversample;// to be sure its not modified from another thread inside step.
 	float drive = clamp(params[DRIVE_PARAM].getValue()+inputs[DRIVE_INPUT].getVoltage()*params[DRIVE_INFL_PARAM].getValue(),0.0f,DRIVE_MAX);
 	
 	r     = clamp(params[RESONANCE_PARAM].getValue()+(inputs[RESONANCE_INPUT].getVoltage()*params[RESONANCE_INFL_PARAM].getValue()), 0.0f, RESONANCE_MAX);
 	input_cutoff =  std::exp2f(inputs[CUTOFF_INPUT].getVoltage()*params[CUTOFF_INFL_PARAM].getValue());
 	float F_c   = clamp(this->toExp(params[CUTOFF_PARAM].getValue())*input_cutoff, FREQ_MIN, FREQ_MAX);
-	F_s   = args.sampleRate*oversample_protected;
+	F_s   = args.sampleRate*current_oversample;
 
 	if (F_c != F_c_prev || F_s != F_s_prev) {
 		// Bilinear Transform pre-warping
@@ -212,88 +189,70 @@ void Fauna::process(const ProcessArgs &args) {
 	float inv_drive = VCV_TO_MOOG*INPUT_TO_CAPACITOR*((autoLevel && drive != 0.0f)?clamp(drive,0.10f,DRIVE_MAX):1.0f);
 	
 	if (outputs[FAUNA_OUTPUT].isConnected()) {
-		this->process_left(args, oversample_protected, drive, inv_drive);
+		this->process_left(args, current_oversample, drive, inv_drive);
 	}
 	
 	if (outputs[FAUNA_OUTPUT2].isConnected()) {
-		this->process_right(args, oversample_protected, drive, inv_drive);
+		this->process_right(args, current_oversample, drive, inv_drive);
 	}
 	
 	F_c_prev = F_c;
 	F_s_prev = F_s;
 }
 
-inline float get_sat_gain(const float s) {
-	// If the signal is tiny, there is no compression (gain is 1.0)
-	if (s > -1e-4f && s < 1e-4f) return 1.0f;
-	// Otherwise, calculate the exact compression ratio
-	return tanh_fast_low(s) / s;
-}
-
 void Fauna::process_left(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive) {
 	float in = inputs[FAUNA_INPUT].getVoltage()*drive*VCV_TO_MOOG*INPUT_TO_CAPACITOR;
-	float inInter [oversample_protected];
-	float outBuf  [oversample_protected];
-	if (oversample_protected == oversample2) {
-		upsampler2.process(in, inInter);
-	} else if (oversample_protected == oversample4) {
-		upsampler4.process(in, inInter);
-	} else {
-		upsampler8.process(in, inInter);
-	}
+	float inInter [2];
+	float outBuf  [2];
+	upsampler2.process(in, inInter);
+
+	const float G = g / (1.0f + g);
+	const float k = 4.0f * r;
+	const float G2 = G * G;
+	const float G3 = G2 * G;
+	const float G4 = G3 * G;
 
 	for (int i = 0; i < oversample_protected; i++) {
-		float G = g / (1.0f + g);
-		float S1 = s1 / (1.0f + g);
-		float S2 = s2 / (1.0f + g);
-		float S3 = s3 / (1.0f + g);
-		float S4 = s4 / (1.0f + g);
+		const float S1 = s1 / (1.0f + g);
+		const float S2 = s2 / (1.0f + g);
+		const float S3 = s3 / (1.0f + g);
+		const float S4 = s4 / (1.0f + g);
 
-		float k = 4.0f * r;
-		float drive_in = inInter[i] * inv_Vt;
+
+		const float drive_in = inInter[i] * inv_Vt;
 
 		// Pure Linear ZDF Feedback Prediction
-		float G2 = G * G;
-		float G3 = G2 * G;
-		float G4 = G3 * G;
-		float feedback_linear = (G4 * drive_in + G3 * S1 + G2 * S2 + G * S3 + S4) / (1.0f + k * G4);
+		const float feedback_linear = (G4 * drive_in + G3 * S1 + G2 * S2 + G * S3 + S4) / (1.0f + k * G4);
 
 		// Saturate the prediction to prevent the Notch overshoot
-		float feedback = tanh_fast_high(feedback_linear);
+		const float feedback = tanh_fast_high(feedback_linear);
 
-		float x = drive_in - k * feedback;
+		const float x = drive_in - k * feedback;
 
 		// Audio path (1-pass explicit TPT updates)
-		float y0 = tanh_fast_high(x);
-		float v1 = (y0 - s1) * G;
-		float y1 = s1 + v1;
+		const float y0 = tanh_fast_high(x);
+		const float v1 = (y0 - s1) * G;
+		const float y1 = s1 + v1;
 		s1 = 2.0f * y1 - s1;
 
-		float y1_sat = tanh_fast_high(y1);
-		float v2 = (y1_sat - s2) * G;
-		float y2 = s2 + v2;
+		const float y1_sat = tanh_fast_high(y1);
+		const float v2 = (y1_sat - s2) * G;
+		const float y2 = s2 + v2;
 		s2 = 2.0f * y2 - s2;
 
-		float y2_sat = tanh_fast_high(y2);
-		float v3 = (y2_sat - s3) * G;
-		float y3 = s3 + v3;
+		const float y2_sat = tanh_fast_high(y2);
+		const float v3 = (y2_sat - s3) * G;
+		const float y3 = s3 + v3;
 		s3 = 2.0f * y3 - s3;
 
-		float y3_sat = tanh_fast_high(y3);
-		float v4 = (y3_sat - s4) * G;
-		float y4 = s4 + v4;
+		const float y3_sat = tanh_fast_high(y3);
+		const float v4 = (y3_sat - s4) * G;
+		const float y4 = s4 + v4;
 		s4 = 2.0f * y4 - s4;
 
 		outBuf[i] = y4 * V_t;
 	}
-	float out;
-	if (oversample_protected == oversample2) {
-		out = decimator2.process(outBuf);
-	} else if (oversample_protected == oversample4) {
-		out = decimator4.process(outBuf);
-	} else {
-		out = decimator8.process(outBuf);
-	}
+	float out = decimator2.process(outBuf);
 	if(!std::isfinite(out) || out > 100.0f || out < -100.0f) {
 		out = 0.0f;
 		// Reset all State Variables to 0 to stop the NaN
@@ -304,68 +263,57 @@ void Fauna::process_left(const ProcessArgs &args, int oversample_protected, floa
 
 void Fauna::process_right(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive) {
 	float in = inputs[FAUNA_INPUT2].getVoltage()*drive*VCV_TO_MOOG*INPUT_TO_CAPACITOR;
-	float inInter [oversample_protected];
-	float outBuf  [oversample_protected];
-	if (oversample_protected == oversample2) {
-		upsampler2_right.process(in, inInter);
-	} else if (oversample_protected == oversample4) {
-		upsampler4_right.process(in, inInter);
-	} else {
-		upsampler8_right.process(in, inInter);
-	}
+	float inInter [2];
+	float outBuf  [2];
+
+	upsampler2_right.process(in, inInter);
+
+	const float G = g / (1.0f + g);
+	const float G2 = G * G;
+	const float G3 = G2 * G;
+	const float G4 = G3 * G;
+	const float k = 4.0f * r;
 
 	for (int i = 0; i < oversample_protected; i++) {
-		float G = g / (1.0f + g);
-		float S1 = s1 / (1.0f + g);
-		float S2 = s2 / (1.0f + g);
-		float S3 = s3 / (1.0f + g);
-		float S4 = s4 / (1.0f + g);
+		const float S1 = s1_r / (1.0f + g);
+		const float S2 = s2_r / (1.0f + g);
+		const float S3 = s3_r / (1.0f + g);
+		const float S4 = s4_r / (1.0f + g);
 
-		float k = 4.0f * r;
-		float drive_in = inInter[i] * inv_Vt;
+		const float drive_in = inInter[i] * inv_Vt;
 
 		// Pure Linear ZDF Feedback Prediction
-		float G2 = G * G;
-		float G3 = G2 * G;
-		float G4 = G3 * G;
-		float feedback_linear = (G4 * drive_in + G3 * S1 + G2 * S2 + G * S3 + S4) / (1.0f + k * G4);
+		const float feedback_linear = (G4 * drive_in + G3 * S1 + G2 * S2 + G * S3 + S4) / (1.0f + k * G4);
 
-		// Saturate the prediction to prevent the "Notch" overshoot
-		float feedback = tanh_fast_high(feedback_linear);
+		// Saturate the prediction to prevent the Notch overshoot
+		const float feedback = feedback_linear;
 
-		float x = drive_in - k * feedback;
+		const float x = drive_in - k * feedback;
 
 		// Audio path (1-pass explicit TPT updates)
-		float y0 = tanh_fast_high(x);
-		float v1 = (y0 - s1_r) * G;
-		float y1 = s1_r + v1;
+		const float y0 = tanh_fast_high(x);
+		const float v1 = (y0 - s1_r) * G;
+		const float y1 = s1_r + v1;
 		s1_r = 2.0f * y1 - s1_r;
 
-		float y1_sat = tanh_fast_high(y1);
-		float v2 = (y1_sat - s2_r) * G;
-		float y2 = s2_r + v2;
+		const float y1_sat = tanh_fast_high(y1);
+		const float v2 = (y1_sat - s2_r) * G;
+		const float y2 = s2_r + v2;
 		s2_r = 2.0f * y2 - s2_r;
 
-		float y2_sat = tanh_fast_high(y2);
-		float v3 = (y2_sat - s3_r) * G;
-		float y3 = s3_r + v3;
+		const float y2_sat = tanh_fast_high(y2);
+		const float v3 = (y2_sat - s3_r) * G;
+		const float y3 = s3_r + v3;
 		s3_r = 2.0f * y3 - s3_r;
 
-		float y3_sat = tanh_fast_high(y3);
-		float v4 = (y3_sat - s4_r) * G;
-		float y4 = s4_r + v4;
+		const float y3_sat = tanh_fast_high(y3);
+		const float v4 = (y3_sat - s4_r) * G;
+		const float y4 = s4_r + v4;
 		s4_r = 2.0f * y4 - s4_r;
 
 		outBuf[i] = y4 * V_t;
 	}
-	float out;
-	if (oversample_protected == oversample2) {
-		out = decimator2_right.process(outBuf);
-	} else if (oversample_protected == oversample4) {
-		out = decimator4_right.process(outBuf);
-	} else {
-		out = decimator8_right.process(outBuf);
-	}
+	float out = decimator2_right.process(outBuf);
 	if(!std::isfinite(out) || out > 100.0f || out < -100.0f) {
 		out = 0.0f;
 
@@ -393,25 +341,6 @@ struct AutoLevelMenuItem : MenuItem {
 	}
 };
 
-
-struct OversampleFaunaMenuItem : MenuItem {
-	Fauna* _module;
-	int _os;
-
-	OversampleFaunaMenuItem(Fauna* module, const char* label, int os)
-	: _module(module), _os(os)
-	{
-		this->text = label;
-	}
-
-	void onAction(const event::Action &e) override {
-		_module->current_oversample = _os;
-	}
-
-	void step() override {
-		rightText = _module->current_oversample == _os ? "✔" : "";
-	}
-};
 
 struct FaunaWidget : ModuleWidget {
 	FaunaWidget(Fauna *module) {
@@ -472,11 +401,7 @@ struct FaunaWidget : ModuleWidget {
 		//menu->addChild(new EmphasizeMenuItem(a, "Passband gain comp.",  1.0f));
 		//menu->addChild(new EmphasizeMenuItem(a, "Medium compensation",  0.5f));
 		//menu->addChild(new EmphasizeMenuItem(a, "No compensation", 0.0f));
-		
-		menu->addChild(new MenuLabel());
-		menu->addChild(new OversampleFaunaMenuItem(a, "Oversample x2", 2));
-		menu->addChild(new OversampleFaunaMenuItem(a, "Oversample x4", 4));
-		menu->addChild(new OversampleFaunaMenuItem(a, "Oversample x8", 8));
+
 		menu->addChild(new MenuLabel());
 		menu->addChild(new AutoLevelMenuItem(a, "Auto level"));
 	}
