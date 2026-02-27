@@ -1777,20 +1777,21 @@ struct ScopeDisplay : OpaqueWidget {
 			if (!module->inputs[Scope::A_INPUT + chX].isConnected() || module->scale[chX] < -0.5f) continue;
 			if (!module->inputs[Scope::A_INPUT + chY].isConnected() || module->scale[chY] < -0.5f) continue;
 
-			NVGcolor color = (plot == 0) ? colorXY1 : colorXY2;
+			const NVGcolor color = (plot == 0) ? colorXY1 : colorXY2;
 
 			// X is the trigger source
-			int polyX = module->polyTrig[chX].load();
+			const int polyX = module->polyTrig[chX].load();
 			if (module->buffer[chX][polyX] == nullptr) continue;
 
 			// Y uses the context mask (4x4 Grid)
-			uint16_t maskY = module->polyViewMask[chY].load();
-			int activeY = module->polyCount[chY].load();
+			const uint16_t maskY = module->polyViewMask[chY].load();
+			const int activeY = module->polyCount[chY].load();
 
 			// Draw Lissajous pair for every Y the user enabled in the grid
 			for (int polyY = 0; polyY < activeY; polyY++) {
 				if (maskY & (1 << polyY)) {
 					if (module->buffer[chY][polyY] == nullptr) continue;
+					if (chX == chY && polyY == polyX) continue;
 					drawXY(args, chX, chY, polyX, polyY, color);
 				}
 			}
