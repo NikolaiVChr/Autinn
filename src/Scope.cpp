@@ -255,7 +255,7 @@ struct Scope : Module {
 		configParam(TRIG_LEVEL_PARAM, -10.0f, 10.0f, 0.0f, "Trigger threshold", " V");
 		configSwitch(TRIG_SOURCE_PARAM, 0.0f, 4.0f, 0.0f, "Trigger source", {"Channel A", "Channel B", "Channel C", "Channel D", "Ext. trigger"});
 		configSwitch(TRIG_MODE_PARAM, 0.0f, 3.0f, 0.0f, "Trigger mode", {"Auto", "Norm", "Single", "X-Y"});
-		configSwitch(TRIG_EDGE_PARAM, 0.0f, 1.0f, 0.0f, "Trigger edge", {"Rising edge", "Falling edge"});
+		configSwitch(TRIG_EDGE_PARAM, 0.0f, 1.0f, 0.0f, "Trigger on edge", {"Rising", "Falling"});
 		configButton(FREEZE_PARAM, "Freeze");
 		configButton(AUTO_TIME_PARAM, "Auto time");
 		configButton(STATS_PARAM, "Cycle stats");

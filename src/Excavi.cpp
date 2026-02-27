@@ -55,7 +55,7 @@ struct Excavi : Module {
 		AGE_PARAM,
 		ENUMS(GAIN_PARAM,2),
 		ENUMS(SHAPE_PARAM,2),
-		HARD_SYNC_TOGGLE_PARAM,
+		INTER_SYNC_TOGGLE_PARAM,
 		CROSS_MODULATION_PARAM,
 		NUM_PARAMS
 	};
@@ -64,7 +64,7 @@ struct Excavi : Module {
 		ENUMS(CV_GAIN_INPUT,2),
 		CV_SYNC_INPUT,
 		CV_AGE_INPUT,
-		CV_HARD_SYNC_TOGGLE_INPUT,
+		CV_INTER_SYNC_TOGGLE_INPUT,
 		CV_CROSS_MODULATION_INPUT,
 		ENUMS(CV_SHAPE_INPUT,2),
 		NUM_INPUTS
@@ -77,6 +77,8 @@ struct Excavi : Module {
 	};
 	enum LightIds {
 		HARD_SYNC_LIGHT,
+		SOFT_SYNC_LIGHT,
+		OFF_SYNC_LIGHT,
 		NUM_LIGHTS
 	};
 
@@ -111,6 +113,7 @@ struct Excavi : Module {
 	dsp::SchmittTrigger schmittButton;
 	dsp::SchmittTrigger syncTrigger[16];
 	bool hardSyncEnabled = false;
+	bool softSyncEnabled = false;
 
 	Excavi() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -122,14 +125,14 @@ struct Excavi : Module {
 		configParam<Param3Digits>(GAIN_PARAM + 0, 0.0f, 1.0f, 1.0f, "Master gain", " dB", -10.0f, 20.f, .0f);
 		configParam<Param3Digits>(GAIN_PARAM + 1, 0.0f, 1.0f, 1.0f, "Slave gain", " dB", -10.0f, 20.f, .0f);
 		configParam<Param3Digits>(CROSS_MODULATION_PARAM, -1.0f, 1.0f, 0.0f, "Cross modulation");
-		configButton(HARD_SYNC_TOGGLE_PARAM, "Toggle hard sync");
+		configSwitch(INTER_SYNC_TOGGLE_PARAM, 0.0f, 2.0f, 0.0f, "Toggle sync mode", {"Off", "Soft", "Hard"});
 
 		configInput(CV_PITCH_INPUT+0, "Master 1V/Oct CV");
 		configInput(CV_PITCH_INPUT+1, "Slave 1V/Oct CV");
 		configInput(CV_GAIN_INPUT+0, "CV master gain");
 		configInput(CV_GAIN_INPUT+1, "CV slave gain");
-		configInput(CV_SYNC_INPUT, "CV sync");
-		configInput(CV_HARD_SYNC_TOGGLE_INPUT, "CV hard sync toggle");
+		configInput(CV_SYNC_INPUT, "CV sync master (hard)");
+		configInput(CV_INTER_SYNC_TOGGLE_INPUT, "CV sync mode between master and slave toggle");
 		configInput(CV_AGE_INPUT, "1V/decade age CV");
 		configInput(CV_CROSS_MODULATION_INPUT, "Cross modulation CV");
 		configInput(CV_SHAPE_INPUT+0, "1V/shape CV master");
@@ -140,7 +143,9 @@ struct Excavi : Module {
 		configOutput(SOLO_OUTPUT+0, "Master audio");
 		configOutput(SOLO_OUTPUT+1, "Slave audio");
 
-		configLight(HARD_SYNC_LIGHT, "Hard sync");
+		configLight(OFF_SYNC_LIGHT, "Sync off between master and slave");
+		configLight(SOFT_SYNC_LIGHT, "Sync soft between master and slave");
+		configLight(HARD_SYNC_LIGHT, "Sync hard between master and slave");
 
 		decimatorA4.resize(16); decimatorB4.resize(16);
 		decimatorA2.resize(16); decimatorB2.resize(16);
@@ -176,8 +181,8 @@ struct Excavi : Module {
 			phaseB[c] = 0.0f;
 			syncTrigger[c].reset();
 		}
-		schmittButton.reset();
 		hardSyncEnabled = false;
+		softSyncEnabled = false;
 		Module::onReset(e);
 	}
 
@@ -187,14 +192,16 @@ struct Excavi : Module {
 
 	json_t *dataToJson() override {
 		json_t *root = json_object();
-		json_object_set_new(root, "hardSyncEnabled", json_boolean(hardSyncEnabled));
 		return root;
 	}
 
 	void dataFromJson(json_t *rootJ) override {
 		json_t *hs = json_object_get(rootJ, "hardSyncEnabled");
-		if (hs)
+		if (hs) {
 			hardSyncEnabled = json_boolean_value(hs);
+			softSyncEnabled = false;
+			params[INTER_SYNC_TOGGLE_PARAM].setValue(hardSyncEnabled ? 2.0f : 0.0f);
+		}
 	}
 
 	struct MorphWeights {
@@ -320,7 +327,7 @@ struct Excavi : Module {
 		const bool masterWrapped = (dtA > 0.0f && oldPhaseA + dtA >= 1.0f) ||
 							 (dtA < 0.0f && oldPhaseA + dtA < 0.0f);
 
-		if (hardSyncEnabled && masterWrapped) {
+		if ((hardSyncEnabled || softSyncEnabled) && masterWrapped) {
 			// Master just finished a period and slave should be synced
 			const float overshoot = (dtA > 0.0f) ? (oldPhaseA + dtA - 1.0f) : (oldPhaseA + dtA);
 			const float fraction = overshoot / dtA;
@@ -329,21 +336,32 @@ struct Excavi : Module {
 			phaseAtSync -= std::floor(phaseAtSync);
 			if (phaseAtSync < 0.0f) phaseAtSync += 1.0f;
 
-			const float naiveBefore = calculateNaiveMorph(wB, phaseAtSync);
-			const float naiveAfter = calculateNaiveMorph(wB, 0.0f);
-			float jumpMag = naiveAfter - naiveBefore;
+			// Only calculate and insert the PolyBLEP residual for Hard Sync
+			if (hardSyncEnabled) {
+				const float naiveBefore = calculateNaiveMorph(wB, phaseAtSync);
+				const float naiveAfter = calculateNaiveMorph(wB, 0.0f);
+				float jumpMag = naiveAfter - naiveBefore;
 
-			if (dtA < 0.0f) jumpMag = -jumpMag;
+				if (dtA < 0.0f) jumpMag = -jumpMag;
 
-			blepB[c].jump(fraction, jumpMag);
+				blepB[c].jump(fraction, jumpMag);
+			}
+
 			phaseB[c] = dtB * fraction;
 			phaseB[c] -= std::floor(phaseB[c]);
 			if (phaseB[c] < 0.0f) phaseB[c] += 1.0f;
 
 			outB = blepB[c].process(calculateNaiveMorph(wB, phaseB[c]));
-
 		} else {
+			// generateMorphingWaveform calls blep.process, so not needed here
 			outB = generateMorphingWaveform(wB, phaseB[c], dtB, blepB[c]);
+		}
+
+		// Apply the Windowed Sync envelope to the final slave output
+		if (softSyncEnabled) {
+			// Hann window tied to master phase: 0.5 * (1 - cos(2 * PI * masterPhase))
+			const float window = 0.5f * (1.0f - cos_fast_high(phaseA[c] * 2.0f * float(M_PI)));
+			outB *= window;
 		}
 
 		outA = hp2A[c].process(hp1A[c].process(outA));
@@ -362,8 +380,21 @@ struct Excavi : Module {
 		const int oversample = getOversampleAmount(args.sampleRate);
 		const float osSampleTime = args.sampleTime / (float)oversample;
 
-		if (schmittButton.process(params[HARD_SYNC_TOGGLE_PARAM].getValue() + inputs[CV_HARD_SYNC_TOGGLE_INPUT].getVoltage())) {
-			hardSyncEnabled = !hardSyncEnabled;
+		int button = (int)std::round(params[INTER_SYNC_TOGGLE_PARAM].getValue());
+		if (schmittButton.process(inputs[CV_INTER_SYNC_TOGGLE_INPUT].getVoltage())) {
+			button++;
+			if (button > 2) button = 0;
+			params[INTER_SYNC_TOGGLE_PARAM].setValue((float)button);
+		}
+		if (button == 0) {
+			hardSyncEnabled = false;
+			softSyncEnabled = false;
+		} else if (button == 1) {
+			hardSyncEnabled = false;
+			softSyncEnabled = true;
+		} else {
+			hardSyncEnabled = true;
+			softSyncEnabled = false;
 		}
 
 		if (!outputs[BUZZ_OUTPUT].isConnected() &&
@@ -371,6 +402,8 @@ struct Excavi : Module {
 			!outputs[SOLO_OUTPUT + 0].isConnected() &&
 			!outputs[SOLO_OUTPUT + 1].isConnected()) {
 			lights[HARD_SYNC_LIGHT].setBrightness(hardSyncEnabled ? 1.0f : 0.0f);
+			lights[SOFT_SYNC_LIGHT].setBrightness(softSyncEnabled ? 1.0f : 0.0f);
+			lights[OFF_SYNC_LIGHT].setBrightness(softSyncEnabled || hardSyncEnabled? 0.0f : 1.0f);
 			return;
 		}
 
@@ -527,6 +560,8 @@ struct Excavi : Module {
         }
 
 		lights[HARD_SYNC_LIGHT].setBrightness(hardSyncEnabled ? 1.0f : 0.0f);
+		lights[SOFT_SYNC_LIGHT].setBrightness(softSyncEnabled ? 1.0f : 0.0f);
+		lights[OFF_SYNC_LIGHT].setBrightness(softSyncEnabled || hardSyncEnabled? 0.0f : 1.0f);
     }
 };
 
@@ -594,9 +629,8 @@ struct ExcaviWidget : ModuleWidget {
 			return clamp(val + (cv * 0.1f), 0.0f, 1.0f);
 		});
     	addParam(gain1Knob);
-        addInput(createInputCentered<InPortAutinn>(Vec(xMidL, yRow3), module, Excavi::CV_SYNC_INPUT));
-        addParam(createParamCentered<RoundButtonSmallAutinn>(Vec(xCenter, yRow3), module, Excavi::HARD_SYNC_TOGGLE_PARAM));
-        addInput(createInputCentered<InPortAutinn>(Vec(xMidR, yRow3), module, Excavi::CV_HARD_SYNC_TOGGLE_INPUT));
+        addParam(createParamCentered<RoundCycleButtonSmallAutinn>(Vec(xCenter, yRow3), module, Excavi::INTER_SYNC_TOGGLE_PARAM));
+
 
     	auto gain2Knob = createParamCentered<AutinnArcSmallKnob>(Vec(xRight, yRow3), module, Excavi::GAIN_PARAM + 1);
     	gain2Knob->setModulation(Excavi::CV_GAIN_INPUT+1, [](float cv, float val, float att) {
@@ -604,11 +638,15 @@ struct ExcaviWidget : ModuleWidget {
 		});
     	addParam(gain2Knob);
 
-        addChild(createLightCentered<MediumLight<YellowLight>>(Vec((xCenter+xMidR)*0.5f, yRow3), module, Excavi::HARD_SYNC_LIGHT));
+        addChild(createLightCentered<MediumLight<BlueLight>>(Vec((xCenter+xMidR)*0.5f, yRow3-10.f), module, Excavi::OFF_SYNC_LIGHT));
+    	addChild(createLightCentered<MediumLight<YellowLight>>(Vec((xCenter+xMidR)*0.5f, yRow3), module, Excavi::SOFT_SYNC_LIGHT));
+    	addChild(createLightCentered<MediumLight<RedLight>>(Vec((xCenter+xMidR)*0.5f, yRow3+10.f), module, Excavi::HARD_SYNC_LIGHT));
 
         // Row 4: Pitch CV & cross-mod CV
         addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow4), module, Excavi::CV_PITCH_INPUT + 0));
+    	addInput(createInputCentered<InPortAutinn>(Vec(xMidL, yRow4), module, Excavi::CV_SYNC_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow4), module, Excavi::CV_CROSS_MODULATION_INPUT));
+    	addInput(createInputCentered<InPortAutinn>(Vec(xMidR, yRow4), module, Excavi::CV_INTER_SYNC_TOGGLE_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(xRight, yRow4), module, Excavi::CV_PITCH_INPUT + 1));
 
         // Row 5: Gain CV & age CV

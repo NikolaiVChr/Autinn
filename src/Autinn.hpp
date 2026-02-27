@@ -426,6 +426,41 @@ inline float sin_fast_high(const float radians) {
 	return sine;
 }
 
+inline float cos_fast_low(const float radians) {
+	// Multiply by 1 / (2 * pi) and shift by 90 degrees (0.25)
+	float phase = radians * 0.159154943f + 0.25f;
+
+	// Wrap phase to 0.0 - 1.0
+	phase -= std::floor(phase);
+
+	// Shift to -1.0 to +1.0
+	const float x = phase * 2.0f - 1.0f;
+
+	// Fast parabolic approximation
+	const float cosine = -4.0f * x * (1.0f - std::abs(x));
+
+	return cosine;
+}
+
+inline float cos_fast_high(const float radians) {
+	// Multiply by 1 / (2 * pi) and shift by 90 degrees (0.25)
+	float phase = radians * 0.159154943f + 0.25f;
+
+	// Wrap phase to 0.0 - 1.0
+	phase -= std::floor(phase);
+
+	// Shift to -1.0 to +1.0
+	const float x = phase * 2.0f - 1.0f;
+
+	// Fast parabolic approximation
+	float cosine = -4.0f * x * (1.0f - std::abs(x));
+
+	// Curve smoothing (drops THD from 4% to 0.2%)
+	cosine = 0.225f * (cosine * std::abs(cosine) - cosine) + cosine;
+
+	return cosine;
+}
+
 inline float interpolator(float mix, float a, float b) {
 	// same as: a * (1.0f - mix) + b * mix;
 	return a + mix * (b - a);
