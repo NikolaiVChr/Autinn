@@ -121,19 +121,19 @@ struct Bass : Module {
 	float input_cutoff = 0.0f;
 	float F_s = 0.0f;
 	float g = 0.0f; // tuning parameter
-	float y_a = 0.0f;
-	float y_b = 0.0f;
-	float y_c = 0.0f;
-	float y_d = 0.0f;
+	double y_a = 0.0;
+	double y_b = 0.0;
+	double y_c = 0.0;
+	double y_d = 0.0;
 	float W_a = 0.0f;
 	float W_b = 0.0f;
 	float W_c = 0.0f;
 
-	float y_a_prev = 0.0f;
-	float y_b_prev = 0.0f;
-	float y_c_prev = 0.0f;
-	float y_d_prev = 0.0f;
-	float y_d_prev_prev = 0.0f;
+	double y_a_prev = 0.0;
+	double y_b_prev = 0.0;
+	double y_c_prev = 0.0;
+	double y_d_prev = 0.0;
+	double y_d_prev_prev = 0.0;
 
 	float W_a_prev = 0.0f;
 	float W_b_prev = 0.0f;
@@ -867,16 +867,15 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected, 
 	in *= voltage_drive;
 	F_s   = APP->engine->getSampleRate()*float(oversample_protected);
 
-	auto w_c = float(2.0f*M_PI*F_c/F_s);// cutoff in radians per sample.
-	//g = V_t * (0.0008116984f + 0.9724111f*w_c - 0.5077766f*w_c*w_c + 0.1534058f*w_c*w_c*w_c);// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
+	auto w_c = double(2.0*M_PI*F_c/F_s);// cutoff in radians per sample.
+	// w_c can be very tiny, so we use double:
 	// Horner's Method (nested multiplication optimization):
 	// y = A + x(B + x(C + xD))
-	g = V_t * (0.0008116984f + w_c * (0.9724111f + w_c * (-0.5077766f + w_c * 0.1534058f)));
+	g = float(V_t * (0.0008116984 + w_c * (0.9724111 + w_c * (-0.5077766 + w_c * 0.1534058))));
 
 	if (tunedResonance) {
-		//Gres = 1.037174f + 3.606925f*w_c + 7.074555f*w_c*w_c - 18.14674f*w_c*w_c*w_c + 9.364587f*w_c*w_c*w_c*w_c;//auto tuned resonance power for resonance <= 1.0
 		// Horner's Method:
-		Gres = 1.037174f + w_c * (3.606925f + w_c * (7.074555f + w_c * (-18.14674f + w_c * 9.364587f)));
+		Gres = float(1.037174 + w_c * (3.606925 + w_c * (7.074555 + w_c * (-18.14674 + w_c * 9.364587))));
 	} else {
 		Gres = 1.15f;
 	}
@@ -898,19 +897,19 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected, 
 	}
 
 	for (int i = 0; i < oversample_protected; i++) {
-		x   = inInter[i] - 2.0f*Gres*r*(y_d_prev+y_d_prev_prev-priority*inInter[i]);//unit and a half feedback delay. -inInter[i] is Gcomp, to make passband gain not decrease too much when turning up resonance.
+		x   = inInter[i] - float( 2.0f*Gres*r*(y_d_prev+y_d_prev_prev-priority*inInter[i]));//unit and a half feedback delay. -inInter[i] is Gcomp, to make passband gain not decrease too much when turning up resonance.
 
 		// 1st transistor stage:
 		y_a = y_a_prev+g2*(tanh_fast_low( x*inv_Vt )-W_a_prev);
-		W_a = tanh_fast_low( y_a*inv_Vt );
+		W_a = tanh_fast_low( float(y_a*inv_Vt) );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
-		W_b = tanh_fast_low( y_b*inv_Vt );
+		W_b = tanh_fast_low( float(y_b*inv_Vt) );
 		// 3rd transistor stage:
 		y_c = y_c_prev+g*(W_b-W_c_prev);
-		W_c = tanh_fast_low( y_c*inv_Vt );
+		W_c = tanh_fast_low( float(y_c*inv_Vt) );
 		// 4th transistor stage:
-		y_d = y_d_prev+g*(W_c-tanh_fast_low( y_d_prev*inv_Vt ));
+		y_d = y_d_prev+g*(W_c-tanh_fast_low( float(y_d_prev*inv_Vt) ));
 
 		// record stuff for next step
 		y_d_prev_prev = y_d_prev;
@@ -923,7 +922,7 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected, 
 		W_b_prev = W_b;
 		W_c_prev = W_c;
 		
-		outBuf[i] = y_d;
+		outBuf[i] = (float)y_d;
 	}
 	float out;
 	if (oversample_protected == oversample2) {
@@ -933,8 +932,8 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected, 
 	}
 	if(!std::isfinite(out)) {
 		out = 0.0f;
-		y_a = 0.0f; y_b = 0.0f; y_c = 0.0f; y_d = 0.0f;
-    	y_a_prev = 0.0f; y_b_prev = 0.0f; y_c_prev = 0.0f; y_d_prev = 0.0f; y_d_prev_prev = 0.0f;
+		y_a = 0.0; y_b = 0.0; y_c = 0.0; y_d = 0.0;
+    	y_a_prev = 0.0; y_b_prev = 0.0; y_c_prev = 0.0; y_d_prev = 0.0; y_d_prev_prev = 0.0;
     	W_a_prev = 0.0f; W_b_prev = 0.0f; W_c_prev = 0.0f;
 	}
 	return out/voltage_drive;

@@ -80,19 +80,19 @@ struct Flora : Module {
 	
 	//LEFT
 	
-	float y_a = 0.0f;
-	float y_b = 0.0f;
-	float y_c = 0.0f;
-	float y_d = 0.0f;
+	double y_a = 0.0;
+	double y_b = 0.0;
+	double y_c = 0.0;
+	double y_d = 0.0;
 	float W_a = 0.0f;
 	float W_b = 0.0f;
 	float W_c = 0.0f;
 
-	float y_a_prev = 0.0f;
-	float y_b_prev = 0.0f;
-	float y_c_prev = 0.0f;
-	float y_d_prev = 0.0f;
-	float y_d_prev_prev = 0.0f;
+	double y_a_prev = 0.0;
+	double y_b_prev = 0.0;
+	double y_c_prev = 0.0;
+	double y_d_prev = 0.0;
+	double y_d_prev_prev = 0.0;
 
 	float W_a_prev = 0.0f;
 	float W_b_prev = 0.0f;
@@ -107,19 +107,19 @@ struct Flora : Module {
 
 	// RIGHT
 	
-	float y_a_right = 0.0f;
-	float y_b_right = 0.0f;
-	float y_c_right = 0.0f;
-	float y_d_right = 0.0f;
+	double y_a_right = 0.0;
+	double y_b_right = 0.0;
+	double y_c_right = 0.0;
+	double y_d_right = 0.0;
 	float W_a_right = 0.0f;
 	float W_b_right = 0.0f;
 	float W_c_right = 0.0f;
 
-	float y_a_prev_right = 0.0f;
-	float y_b_prev_right = 0.0f;
-	float y_c_prev_right = 0.0f;
-	float y_d_prev_right = 0.0f;
-	float y_d_prev_prev_right = 0.0f;
+	double y_a_prev_right = 0.0;
+	double y_b_prev_right = 0.0;
+	double y_c_prev_right = 0.0;
+	double y_d_prev_right = 0.0;
+	double y_d_prev_prev_right = 0.0;
 
 	float W_a_prev_right = 0.0f;
 	float W_b_prev_right = 0.0f;
@@ -251,9 +251,11 @@ void Flora::process(const ProcessArgs &args) {
 	F_s   = args.sampleRate*float(oversample_protected);
 
 	if (F_c != F_c_prev || F_s != F_s_prev) {
-		auto w_c = double(2.0f*M_PI*F_c/F_s);// cutoff in radians per sample.
-		g = V_t * (0.0008116984 + 0.9724111*w_c - 0.5077766*w_c*w_c + 0.1534058*w_c*w_c*w_c);// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
-		Gres = 1.037174 + 3.606925*w_c + 7.074555*w_c*w_c - 18.14674*w_c*w_c*w_c + 9.364587*w_c*w_c*w_c*w_c;
+		auto w_c = double(2.0*M_PI*F_c/F_s);// cutoff in radians per sample.
+		// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
+		// w_c can be very tiny, so we use double:
+		g = float(V_t * (0.0008116984 + w_c * (0.9724111 + w_c * (-0.5077766 + w_c * 0.1534058))));
+		Gres = float(1.037174 + w_c * (3.606925 + w_c * (7.074555 + w_c * (-18.14674 + w_c * 9.364587))));
 	}
 	
 	float inv_drive = VCV_TO_MOOG*INPUT_TO_CAPACITOR*((autoLevel && drive != 0.0f)?clamp(drive,0.10f,DRIVE_MAX):1.0f);
@@ -284,20 +286,20 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 
 	for (int i = 0; i < oversample_protected; i++) {
 		// x is the voltage over the capacitor in the first stage:
-		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev+y_d_prev_prev) + 1e-9f;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
+		float x   = inInter[i] - float(2.0*r*Gres*(y_d_prev+y_d_prev_prev)) + 1e-9f;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
 		y_a = y_a_prev+g*(tanh_fast_high( x*inv_Vt )-W_a_prev);
-		W_a = tanh_fast_high( y_a*inv_Vt );
+		W_a = tanh_fast_high( float(y_a*inv_Vt) );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
-		W_b = tanh_fast_high( y_b*inv_Vt );
+		W_b = tanh_fast_high( float(y_b*inv_Vt) );
 		// 3rd transistor stage:
 		y_c = y_c_prev+g*(W_b-W_c_prev);
-		W_c = tanh_fast_high( y_c*inv_Vt );
+		W_c = tanh_fast_high( float(y_c*inv_Vt) );
 		// 4th transistor stage:
-		y_d = y_d_prev+g*(W_c-tanh_fast_high( y_d_prev*inv_Vt ));
+		y_d = y_d_prev+g*(W_c-tanh_fast_high( float(y_d_prev*inv_Vt) ));
 
 		// record stuff for next step
 		y_d_prev_prev = y_d_prev;
@@ -310,7 +312,7 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 		W_b_prev = W_b;
 		W_c_prev = W_c;
 		
-		outBuf[i] = y_d;
+		outBuf[i] = (float)y_d;
 	}
 	float out;
 	if (oversample_protected == oversample2) {
@@ -324,12 +326,12 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 		out = 0.0f;
 
 		// Reset all State Variables to 0 to stop the NaN
-		y_a_prev = 0.0f; y_b_prev = 0.0f; y_c_prev = 0.0f;
-		y_d_prev = 0.0f; y_d_prev_prev = 0.0f;
+		y_a_prev = 0.0; y_b_prev = 0.0; y_c_prev = 0.0;
+		y_d_prev = 0.0; y_d_prev_prev = 0.0;
 		W_a_prev = 0.0f; W_b_prev = 0.0f; W_c_prev = 0.0f;
 
 		// Reset current steps too (not strictly necessary but safe)
-		y_a = 0.0f; y_b = 0.0f; y_c = 0.0f; y_d = 0.0f;
+		y_a = 0.0; y_b = 0.0; y_c = 0.0; y_d = 0.0;
 		W_a = 0.0f; W_b = 0.0f; W_c = 0.0f;
 	}
 	outputs[FLORA_OUTPUT].setVoltage(out/inv_drive);
@@ -350,20 +352,20 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 
 	for (int i = 0; i < oversample_protected; i++) {
 		// x is the voltage over the capacitor in the first stage:
-		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev_right+y_d_prev_prev_right) + 1e-9f;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
+		float x   = inInter[i] - float( 2.0f*r*Gres*(y_d_prev_right+y_d_prev_prev_right)) + 1e-9f;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
 		y_a_right = y_a_prev_right+g*(tanh_fast_high( x*inv_Vt )-W_a_prev_right);
-		W_a_right = tanh_fast_high( y_a_right*inv_Vt );
+		W_a_right = tanh_fast_high( float(y_a_right*inv_Vt) );
 		// 2nd transistor stage:
 		y_b_right = y_b_prev_right+g*(W_a_right-W_b_prev_right);
-		W_b_right = tanh_fast_high( y_b_right*inv_Vt );
+		W_b_right = tanh_fast_high( float(y_b_right*inv_Vt) );
 		// 3rd transistor stage:
 		y_c_right = y_c_prev_right+g*(W_b_right-W_c_prev_right);
-		W_c_right = tanh_fast_high( y_c_right*inv_Vt );
+		W_c_right = tanh_fast_high( float(y_c_right*inv_Vt) );
 		// 4th transistor stage:
-		y_d_right = y_d_prev_right+g*(W_c_right-tanh_fast_high( y_d_prev_right*inv_Vt ));
+		y_d_right = y_d_prev_right+g*(W_c_right-tanh_fast_high( float(y_d_prev_right*inv_Vt) ));
 
 		// record stuff for next step
 		y_d_prev_prev_right = y_d_prev_right;
@@ -376,7 +378,7 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 		W_b_prev_right = W_b_right;
 		W_c_prev_right = W_c_right;
 		
-		outBuf[i] = y_d_right;
+		outBuf[i] = (float)y_d_right;
 	}
 	float out;
 	if (oversample_protected == oversample2) {
@@ -390,12 +392,12 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 		out = 0.0f;
 
 		// Reset all State Variables to 0 to stop the NaN
-		y_a_prev_right = 0.0f; y_b_prev_right = 0.0f; y_c_prev_right = 0.0f;
-		y_d_prev_right = 0.0f; y_d_prev_prev_right = 0.0f;
+		y_a_prev_right = 0.0; y_b_prev_right = 0.0; y_c_prev_right = 0.0;
+		y_d_prev_right = 0.0; y_d_prev_prev_right = 0.0;
 		W_a_prev_right = 0.0f; W_b_prev_right = 0.0f; W_c_prev_right = 0.0f;
 
 		// Reset current steps too (not strictly necessary but safe)
-		y_a_right = 0.0f; y_b_right = 0.0f; y_c_right = 0.0f; y_d_right = 0.0f;
+		y_a_right = 0.0; y_b_right = 0.0; y_c_right = 0.0; y_d_right = 0.0;
 		W_a_right = 0.0f; W_b_right = 0.0f; W_c_right = 0.0f;
 	}
 	outputs[FLORA_OUTPUT2].setVoltage(out/inv_drive);
