@@ -63,6 +63,13 @@ struct Alias : Module {
 	alignas(16) float power[numBins] = {};
 	int bufferIndex = 0;
 
+	const int MUTE_RADIUS_BINS = 3;
+	const int MINIMUM_FUNDAMENTAL_SEARCHRADIUS_BINS = 5;
+	const int MINIMUM_HARMONICS_SEARCHRADIUS_BINS = 4;
+	const float MAXIMUM_TOWARDS_NEXT_HARMONICS_SEARCH_FRACTION = 0.45f;
+	const float HARMONICS_SEARCHRADIUS = 0.10f;
+	const float FUNDAMENTAL_SEARCHRADIUS = 0.05f;
+
 	// debug
 	//volatile float debugValue = 0.0f;
 
@@ -78,8 +85,7 @@ struct Alias : Module {
 
 		benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
 
-		/*
-		// Pre-calculate the Blackman-Harris window
+		// Blackman-Harris Window coefficients
 		const float a0 = 0.35875f;
 		const float a1 = 0.48829f;
 		const float a2 = 0.14128f;
@@ -92,8 +98,8 @@ struct Alias : Module {
 						   + a2 * std::cos(4.0f * (float)M_PI * phase)
 						   - a3 * std::cos(6.0f * (float)M_PI * phase);
 		}
-		*/
 
+		/*
 		// Flat Top Window coefficients
 		float a0 = 0.21557895;
 		float a1 = 0.41663158;
@@ -108,6 +114,7 @@ struct Alias : Module {
 				- a3 * cos(6.0 * M_PI * (double)i / double(FFT_SIZE))
 				+ a4 * cos(8.0 * M_PI * (double)i / double(FFT_SIZE));
 		}
+		*/
 	}
 
 	void onReset(const ResetEvent& e) override {
@@ -273,7 +280,7 @@ struct Alias : Module {
 
 					// Find the fundamental
 					const int expectedFundBin = (int)std::round(sweepFreq / binResolution);
-					const int searchWidth = std::max(5, (int)(expectedFundBin * 0.05f)); // Search +/- 5% around expected pitch
+					const int searchWidth = std::max(MINIMUM_FUNDAMENTAL_SEARCHRADIUS_BINS, (int)(expectedFundBin * FUNDAMENTAL_SEARCHRADIUS)); // Search +/- 5% around expected pitch
 
 					int actualFundBin = expectedFundBin;
 					float maxMag = 0.0f;
@@ -295,10 +302,10 @@ struct Alias : Module {
 						const int expectedBin = (int)std::round(expectedHz / binResolution);
 						// Find the actual peak for this harmonic (h=1, 2, 3 etc.)
 						// We look in a +-10% window to handle drifting VCOs
-						int searchRadius = (int)std::round((expectedHz * 0.10f) / binResolution);
+						int searchRadius = (int)std::round((expectedHz * HARMONICS_SEARCHRADIUS) / binResolution);
 						// Don't look so far that we hit the next harmonic
-						int maxSearch = (int)((trueFundFreq / binResolution) * 0.45f);
-						searchRadius = std::min(std::max(searchRadius, 7), maxSearch);
+						int maxSearch = (int)((trueFundFreq / binResolution) * MAXIMUM_TOWARDS_NEXT_HARMONICS_SEARCH_FRACTION);
+						searchRadius = std::min(std::max(searchRadius, MINIMUM_HARMONICS_SEARCHRADIUS_BINS), maxSearch);// note: do not use clamp
 						int peakBin = expectedBin;
 						float maxMag2 = -1.0f;
 						// Search the window for the loudest bin
@@ -310,11 +317,10 @@ struct Alias : Module {
 								}
 							}
 						}
-						// Now scoop exactly 7 bins for the Flat-top window power
-						constexpr int measureRadius = 7; // 4 for Blackman-Harris, 7 for flattop
+						// Now scoop exactly 3 bins for the BH window power
 						float currentHarmonicPower = 0.0f;
 
-						for (int i = peakBin - measureRadius; i <= peakBin + measureRadius; i++) {
+						for (int i = peakBin - MUTE_RADIUS_BINS; i <= peakBin + MUTE_RADIUS_BINS; i++) {
 							if (i > 0 && i < numBins) {
 								currentHarmonicPower += power[i];
 								power[i] = 0.0f; // Mute this harmonic so only noise remains
