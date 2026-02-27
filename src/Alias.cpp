@@ -485,6 +485,12 @@ struct AliasDisplay : TransparentWidget {
 				nvgMoveTo(args.vg, x, graphY);
 				nvgLineTo(args.vg, x, graphY + graphHeight);
 			}
+			const float sixty = (-60.f - DISPLAY_BOTTOM_DB) / (DISPLAY_TOP_DB - DISPLAY_BOTTOM_DB);;
+			const float hundredtwenty = (-120.f - DISPLAY_BOTTOM_DB) / (DISPLAY_TOP_DB - DISPLAY_BOTTOM_DB);;
+			nvgMoveTo(args.vg, 0, sixty);
+			nvgLineTo(args.vg, graphWidth, sixty);
+			nvgMoveTo(args.vg, 0, hundredtwenty);
+			nvgLineTo(args.vg, graphWidth, hundredtwenty);
 			nvgStrokeColor(args.vg, nvgRGBA(0x00, 0x55, 0x00, 0xFF)); // Faint dark green
 			nvgStrokeWidth(args.vg, DISPLAY_STROKE);
 			nvgStroke(args.vg);
