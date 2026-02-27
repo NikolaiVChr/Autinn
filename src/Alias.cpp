@@ -454,7 +454,7 @@ struct AliasDisplay : TransparentWidget {
 			// samplerate
 			nvgFillColor(args.vg, nvgRGBA(0, 255, 0, 255));
 			nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP );
-			std::string rateText = string::f("%.1K Hz  %.2gs", std::round(module->lastSampleRate * 0.01f) * 0.1f, module->activeSettleTime);
+			std::string rateText = string::f("%.1fK Hz  %.2gs", std::round(module->lastSampleRate * 0.01f) * 0.1f, module->activeSettleTime);
 			nvgText(args.vg, 0, 55, rateText.c_str(), nullptr);
 		}
 
