@@ -63,7 +63,7 @@ struct Alias : Module {
 	alignas(16) float power[numBins] = {};
 	int bufferIndex = 0;
 
-	const int MUTE_RADIUS_BINS = 4;
+	const int MUTE_RADIUS_BINS = 5;// TODO: the 5th bin is -92dB of 0th bin. Have to mute it :(
 	const int MINIMUM_FUNDAMENTAL_SEARCHRADIUS_BINS = 5;
 	const int MINIMUM_HARMONICS_SEARCHRADIUS_BINS = 4;
 	const float MAXIMUM_TOWARDS_NEXT_HARMONICS_SEARCH_FRACTION = 0.45f;
@@ -473,14 +473,14 @@ struct AliasDisplay : TransparentWidget {
 			nvgFill(args.vg);
 
 			// Draw vertical grid lines
-			float sRate = (module->lastSampleRate > 0) ? module->lastSampleRate : 44100.0f;
-			float binRes = sRate / float(module->FFT_SIZE);
-			float startFreq = std::round(module->START_HZ / binRes) * binRes;
+			const float sRate = (module->lastSampleRate > 0) ? module->lastSampleRate : 44100.0f;
+			const float binRes = sRate / float(module->FFT_SIZE);
+			const float startFreq = std::round(module->START_HZ / binRes) * binRes;
 
 			nvgBeginPath(args.vg);
 			for (int i = 0; i < 3; i++) {
-				float targetLogP = std::log(module->targetFrequencies[i] / startFreq) / std::log(module->END_HZ / startFreq);
-				float x = graphX + targetLogP * graphWidth;
+				const float targetLogP = std::log(module->targetFrequencies[i] / startFreq) / std::log(module->END_HZ / startFreq);
+				const float x = graphX + targetLogP * graphWidth;
 
 				nvgMoveTo(args.vg, x, graphY);
 				nvgLineTo(args.vg, x, graphY + graphHeight);
