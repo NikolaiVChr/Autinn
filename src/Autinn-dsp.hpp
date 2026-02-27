@@ -27,7 +27,7 @@ using namespace rack::dsp;
 
 /**
  * PolyBLEP: Polynomial Band-Limited Step
- * Smooths the sharp discontinuity of sawtooth-ish osc. to remove aliasing of the sharp drop.
+ * Smooths the sharp discontinuity of sawtooth-ish osc to remove aliasing of the sharp drop.
  *
  * Much faster than minBLEP, and kinda decent.
  *
@@ -326,12 +326,16 @@ public:
     }
 };
 
+/**
+ * A fast tanh saturator that produce less aliasing than a regular tanh
+ * Alternative to oversampling.
+ */
 struct ADAATanh {
 private:
     float lastX = 0.0f;
 
     // antiderivative of tanh_fast_low
-    inline float antiderivative(float x) const {
+    static float antiderivative(float x) {
         float absX = std::abs(x);
 
         if (absX >= 3.0f) {
@@ -344,14 +348,8 @@ private:
         return (1.0f / 18.0f) * x2 + (4.0f / 3.0f) * std::log(x2 + 3.0f);
     }
 
-    inline float tanh_fast_low(const float x) const {
-        const float x_safe = clamp(x, -3.0f, 3.0f);
-        const float x2 = x_safe * x_safe;
-        return x_safe * (27.0f + x2) / (27.0f + 9.0f * x2);
-    }
-
 public:
-    inline float process(float x) {
+    float process(float x) {
         float out;
         float diff = x - lastX;
 

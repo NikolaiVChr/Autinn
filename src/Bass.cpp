@@ -63,8 +63,8 @@
 #define VCA_ENV_3_END 3
 #define VCA_ENV_4_OFF 4
 
-static const int oversample2 = 2;
-static const int oversample4 = 4;
+static constexpr int oversample2 = 2;
+static constexpr int oversample4 = 4;
 
 static const float LOG2_CUTOFF_RANGE = std::log2(CUTOFF_KNOB_MAX / CUTOFF_KNOB_MIN);
 
@@ -246,12 +246,12 @@ struct Bass : Module {
 
 	float vca_env(bool gateRising, float resonance,float knob_accent, float dt);
 	float vca_env_acc(bool gateRising, float resonance,float knob_accent, float dt);
-	float filter_env(bool gateRising,float decay_cutoff_time, float accent, float r, float knob_accent, float dt);
-	float acid_filter(float in, float r, float cutoff, int oversample_protected, float dt);
-	float attackCurve(float x, unsigned target);
-	float accentAttackCurve(float x);
-	float accentAttackCurveInverse(float y);
-	float toExp(float x, float min, float max);
+	float filter_env(bool gateRising,float knob_env_decay, float accent, float r, float knob_accent, float dt);
+	float acid_filter(float in, float r, float F_c, int oversample_protected, float dt);
+	static float attackCurve(float x, unsigned target);
+	static float accentAttackCurve(float x);
+	static float accentAttackCurveInverse(float y);
+	static float toExp(float x, float min, float max);
 	float accent_env(bool gateRising, bool accent, float knob_accent, float dt);
 	void setEnvMod(bool envmod_oct);
 	void process(const ProcessArgs &args) override;
@@ -546,7 +546,7 @@ void Bass::process(const ProcessArgs &args) {
 
 float Bass::attackCurve(float xx, unsigned target) {
 	//return log10f(xx/target+1.0f)*3.321928f;
-	return std::log2f(xx/target + 1.0f);//same
+	return std::log2f(xx/float(target) + 1.0f);//same
 }
 
 float Bass::accentAttackCurve(float xx) {
@@ -723,7 +723,7 @@ float Bass::vca_env_acc(bool gateRising, float resonance, float knob_accent, flo
 	switch (mode_vca) {
 		case VCA_ENV_0_ATTACK: {//attack
 			float fraction = target_vca==0?1.0f:float(number_vca) * inv_target_vca;
-			level = this->accentAttackCurve(fraction) * attack_vca_accent_peak;
+			level = Bass::accentAttackCurve(fraction) * attack_vca_accent_peak;
 			current_vca = level;
 			break;
 		} case VCA_ENV_1_PEAK: { //peak
@@ -827,7 +827,7 @@ float Bass::filter_env(bool gate, float knob_env_decay, float accent, float reso
 		case FILTER_ENV_0_ATTACK: { //attack
 			if (accentBool) {
 				float fraction = target_cutoff==0?1.0f:float(number_cutoff) * inv_target_cutoff;
-				level = this->accentAttackCurve(fraction) * (accentAttackPeak - accentAttackBase) + accentAttackBase;
+				level = Bass::accentAttackCurve(fraction) * (accentAttackPeak - accentAttackBase) + accentAttackBase;
 			} else {
 				level = 1.0f;//instant
 			}
@@ -882,8 +882,8 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected, 
 	
 	float g2;
 	if (firstPoleOneOctHigher) {
-		float w_c2 = 2.0f*w_c;
-		g2 = V_t * (0.0008116984f + 0.9724111f*w_c2 - 0.5077766f*w_c2*w_c2 + 0.1534058f*w_c2*w_c2*w_c2);
+		double w_c2 = 2.0*w_c;
+		g2 = float(V_t * (0.0008116984 + 0.9724111*w_c2 - 0.5077766*w_c2*w_c2 + 0.1534058*w_c2*w_c2*w_c2));
 	} else {
 		g2 = g;
 	}
@@ -897,7 +897,8 @@ float Bass::acid_filter(float in, float r, float F_c, int oversample_protected, 
 	}
 
 	for (int i = 0; i < oversample_protected; i++) {
-		x   = inInter[i] - float( 2.0f*Gres*r*(y_d_prev+y_d_prev_prev-priority*inInter[i]));//unit and a half feedback delay. -inInter[i] is Gcomp, to make passband gain not decrease too much when turning up resonance.
+		//unit and a half feedback delay. -inInter[i] is Gcomp, to make passband gain not decrease too much when turning up resonance.
+		x   = inInter[i] - float( 2.0f*Gres*r*(y_d_prev+y_d_prev_prev-priority*inInter[i])) + 1e-9f;// 1e-9 for denormal protection
 
 		// 1st transistor stage:
 		y_a = y_a_prev+g2*(tanh_fast_low( x*inv_Vt )-W_a_prev);
@@ -1041,69 +1042,69 @@ struct BassWidget : ModuleWidget {
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/BassModule.svg")));
 		//box.size = Vec(16 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
-		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, 0.f)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2.f * RACK_GRID_WIDTH, 0.f)));
 		addChild(createWidget<ScrewStarAutinn>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+		addChild(createWidget<ScrewStarAutinn>(Vec(box.size.x - 2.f * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
 		//addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 1*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::CUTOFF_PARAM));
-		auto cutKnob = createParam<AutinnArcSmallKnob>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 1*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::CUTOFF_PARAM);
+		auto cutKnob = createParam<AutinnArcSmallKnob>(Vec(12.f * RACK_GRID_WIDTH*0.25f-HALF_KNOB_SMALL, 1.f*RACK_GRID_HEIGHT/4.f-HALF_KNOB_SMALL), module, Bass::CUTOFF_PARAM);
 		cutKnob->setModulation(Bass::CV_CUTOFF_INPUT, [](float cv, float val, float att) {
 							return clamp(val + cv*att, 0.0f, 1.0f);
 						}, Bass::CV_CUTOFF_PARAM);
 		addParam(cutKnob);
 		//addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.75-HALF_KNOB_SMALL, 1*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::RESONANCE_PARAM));
-		auto qKnob = createParam<AutinnArcSmallKnob>(Vec(12 * RACK_GRID_WIDTH*0.75-HALF_KNOB_SMALL, 1*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::RESONANCE_PARAM);
+		auto qKnob = createParam<AutinnArcSmallKnob>(Vec(12.f * RACK_GRID_WIDTH*0.75f-HALF_KNOB_SMALL, 1.f*RACK_GRID_HEIGHT/4.f-HALF_KNOB_SMALL), module, Bass::RESONANCE_PARAM);
 		qKnob->setModulation(Bass::CV_RESONANCE_INPUT, [](float cv, float val, float att) {
 							return clamp(val + cv*att, 0.0f, RESONANCE_MAX);
 						}, Bass::CV_RESONANCE_PARAM);
 		addParam(qKnob);
 		//addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.5-HALF_KNOB_SMALL, 1.625*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ENV_DECAY_PARAM));
-		auto decayKnob = createParam<AutinnArcSmallKnob>(Vec(12 * RACK_GRID_WIDTH*0.5-HALF_KNOB_SMALL, 1.625*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ENV_DECAY_PARAM);
+		auto decayKnob = createParam<AutinnArcSmallKnob>(Vec(12.f * RACK_GRID_WIDTH*0.5f-HALF_KNOB_SMALL, 1.625f*RACK_GRID_HEIGHT/4.f-HALF_KNOB_SMALL), module, Bass::ENV_DECAY_PARAM);
 		decayKnob->setModulation(Bass::CV_DECAY_INPUT, [](float cv, float val, float att) {
 							return clamp(val + cv*att, DECAY_VCF_MIN,DECAY_VCF_MAX);
 						}, Bass::CV_DECAY_PARAM);
 		addParam(decayKnob);
 		//addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 2.25*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ENVMOD_PARAM));
-		auto modKnob = createParam<AutinnArcSmallKnob>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_KNOB_SMALL, 2.25*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ENVMOD_PARAM);
+		auto modKnob = createParam<AutinnArcSmallKnob>(Vec(12.f * RACK_GRID_WIDTH*0.25f-HALF_KNOB_SMALL, 2.25f*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ENVMOD_PARAM);
 		modKnob->setModulation(Bass::CV_ENVMOD_INPUT, [](float cv, float val, float att) {
 							return clamp(val + cv*att, 0.0f, 1.0f);
 						}, Bass::CV_ENVMOD_PARAM);
 		addParam(modKnob);
-		addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.75-HALF_KNOB_SMALL, 2.25*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::ACCENT_PARAM));
+		addParam(createParam<RoundSmallAutinnKnob>(Vec(12.f * RACK_GRID_WIDTH*0.75f-HALF_KNOB_SMALL, 2.25f*RACK_GRID_HEIGHT/4.f-HALF_KNOB_SMALL), module, Bass::ACCENT_PARAM));
 
-		addInput(createInput<InPortAutinn>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_PORT, 270-HALF_PORT), module, Bass::ACCENT_GATE_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(12 * RACK_GRID_WIDTH*0.75-HALF_PORT, 270-HALF_PORT), module, Bass::NOTE_GATE_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(12.f * RACK_GRID_WIDTH*0.25f-HALF_PORT, 270.f-HALF_PORT), module, Bass::ACCENT_GATE_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(12.f * RACK_GRID_WIDTH*0.75f-HALF_PORT, 270.f-HALF_PORT), module, Bass::NOTE_GATE_INPUT));
 
-		addInput(createInput<InPortAutinn>(Vec(12 * RACK_GRID_WIDTH*0.25-HALF_PORT, 300), module, Bass::OSC_INPUT));
-		addOutput(createOutput<OutPortAutinn>(Vec(12 * RACK_GRID_WIDTH*0.75-HALF_PORT, 300), module, Bass::BASS_OUTPUT));
+		addInput(createInput<InPortAutinn>(Vec(12.f * RACK_GRID_WIDTH*0.25f-HALF_PORT, 300.f), module, Bass::OSC_INPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(12.f * RACK_GRID_WIDTH*0.75f-HALF_PORT, 300.f), module, Bass::BASS_OUTPUT));
 		
-		addChild(createLight<SmallLight<RedLight>>(Vec(12 * RACK_GRID_WIDTH*0.16-6.4252*0.5, RACK_GRID_HEIGHT/5.5), module, Bass::A_LIGHT));
-		addChild(createLight<SmallLight<GreenLight>>(Vec(12 * RACK_GRID_WIDTH*0.32-6.4252*0.5, RACK_GRID_HEIGHT/5.5), module, Bass::B_LIGHT));
-		addChild(createLight<SmallLight<YellowLight>>(Vec(12 * RACK_GRID_WIDTH*0.48-6.4252*0.5, RACK_GRID_HEIGHT/5.5), module, Bass::C_LIGHT));
-		addChild(createLight<SmallLight<RedLight>>(Vec(12 * RACK_GRID_WIDTH*0.66-6.4252*0.5, RACK_GRID_HEIGHT/5.5), module, Bass::D_LIGHT));
+		addChild(createLight<SmallLight<RedLight>>(Vec(12.f * RACK_GRID_WIDTH*0.16f-6.4252f*0.5f, RACK_GRID_HEIGHT/5.5f), module, Bass::A_LIGHT));
+		addChild(createLight<SmallLight<GreenLight>>(Vec(12.f * RACK_GRID_WIDTH*0.32f-6.4252f*0.5f, RACK_GRID_HEIGHT/5.5f), module, Bass::B_LIGHT));
+		addChild(createLight<SmallLight<YellowLight>>(Vec(12.f * RACK_GRID_WIDTH*0.48f-6.4252f*0.5f, RACK_GRID_HEIGHT/5.5f), module, Bass::C_LIGHT));
+		addChild(createLight<SmallLight<RedLight>>(Vec(12.f * RACK_GRID_WIDTH*0.66f-6.4252f*0.5f, RACK_GRID_HEIGHT/5.5f), module, Bass::D_LIGHT));
 
-		addChild(createLight<SmallLight<BlueLight>>(Vec(12 * RACK_GRID_WIDTH*0.82-6.4252*0.5, RACK_GRID_HEIGHT/6.0), module, Bass::E_LIGHT));
+		addChild(createLight<SmallLight<BlueLight>>(Vec(12.f * RACK_GRID_WIDTH*0.82f-6.4252f*0.5f, RACK_GRID_HEIGHT/6.0f), module, Bass::E_LIGHT));
 
-		addChild(createLight<SmallLight<RedLight>>(Vec(12 * RACK_GRID_WIDTH*0.16-6.4252*0.5, RACK_GRID_HEIGHT/6.5), module, Bass::A2_LIGHT));
-		addChild(createLight<SmallLight<GreenLight>>(Vec(12 * RACK_GRID_WIDTH*0.32-6.4252*0.5, RACK_GRID_HEIGHT/6.5), module, Bass::B2_LIGHT));
-		addChild(createLight<SmallLight<YellowLight>>(Vec(12 * RACK_GRID_WIDTH*0.48-6.4252*0.5, RACK_GRID_HEIGHT/6.5), module, Bass::C2_LIGHT));
-		addChild(createLight<SmallLight<RedLight>>(Vec(12 * RACK_GRID_WIDTH*0.66-6.4252*0.5, RACK_GRID_HEIGHT/6.5), module, Bass::D2_LIGHT));
+		addChild(createLight<SmallLight<RedLight>>(Vec(12.f * RACK_GRID_WIDTH*0.16f-6.4252f*0.5f, RACK_GRID_HEIGHT/6.5f), module, Bass::A2_LIGHT));
+		addChild(createLight<SmallLight<GreenLight>>(Vec(12.f * RACK_GRID_WIDTH*0.32f-6.4252f*0.5f, RACK_GRID_HEIGHT/6.5f), module, Bass::B2_LIGHT));
+		addChild(createLight<SmallLight<YellowLight>>(Vec(12.f * RACK_GRID_WIDTH*0.48f-6.4252f*0.5f, RACK_GRID_HEIGHT/6.5f), module, Bass::C2_LIGHT));
+		addChild(createLight<SmallLight<RedLight>>(Vec(12.f * RACK_GRID_WIDTH*0.66f-6.4252f*0.5f, RACK_GRID_HEIGHT/6.5f), module, Bass::D2_LIGHT));
 
-		addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH*0.875-HALF_PORT, 1*RACK_GRID_HEIGHT/5-HALF_PORT), module, Bass::CV_CUTOFF_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH*0.875-HALF_PORT, 2*RACK_GRID_HEIGHT/5-HALF_PORT), module, Bass::CV_RESONANCE_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH*0.875-HALF_PORT, 3*RACK_GRID_HEIGHT/5-HALF_PORT), module, Bass::CV_DECAY_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(16 * RACK_GRID_WIDTH*0.875-HALF_PORT, 4*RACK_GRID_HEIGHT/5-HALF_PORT), module, Bass::CV_ENVMOD_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(16.f * RACK_GRID_WIDTH*0.875f-HALF_PORT, 1.f*RACK_GRID_HEIGHT/5.f-HALF_PORT), module, Bass::CV_CUTOFF_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(16.f * RACK_GRID_WIDTH*0.875f-HALF_PORT, 2.f*RACK_GRID_HEIGHT/5.f-HALF_PORT), module, Bass::CV_RESONANCE_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(16.f * RACK_GRID_WIDTH*0.875f-HALF_PORT, 3.f*RACK_GRID_HEIGHT/5.f-HALF_PORT), module, Bass::CV_DECAY_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(16.f * RACK_GRID_WIDTH*0.875f-HALF_PORT, 4.f*RACK_GRID_HEIGHT/5.f-HALF_PORT), module, Bass::CV_ENVMOD_INPUT));
 
-		addParam(createParam<RoundSmallAutinnKnob>(Vec(16 * RACK_GRID_WIDTH*0.875-HALF_KNOB_SMALL, 1.35*RACK_GRID_HEIGHT/5-HALF_KNOB_SMALL), module, Bass::CV_CUTOFF_PARAM));
-		addParam(createParam<RoundSmallAutinnKnob>(Vec(16 * RACK_GRID_WIDTH*0.875-HALF_KNOB_SMALL, 2.35*RACK_GRID_HEIGHT/5-HALF_KNOB_SMALL), module, Bass::CV_RESONANCE_PARAM));
-		addParam(createParam<RoundSmallAutinnKnob>(Vec(16 * RACK_GRID_WIDTH*0.875-HALF_KNOB_SMALL, 3.35*RACK_GRID_HEIGHT/5-HALF_KNOB_SMALL), module, Bass::CV_DECAY_PARAM));
-		addParam(createParam<RoundSmallAutinnKnob>(Vec(16 * RACK_GRID_WIDTH*0.875-HALF_KNOB_SMALL, 4.35*RACK_GRID_HEIGHT/5-HALF_KNOB_SMALL), module, Bass::CV_ENVMOD_PARAM));
+		addParam(createParam<RoundSmallAutinnKnob>(Vec(16.f * RACK_GRID_WIDTH*0.875f-HALF_KNOB_SMALL, 1.35f*RACK_GRID_HEIGHT/5.f-HALF_KNOB_SMALL), module, Bass::CV_CUTOFF_PARAM));
+		addParam(createParam<RoundSmallAutinnKnob>(Vec(16.f * RACK_GRID_WIDTH*0.875f-HALF_KNOB_SMALL, 2.35f*RACK_GRID_HEIGHT/5.f-HALF_KNOB_SMALL), module, Bass::CV_RESONANCE_PARAM));
+		addParam(createParam<RoundSmallAutinnKnob>(Vec(16.f * RACK_GRID_WIDTH*0.875f-HALF_KNOB_SMALL, 3.35f*RACK_GRID_HEIGHT/5.f-HALF_KNOB_SMALL), module, Bass::CV_DECAY_PARAM));
+		addParam(createParam<RoundSmallAutinnKnob>(Vec(16.f * RACK_GRID_WIDTH*0.875f-HALF_KNOB_SMALL, 4.35f*RACK_GRID_HEIGHT/5.f-HALF_KNOB_SMALL), module, Bass::CV_ENVMOD_PARAM));
 
-		addChild(createLight<SmallLight<GreenLight>>(Vec(12 * RACK_GRID_WIDTH*0.5-6.4252*0.5, 270-5-6.4252*0.5), module, Bass::GATE_LIGHT));
-		addChild(createLight<SmallLight<GreenLight>>(Vec(12 * RACK_GRID_WIDTH*0.5-6.4252*0.5, 270+5-6.4252*0.5), module, Bass::TRIG_LIGHT));
-		addChild(createLight<SmallLight<RedLight>>(Vec(12 * RACK_GRID_WIDTH*0.125-6.4252*0.5, 300-6.4252*0.5), module, Bass::GAIN_LIGHT));
-		addParam(createParam<RoundButtonSmallAutinn>(Vec(12 * RACK_GRID_WIDTH*0.5+7.5, 270-17.5-HALF_BUTTON_SMALL), module, Bass::BUTTON_PARAM));
+		addChild(createLight<SmallLight<GreenLight>>(Vec(12.f * RACK_GRID_WIDTH*0.5f-6.4252f*0.5f, 270-5.f-6.4252f*0.5f), module, Bass::GATE_LIGHT));
+		addChild(createLight<SmallLight<GreenLight>>(Vec(12.f * RACK_GRID_WIDTH*0.5f-6.4252f*0.5f, 270+5.f-6.4252f*0.5f), module, Bass::TRIG_LIGHT));
+		addChild(createLight<SmallLight<RedLight>>(Vec(12.f * RACK_GRID_WIDTH*0.125f-6.4252f*0.5f, 300-6.4252f*0.5f), module, Bass::GAIN_LIGHT));
+		addParam(createParam<RoundButtonSmallAutinn>(Vec(12.f * RACK_GRID_WIDTH*0.5f+7.5f, 270.f-17.5f-HALF_BUTTON_SMALL), module, Bass::BUTTON_PARAM));
 	//	addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.5-HALF_KNOB_SMALL, 2.5*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::DECAY2_PARAM));
 	//	addParam(createParam<RoundSmallAutinnKnob>(Vec(12 * RACK_GRID_WIDTH*0.5-HALF_KNOB_SMALL, 3.5*RACK_GRID_HEIGHT/4-HALF_KNOB_SMALL), module, Bass::DECAY3_PARAM));
 	}
