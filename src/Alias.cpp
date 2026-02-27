@@ -204,6 +204,7 @@ struct Alias : Module {
 				currentStep = 0;
 				sweepFreq = getFreqForStep(0);
 				activeSettleTime = params[SETTLE_KNOB].getValue();
+				mode = params[VCO_MODE_SWITCH].getValue() > 0.5f;
 				sweepPhase = 0.0f;
 				benchmarkScores[0] = benchmarkScores[1] = benchmarkScores[2] = -210.0f;
 				benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
@@ -213,9 +214,10 @@ struct Alias : Module {
 
 		float out = 0.0f;
 
-		mode = params[VCO_MODE_SWITCH].getValue() > 0.5f;
-
-		if (currentState != READY && currentState != FINISHED) {
+		if (currentState == READY || currentState == NOT_READY) {
+			activeSettleTime = params[SETTLE_KNOB].getValue();
+			mode = params[VCO_MODE_SWITCH].getValue() > 0.5f;
+		} else if (currentState != READY && currentState != FINISHED) {
 
 			if (mode) {
 				// 1V/Octave
