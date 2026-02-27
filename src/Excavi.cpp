@@ -125,18 +125,18 @@ struct Excavi : Module {
 		configParam<Param3Digits>(GAIN_PARAM + 0, 0.0f, 1.0f, 1.0f, "Master gain", " dB", -10.0f, 20.f, .0f);
 		configParam<Param3Digits>(GAIN_PARAM + 1, 0.0f, 1.0f, 1.0f, "Slave gain", " dB", -10.0f, 20.f, .0f);
 		configParam<Param3Digits>(CROSS_MODULATION_PARAM, -1.0f, 1.0f, 0.0f, "Cross modulation");
-		configSwitch(INTER_SYNC_TOGGLE_PARAM, 0.0f, 2.0f, 0.0f, "Toggle sync mode", {"Off", "Soft", "Hard"});
+		configSwitch(INTER_SYNC_TOGGLE_PARAM, 0.0f, 2.0f, 0.0f, "Toggle sync mode (master -> slave)", {"Off", "Soft", "Hard"});
 
 		configInput(CV_PITCH_INPUT+0, "Master 1V/Oct CV");
 		configInput(CV_PITCH_INPUT+1, "Slave 1V/Oct CV");
-		configInput(CV_GAIN_INPUT+0, "CV master gain");
-		configInput(CV_GAIN_INPUT+1, "CV slave gain");
-		configInput(CV_SYNC_INPUT, "CV sync master (hard)");
-		configInput(CV_INTER_SYNC_TOGGLE_INPUT, "CV sync mode between master and slave toggle");
+		configInput(CV_GAIN_INPUT+0, "Master gain CV");
+		configInput(CV_GAIN_INPUT+1, "Slave gain CV");
+		configInput(CV_SYNC_INPUT, "Ext. sync master (hard) CV");
+		configInput(CV_INTER_SYNC_TOGGLE_INPUT, "Switch sync mode (master -> slave) CV");
 		configInput(CV_AGE_INPUT, "1V/decade age CV");
 		configInput(CV_CROSS_MODULATION_INPUT, "Cross modulation CV");
-		configInput(CV_SHAPE_INPUT+0, "1V/shape CV master");
-		configInput(CV_SHAPE_INPUT+1, "1V/shape CV slave");
+		configInput(CV_SHAPE_INPUT+0, "1V/shape CV (master)");
+		configInput(CV_SHAPE_INPUT+1, "1V/shape CV (slave)");
 
 		configOutput(BUZZ_OUTPUT, "Main audio");
 		configOutput(RING_MODULATION_OUTPUT, "Ring modulation audio");
@@ -638,9 +638,9 @@ struct ExcaviWidget : ModuleWidget {
 		});
     	addParam(gain2Knob);
 
-        addChild(createLightCentered<MediumLight<BlueLight>>(Vec((xCenter+xMidR)*0.5f, yRow3-10.f), module, Excavi::OFF_SYNC_LIGHT));
-    	addChild(createLightCentered<MediumLight<YellowLight>>(Vec((xCenter+xMidR)*0.5f, yRow3), module, Excavi::SOFT_SYNC_LIGHT));
-    	addChild(createLightCentered<MediumLight<RedLight>>(Vec((xCenter+xMidR)*0.5f, yRow3+10.f), module, Excavi::HARD_SYNC_LIGHT));
+        addChild(createLightCentered<SmallLight<BlueLight>>(Vec((xCenter+xMidR)*0.5f, yRow3-10.f), module, Excavi::OFF_SYNC_LIGHT));
+    	addChild(createLightCentered<SmallLight<YellowLight>>(Vec((xCenter+xMidR)*0.5f, yRow3), module, Excavi::SOFT_SYNC_LIGHT));
+    	addChild(createLightCentered<SmallLight<RedLight>>(Vec((xCenter+xMidR)*0.5f, yRow3+10.f), module, Excavi::HARD_SYNC_LIGHT));
 
         // Row 4: Pitch CV & cross-mod CV
         addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow4), module, Excavi::CV_PITCH_INPUT + 0));
