@@ -392,6 +392,10 @@ struct AliasDisplay : TransparentWidget {
 	float panelWidth = 128.0f;
 	int frame = 0;
 
+	const float DISPLAY_TOP_DB = 0.0f;
+	const float DISPLAY_BOTTOM_DB = -144.0f;
+	const float DISPLAY_STROKE = 0.5f;
+
 	AliasDisplay() : module(nullptr) {
 		box.size = Vec(panelWidth, panelHeight);
 	}
@@ -476,7 +480,7 @@ struct AliasDisplay : TransparentWidget {
 				nvgLineTo(args.vg, x, graphY + graphHeight);
 			}
 			nvgStrokeColor(args.vg, nvgRGBA(0x00, 0x55, 0x00, 0xFF)); // Faint dark green
-			nvgStrokeWidth(args.vg, 0.5f);
+			nvgStrokeWidth(args.vg, DISPLAY_STROKE);
 			nvgStroke(args.vg);
 
 			// Draw the THD curve
@@ -486,8 +490,8 @@ struct AliasDisplay : TransparentWidget {
 			for (int i = 0; i < module->STEPS; i++) {
 				float x = graphX + (i / float(module->STEPS-1)) * graphWidth;
 				
-				// Map -120dB (bottom) to 0dB (top)
-				float normalizedY = (module->ratioCurve[i] + 120.0f) / 120.0f;
+				// Map -144dB (bottom) to 0dB (top)
+				float normalizedY = (module->ratioCurve[i] - DISPLAY_BOTTOM_DB) / (DISPLAY_TOP_DB - DISPLAY_BOTTOM_DB);
 				normalizedY = clamp(normalizedY, -100.0f, 1.0f);// 1.0 is top
 				
 				float y = graphY + graphHeight - (normalizedY * graphHeight); 
