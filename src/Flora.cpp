@@ -80,59 +80,59 @@ struct Flora : Module {
 	
 	//LEFT
 	
-	double y_a = 0.0;
-	double y_b = 0.0;
-	double y_c = 0.0;
-	double y_d = 0.0;
+	float y_a = 0.0f;
+	float y_b = 0.0f;
+	float y_c = 0.0f;
+	float y_d = 0.0f;
 	float W_a = 0.0f;
 	float W_b = 0.0f;
 	float W_c = 0.0f;
 
-	double y_a_prev = 0.0;
-	double y_b_prev = 0.0;
-	double y_c_prev = 0.0;
-	double y_d_prev = 0.0;
-	double y_d_prev_prev = 0.0;
+	float y_a_prev = 0.0f;
+	float y_b_prev = 0.0f;
+	float y_c_prev = 0.0f;
+	float y_d_prev = 0.0f;
+	float y_d_prev_prev = 0.0f;
 
 	float W_a_prev = 0.0f;
 	float W_b_prev = 0.0f;
 	float W_c_prev = 0.0f;
-	
-	dsp::Upsampler<oversample2, 8> upsampler2;
-	dsp::Decimator<oversample2, 8> decimator2;
-	dsp::Upsampler<oversample4, 8> upsampler4;
-	dsp::Decimator<oversample4, 8> decimator4;
-	dsp::Upsampler<oversample8, 8> upsampler8;
-	dsp::Decimator<oversample8, 8> decimator8;
+
+	dsp::Upsampler<oversample2, 10> upsampler2;
+	dsp::Decimator<oversample2, 10> decimator2;
+	dsp::Upsampler<oversample4, 10> upsampler4;
+	dsp::Decimator<oversample4, 10> decimator4;
+	dsp::Upsampler<oversample8, 10> upsampler8;
+	dsp::Decimator<oversample8, 10> decimator8;
 
 	// RIGHT
-	
-	double y_a_right = 0.0;
-	double y_b_right = 0.0;
-	double y_c_right = 0.0;
-	double y_d_right = 0.0;
+
+	float y_a_right = 0.0f;
+	float y_b_right = 0.0f;
+	float y_c_right = 0.0f;
+	float y_d_right = 0.0f;
 	float W_a_right = 0.0f;
 	float W_b_right = 0.0f;
 	float W_c_right = 0.0f;
 
-	double y_a_prev_right = 0.0;
-	double y_b_prev_right = 0.0;
-	double y_c_prev_right = 0.0;
-	double y_d_prev_right = 0.0;
-	double y_d_prev_prev_right = 0.0;
+	float y_a_prev_right = 0.0f;
+	float y_b_prev_right = 0.0f;
+	float y_c_prev_right = 0.0f;
+	float y_d_prev_right = 0.0f;
+	float y_d_prev_prev_right = 0.0f;
 
 	float W_a_prev_right = 0.0f;
 	float W_b_prev_right = 0.0f;
 	float W_c_prev_right = 0.0f;
-	
-	dsp::Upsampler<oversample2, 8> upsampler2_right;
-	dsp::Decimator<oversample2, 8> decimator2_right;
-	dsp::Upsampler<oversample4, 8> upsampler4_right;
-	dsp::Decimator<oversample4, 8> decimator4_right;
-	dsp::Upsampler<oversample8, 8> upsampler8_right;
-	dsp::Decimator<oversample8, 8> decimator8_right;
 
-	
+	dsp::Upsampler<oversample2, 10> upsampler2_right;
+	dsp::Decimator<oversample2, 10> decimator2_right;
+	dsp::Upsampler<oversample4, 10> upsampler4_right;
+	dsp::Decimator<oversample4, 10> decimator4_right;
+	dsp::Upsampler<oversample8, 10> upsampler8_right;
+	dsp::Decimator<oversample8, 10> decimator8_right;
+
+
 
 	Flora() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -163,6 +163,7 @@ struct Flora : Module {
 	json_t *dataToJson() override {
 		json_t *root = json_object();
 		//json_object_set_new(root, "Gcomp", json_righteal((double) gComp));
+		json_object_set_new(root, "oversample", json_integer(current_oversample));
 		json_object_set_new(root, "autoLevel", json_boolean(autoLevel));
 		return root;
 	}
@@ -174,6 +175,13 @@ struct Flora : Module {
 		json_t *ext2 = json_object_get(rootJ, "autoLevel");
 		if (ext2)
 			autoLevel = json_boolean_value(ext2);
+		json_t *ext3 = json_object_get(rootJ, "oversample");
+		if (ext3) {
+			current_oversample = json_integer_value(ext3);
+			if (current_oversample != 2 and current_oversample != 4 and current_oversample != 8) {
+				current_oversample = 4;
+			}
+		}
 	}
 
 	void onReset(const ResetEvent& e) override {
@@ -182,8 +190,6 @@ struct Flora : Module {
 		current_oversample = 2;
 		Module::onReset(e);
 	}
-
-	static int getOversampleAmount(float sampleRate);
 };
 
 static const float LOG_FREQ_RANGE = logf(FREQ_MAX/FREQ_MIN);
@@ -194,12 +200,6 @@ float Flora::toExp(const float x) {
 }
 
 
-int Flora::getOversampleAmount(const float sampleRate) {
-	if (sampleRate < 50000.0f) return 8;
-	if (sampleRate < 100000.0f) return 4;
-	if (sampleRate < 200000.0f) return 2;
-	return 1;
-}
 
 void Flora::process(const ProcessArgs &args) {
 	// Implements a 4-Pole transistor ladder LP filter
@@ -234,40 +234,42 @@ void Flora::process(const ProcessArgs &args) {
 	if (!outputs[FLORA_OUTPUT].isConnected() and !outputs[FLORA_OUTPUT2].isConnected()) {
 		return;
 	}
-	const int oversample_protected = getOversampleAmount(args.sampleRate);
+	int oversample_protected = current_oversample;// to be sure its not modified from another thread inside step.
 	float drive = clamp(params[DRIVE_PARAM].getValue()+inputs[DRIVE_INPUT].getVoltage()*params[DRIVE_INFL_PARAM].getValue(),0.0f,DRIVE_MAX);
-	
+
 	r     = clamp(params[RESONANCE_PARAM].getValue()+(inputs[RESONANCE_INPUT].getVoltage()*params[RESONANCE_INFL_PARAM].getValue()), 0.0f, RESONANCE_MAX);
 	input_cutoff =  std::exp2f(inputs[CUTOFF_INPUT].getVoltage()*params[CUTOFF_INFL_PARAM].getValue());
-	float F_c   = clamp(Flora::toExp(params[CUTOFF_PARAM].getValue())*input_cutoff, FREQ_MIN, FREQ_MAX);
-	F_s   = args.sampleRate*float(oversample_protected);
+	float F_c   = clamp(this->toExp(params[CUTOFF_PARAM].getValue())*input_cutoff, FREQ_MIN, FREQ_MAX);
+	F_s   = args.sampleRate*oversample_protected;
 
 	if (F_c != F_c_prev || F_s != F_s_prev) {
-		auto w_c = double(2.0*M_PI*F_c/F_s);// cutoff in radians per sample.
-		// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
-		// w_c can be very tiny, so we use double:
-		g = float(V_t * (0.0008116984 + w_c * (0.9724111 + w_c * (-0.5077766 + w_c * 0.1534058))));
-		Gres = float(1.037174 + w_c * (3.606925 + w_c * (7.074555 + w_c * (-18.14674 + w_c * 9.364587))));
+		double w_c = double(2.0f*M_PI*F_c/F_s);// cutoff in radians per sample.
+		//g = V_t * ( 0.9892f*w_c-0.4342f*w_c*w_c+0.1381f*w_c*w_c*w_c-0.0202f*w_c*w_c*w_c*w_c); // old auto tuned g for cutoff
+		g = V_t * (0.0008116984 + 0.9724111*w_c - 0.5077766*w_c*w_c + 0.1534058*w_c*w_c*w_c);// new auto tuned g for cutoff  4th order: y = 0.00007055354 + 0.9960577*x - 0.6082669*x^2 + 0.286043*x^3 - 0.05393212*x^4
+		//g = V_t * 2.0f * tanh_fast_high(w_c * 0.5f);//newest auto tuned g for cutoff
+		//g = V_t * (1.0f - exp(-2.0f*M_PI*F_c/F_s));// old naive
+		//Gres = 1.0029f+0.0526f*w_c-0.0926f*w_c*w_c+0.0218f*w_c*w_c*w_c;// old auto tuned resonance power for resonance <= 1.0 (0.0218->0.218)
+		Gres = 1.037174 + 3.606925*w_c + 7.074555*w_c*w_c - 18.14674*w_c*w_c*w_c + 9.364587*w_c*w_c*w_c*w_c;
 	}
-	
+
 	float inv_drive = VCV_TO_MOOG*INPUT_TO_CAPACITOR*((autoLevel && drive != 0.0f)?clamp(drive,0.10f,DRIVE_MAX):1.0f);
-	
+
 	if (outputs[FLORA_OUTPUT].isConnected()) {
 		this->process_left(args, oversample_protected, drive, inv_drive);
 	}
-	
+
 	if (outputs[FLORA_OUTPUT2].isConnected()) {
 		this->process_right(args, oversample_protected, drive, inv_drive);
 	}
-	
+
 	F_c_prev = F_c;
 	F_s_prev = F_s;
 }
 
 void Flora::process_left(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive) {
 	float in = inputs[FLORA_INPUT].getVoltage()*drive*VCV_TO_MOOG*INPUT_TO_CAPACITOR;
-	float inInter [oversample8];
-	float outBuf  [oversample8];
+	float inInter [oversample_protected];
+	float outBuf  [oversample_protected];
 	if (oversample_protected == oversample2) {
 		upsampler2.process(in, inInter);
 	} else if (oversample_protected == oversample4) {
@@ -278,20 +280,20 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 
 	for (int i = 0; i < oversample_protected; i++) {
 		// x is the voltage over the capacitor in the first stage:
-		float x   = inInter[i] - float(2.0*r*Gres*(y_d_prev+y_d_prev_prev)) + 1e-9f;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
+		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev+y_d_prev_prev);//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
-		
+
 		// 1st transistor stage:
 		y_a = y_a_prev+g*(tanh_fast_high( x*inv_Vt )-W_a_prev);
-		W_a = tanh_fast_high( float(y_a*inv_Vt) );
+		W_a = tanh_fast_high( y_a*inv_Vt );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
-		W_b = tanh_fast_high( float(y_b*inv_Vt) );
+		W_b = tanh_fast_high( y_b*inv_Vt );
 		// 3rd transistor stage:
 		y_c = y_c_prev+g*(W_b-W_c_prev);
-		W_c = tanh_fast_high( float(y_c*inv_Vt) );
+		W_c = tanh_fast_high( y_c*inv_Vt );
 		// 4th transistor stage:
-		y_d = y_d_prev+g*(W_c-tanh_fast_high( float(y_d_prev*inv_Vt) ));
+		y_d = y_d_prev+g*(W_c-tanh_fast_high( y_d_prev*inv_Vt ));
 
 		// record stuff for next step
 		y_d_prev_prev = y_d_prev;
@@ -303,8 +305,8 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 		W_a_prev = W_a;
 		W_b_prev = W_b;
 		W_c_prev = W_c;
-		
-		outBuf[i] = (float)y_d;
+
+		outBuf[i] = y_d;
 	}
 	float out;
 	if (oversample_protected == oversample2) {
@@ -318,12 +320,12 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 		out = 0.0f;
 
 		// Reset all State Variables to 0 to stop the NaN
-		y_a_prev = 0.0; y_b_prev = 0.0; y_c_prev = 0.0;
-		y_d_prev = 0.0; y_d_prev_prev = 0.0;
+		y_a_prev = 0.0f; y_b_prev = 0.0f; y_c_prev = 0.0f;
+		y_d_prev = 0.0f; y_d_prev_prev = 0.0f;
 		W_a_prev = 0.0f; W_b_prev = 0.0f; W_c_prev = 0.0f;
 
 		// Reset current steps too (not strictly necessary but safe)
-		y_a = 0.0; y_b = 0.0; y_c = 0.0; y_d = 0.0;
+		y_a = 0.0f; y_b = 0.0f; y_c = 0.0f; y_d = 0.0f;
 		W_a = 0.0f; W_b = 0.0f; W_c = 0.0f;
 	}
 	outputs[FLORA_OUTPUT].setVoltage(out/inv_drive);
@@ -331,8 +333,8 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 
 void Flora::process_right(const ProcessArgs &args, int oversample_protected, float drive, float inv_drive) {
 	float in = inputs[FLORA_INPUT2].getVoltage()*drive*VCV_TO_MOOG*INPUT_TO_CAPACITOR;
-	float inInter [oversample8];
-	float outBuf  [oversample8];
+	float inInter [oversample_protected];
+	float outBuf  [oversample_protected];
 
 	if (oversample_protected == oversample2) {
 		upsampler2_right.process(in, inInter);
@@ -344,20 +346,20 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 
 	for (int i = 0; i < oversample_protected; i++) {
 		// x is the voltage over the capacitor in the first stage:
-		float x   = inInter[i] - float( 2.0f*r*Gres*(y_d_prev_right+y_d_prev_prev_right)) + 1e-9f;//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
+		float x   = inInter[i] - 2.0f*r*Gres*(y_d_prev_right+y_d_prev_prev_right);//unit and a half feedback delay to get phaseshift close to 180 deg at cutoff.
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
-		
+
 		// 1st transistor stage:
 		y_a_right = y_a_prev_right+g*(tanh_fast_high( x*inv_Vt )-W_a_prev_right);
-		W_a_right = tanh_fast_high( float(y_a_right*inv_Vt) );
+		W_a_right = tanh_fast_high( y_a_right*inv_Vt );
 		// 2nd transistor stage:
 		y_b_right = y_b_prev_right+g*(W_a_right-W_b_prev_right);
-		W_b_right = tanh_fast_high( float(y_b_right*inv_Vt) );
+		W_b_right = tanh_fast_high( y_b_right*inv_Vt );
 		// 3rd transistor stage:
 		y_c_right = y_c_prev_right+g*(W_b_right-W_c_prev_right);
-		W_c_right = tanh_fast_high( float(y_c_right*inv_Vt) );
+		W_c_right = tanh_fast_high( y_c_right*inv_Vt );
 		// 4th transistor stage:
-		y_d_right = y_d_prev_right+g*(W_c_right-tanh_fast_high( float(y_d_prev_right*inv_Vt) ));
+		y_d_right = y_d_prev_right+g*(W_c_right-tanh_fast_high( y_d_prev_right*inv_Vt ));
 
 		// record stuff for next step
 		y_d_prev_prev_right = y_d_prev_right;
@@ -369,8 +371,8 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 		W_a_prev_right = W_a_right;
 		W_b_prev_right = W_b_right;
 		W_c_prev_right = W_c_right;
-		
-		outBuf[i] = (float)y_d_right;
+
+		outBuf[i] = y_d_right;
 	}
 	float out;
 	if (oversample_protected == oversample2) {
@@ -384,12 +386,12 @@ void Flora::process_right(const ProcessArgs &args, int oversample_protected, flo
 		out = 0.0f;
 
 		// Reset all State Variables to 0 to stop the NaN
-		y_a_prev_right = 0.0; y_b_prev_right = 0.0; y_c_prev_right = 0.0;
-		y_d_prev_right = 0.0; y_d_prev_prev_right = 0.0;
+		y_a_prev_right = 0.0f; y_b_prev_right = 0.0f; y_c_prev_right = 0.0f;
+		y_d_prev_right = 0.0f; y_d_prev_prev_right = 0.0f;
 		W_a_prev_right = 0.0f; W_b_prev_right = 0.0f; W_c_prev_right = 0.0f;
 
 		// Reset current steps too (not strictly necessary but safe)
-		y_a_right = 0.0; y_b_right = 0.0; y_c_right = 0.0; y_d_right = 0.0;
+		y_a_right = 0.0f; y_b_right = 0.0f; y_c_right = 0.0f; y_d_right = 0.0f;
 		W_a_right = 0.0f; W_b_right = 0.0f; W_c_right = 0.0f;
 	}
 	outputs[FLORA_OUTPUT2].setVoltage(out/inv_drive);
@@ -422,7 +424,7 @@ struct AutoLevelMenuItem : MenuItem {
 	{
 		this->text = label;
 	}
-	
+
 	void onAction(const event::Action &e) override {
 		_module->autoLevel = !_module->autoLevel;
 	}
@@ -432,6 +434,25 @@ struct AutoLevelMenuItem : MenuItem {
 	}
 };
 
+
+struct OversampleFloraMenuItem : MenuItem {
+	Flora* _module;
+	int _os;
+
+	OversampleFloraMenuItem(Flora* module, const char* label, int os)
+	: _module(module), _os(os)
+	{
+		this->text = label;
+	}
+
+	void onAction(const event::Action &e) override {
+		_module->current_oversample = _os;
+	}
+
+	void step() override {
+		rightText = _module->current_oversample == _os ? "✔" : "";
+	}
+};
 
 struct FloraWidget : ModuleWidget {
 	FloraWidget(Flora *module) {
@@ -473,19 +494,19 @@ struct FloraWidget : ModuleWidget {
 		addParam(drvKnob);
 
 
-		addInput(createInput<InPortAutinn>(Vec(10.f, RACK_GRID_HEIGHT-275.f-HALF_PORT), module, Flora::CUTOFF_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(10.f, RACK_GRID_HEIGHT-205.f-HALF_PORT), module, Flora::RESONANCE_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(10.f, RACK_GRID_HEIGHT-135.f-HALF_PORT), module, Flora::DRIVE_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-275-HALF_PORT), module, Flora::CUTOFF_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-205-HALF_PORT), module, Flora::RESONANCE_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(10, RACK_GRID_HEIGHT-135-HALF_PORT), module, Flora::DRIVE_INPUT));
 
-		addInput(createInput<InPortAutinn>(Vec(9.f * RACK_GRID_WIDTH*0.15f-HALF_PORT, 300.f), module, Flora::FLORA_INPUT));
-		addInput(createInput<InPortAutinn>(Vec(9.f * RACK_GRID_WIDTH*0.35f-HALF_PORT, 300.f), module, Flora::FLORA_INPUT2));
-		addOutput(createOutput<OutPortAutinn>(Vec(9.f * RACK_GRID_WIDTH*0.60f-HALF_PORT, 300.f), module, Flora::FLORA_OUTPUT));
-		addOutput(createOutput<OutPortAutinn>(Vec(9.f * RACK_GRID_WIDTH*0.85f-HALF_PORT, 300.f), module, Flora::FLORA_OUTPUT2));
+		addInput(createInput<InPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.15-HALF_PORT, 300), module, Flora::FLORA_INPUT));
+		addInput(createInput<InPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.35-HALF_PORT, 300), module, Flora::FLORA_INPUT2));
+		addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.60-HALF_PORT, 300), module, Flora::FLORA_OUTPUT));
+		addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.85-HALF_PORT, 300), module, Flora::FLORA_OUTPUT2));
 		//addOutput(createOutput<OutPortAutinn>(Vec(9 * RACK_GRID_WIDTH*0.5-HALF_PORT, 300), module, Flora::OUTPUT_W));
 	}
-	
+
 	void appendContextMenu(Menu* menu) override {
-		auto* a = dynamic_cast<Flora*>(module);
+		Flora* a = dynamic_cast<Flora*>(module);
 		assert(a);
 
 		//menu->addChild(new MenuLabel());
@@ -493,6 +514,10 @@ struct FloraWidget : ModuleWidget {
 		//menu->addChild(new EmphasizeMenuItem(a, "Medium compensation",  0.5f));
 		//menu->addChild(new EmphasizeMenuItem(a, "No compensation", 0.0f));
 
+		menu->addChild(new MenuLabel());
+		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x2", 2));
+		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x4", 4));
+		menu->addChild(new OversampleFloraMenuItem(a, "Oversample x8", 8));
 		menu->addChild(new MenuLabel());
 		menu->addChild(new AutoLevelMenuItem(a, "Auto level"));
 	}
