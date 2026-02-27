@@ -43,7 +43,7 @@ struct Alias : Module {
 	float activeSettleTime = 0.05f;
 	volatile bool mode = false;
 
-	static constexpr int FFT_SIZE = 16384;
+	static constexpr int FFT_SIZE = 32768;
 	static constexpr int STEPS = 256;
 	static constexpr int numBins = FFT_SIZE / 2;
 	static constexpr float START_HZ = 50.0f;
@@ -86,13 +86,13 @@ struct Alias : Module {
 		benchmarkRecorded[0] = benchmarkRecorded[1] = benchmarkRecorded[2] = false;
 
 		// Blackman-Harris Window coefficients
-		const float a0 = 0.35875f;
-		const float a1 = 0.48829f;
-		const float a2 = 0.14128f;
-		const float a3 = 0.01168f;
+		constexpr float a0 = 0.35875f;
+		constexpr float a1 = 0.48829f;
+		constexpr float a2 = 0.14128f;
+		constexpr float a3 = 0.01168f;
 
 		for (int i = 0; i < FFT_SIZE; i++) {
-			float phase = (float)i / (float)(FFT_SIZE - 1);
+			const float phase = (float)i / (float)(FFT_SIZE - 1);
 			windowArray[i] = a0
 						   - a1 * std::cos(2.0f * (float)M_PI * phase)
 						   + a2 * std::cos(4.0f * (float)M_PI * phase)
