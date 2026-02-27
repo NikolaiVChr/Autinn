@@ -63,7 +63,7 @@ struct Alias : Module {
 	alignas(16) float power[numBins] = {};
 	int bufferIndex = 0;
 
-	const int MUTE_RADIUS_BINS = 3;
+	const int MUTE_RADIUS_BINS = 4;
 	const int MINIMUM_FUNDAMENTAL_SEARCHRADIUS_BINS = 5;
 	const int MINIMUM_HARMONICS_SEARCHRADIUS_BINS = 4;
 	const float MAXIMUM_TOWARDS_NEXT_HARMONICS_SEARCH_FRACTION = 0.45f;
