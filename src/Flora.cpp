@@ -98,12 +98,12 @@ struct Flora : Module {
 	float W_b_prev = 0.0f;
 	float W_c_prev = 0.0f;
 	
-	dsp::Upsampler<oversample2, 8> upsampler2;
-	dsp::Decimator<oversample2, 8> decimator2;
-	dsp::Upsampler<oversample4, 8> upsampler4;
-	dsp::Decimator<oversample4, 8> decimator4;
-	dsp::Upsampler<oversample8, 8> upsampler8;
-	dsp::Decimator<oversample8, 8> decimator8;
+	dsp::Upsampler<oversample2, 10> upsampler2;
+	dsp::Decimator<oversample2, 10> decimator2;
+	dsp::Upsampler<oversample4, 10> upsampler4;
+	dsp::Decimator<oversample4, 10> decimator4;
+	dsp::Upsampler<oversample8, 10> upsampler8;
+	dsp::Decimator<oversample8, 10> decimator8;
 
 	// RIGHT
 	
@@ -163,7 +163,6 @@ struct Flora : Module {
 	json_t *dataToJson() override {
 		json_t *root = json_object();
 		//json_object_set_new(root, "Gcomp", json_righteal((double) gComp));
-		json_object_set_new(root, "oversample", json_integer(current_oversample));
 		json_object_set_new(root, "autoLevel", json_boolean(autoLevel));
 		return root;
 	}
@@ -175,13 +174,6 @@ struct Flora : Module {
 		json_t *ext2 = json_object_get(rootJ, "autoLevel");
 		if (ext2)
 			autoLevel = json_boolean_value(ext2);
-		json_t *ext3 = json_object_get(rootJ, "oversample");
-		if (ext3) {
-			current_oversample = int(json_integer_value(ext3));
-			if (current_oversample != 2 and current_oversample != 4 and current_oversample != 8) {
-				current_oversample = 4;
-			}
-		}
 	}
 
 	void onReset(const ResetEvent& e) override {
