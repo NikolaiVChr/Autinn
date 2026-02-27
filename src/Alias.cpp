@@ -485,8 +485,11 @@ struct AliasDisplay : TransparentWidget {
 				nvgMoveTo(args.vg, x, graphY);
 				nvgLineTo(args.vg, x, graphY + graphHeight);
 			}
-			const float sixty = (-60.f - DISPLAY_BOTTOM_DB) / (DISPLAY_TOP_DB - DISPLAY_BOTTOM_DB);;
-			const float hundredtwenty = (-120.f - DISPLAY_BOTTOM_DB) / (DISPLAY_TOP_DB - DISPLAY_BOTTOM_DB);;
+			// draw horiz lines
+			float sixty = (-60.f - DISPLAY_BOTTOM_DB) / (DISPLAY_TOP_DB - DISPLAY_BOTTOM_DB);
+			sixty = graphY + graphHeight - (sixty * graphHeight);
+			float hundredtwenty = (-120.f - DISPLAY_BOTTOM_DB) / (DISPLAY_TOP_DB - DISPLAY_BOTTOM_DB);
+			hundredtwenty = graphY + graphHeight - (hundredtwenty * graphHeight);
 			nvgMoveTo(args.vg, 0, sixty);
 			nvgLineTo(args.vg, graphWidth, sixty);
 			nvgMoveTo(args.vg, 0, hundredtwenty);
