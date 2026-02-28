@@ -64,7 +64,7 @@ struct Excavi : Module {
 		ENUMS(CV_GAIN_INPUT,2),
 		CV_SYNC_INPUT,
 		CV_AGE_INPUT,
-		CV_INTER_SYNC_TOGGLE_INPUT,
+		CV_INTER_SYNC_TOGGLE_INPUT,//kept in enum for backwards compat
 		CV_CROSS_MODULATION_INPUT,
 		ENUMS(CV_SHAPE_INPUT,2),
 		NUM_INPUTS
@@ -110,7 +110,7 @@ struct Excavi : Module {
 		return 1;
 	}
 
-	dsp::SchmittTrigger schmittButton;
+	//dsp::SchmittTrigger schmittButton;
 	dsp::SchmittTrigger syncTrigger[16];
 	bool hardSyncEnabled = false;
 	bool softSyncEnabled = false;
@@ -132,7 +132,7 @@ struct Excavi : Module {
 		configInput(CV_GAIN_INPUT+0, "Master gain CV");
 		configInput(CV_GAIN_INPUT+1, "Slave gain CV");
 		configInput(CV_SYNC_INPUT, "Ext. sync master (hard) CV");
-		configInput(CV_INTER_SYNC_TOGGLE_INPUT, "Switch sync mode (master -> slave) CV");
+		//configInput(CV_INTER_SYNC_TOGGLE_INPUT, "Switch sync mode (master -> slave) CV");
 		configInput(CV_AGE_INPUT, "1V/decade age CV");
 		configInput(CV_CROSS_MODULATION_INPUT, "Cross modulation CV");
 		configInput(CV_SHAPE_INPUT+0, "1V/shape CV (master)");
@@ -381,11 +381,13 @@ struct Excavi : Module {
 		const float osSampleTime = args.sampleTime / (float)oversample;
 
 		int button = (int)std::round(params[INTER_SYNC_TOGGLE_PARAM].getValue());
+		/*
 		if (schmittButton.process(inputs[CV_INTER_SYNC_TOGGLE_INPUT].getVoltage())) {
 			button++;
 			if (button > 2) button = 0;
 			params[INTER_SYNC_TOGGLE_PARAM].setValue((float)button);
 		}
+		*/
 		if (button == 0) {
 			hardSyncEnabled = false;
 			softSyncEnabled = false;
@@ -646,7 +648,7 @@ struct ExcaviWidget : ModuleWidget {
         addInput(createInputCentered<InPortAutinn>(Vec(xLeft, yRow4), module, Excavi::CV_PITCH_INPUT + 0));
     	addInput(createInputCentered<InPortAutinn>(Vec(xMidL, yRow4), module, Excavi::CV_SYNC_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(xCenter, yRow4), module, Excavi::CV_CROSS_MODULATION_INPUT));
-    	addInput(createInputCentered<InPortAutinn>(Vec(xMidR, yRow4), module, Excavi::CV_INTER_SYNC_TOGGLE_INPUT));
+    	//addInput(createInputCentered<InPortAutinn>(Vec(xMidR, yRow4), module, Excavi::CV_INTER_SYNC_TOGGLE_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(xRight, yRow4), module, Excavi::CV_PITCH_INPUT + 1));
 
         // Row 5: Gain CV & age CV
