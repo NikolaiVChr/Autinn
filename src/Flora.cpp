@@ -98,12 +98,12 @@ struct Flora : Module {
 	float W_b_prev = 0.0f;
 	float W_c_prev = 0.0f;
 	
-	dsp::Upsampler<oversample2, 8> upsampler2;
-	dsp::Decimator<oversample2, 8> decimator2;
-	dsp::Upsampler<oversample4, 8> upsampler4;
-	dsp::Decimator<oversample4, 8> decimator4;
-	dsp::Upsampler<oversample8, 8> upsampler8;
-	dsp::Decimator<oversample8, 8> decimator8;
+	dsp::Upsampler<oversample2, 16> upsampler2;
+	dsp::Decimator<oversample2, 16> decimator2;
+	dsp::Upsampler<oversample4, 16> upsampler4;
+	dsp::Decimator<oversample4, 16> decimator4;
+	dsp::Upsampler<oversample8, 16> upsampler8;
+	dsp::Decimator<oversample8, 16> decimator8;
 
 	// RIGHT
 	
