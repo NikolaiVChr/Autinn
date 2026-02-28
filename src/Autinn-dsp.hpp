@@ -330,7 +330,7 @@ public:
  * A fast tanh saturator that produce less aliasing than a regular tanh
  * Alternative to oversampling.
  */
-struct ADAATanh {
+struct ADAATanhLow {
 private:
     float lastX = 0.0f;
 
@@ -356,6 +356,56 @@ public:
         if (std::abs(diff) < 1e-4f) {
             // Fallback for when delta is too small to avoid division by zero
             out = tanh_fast_low((x + lastX) * 0.5f);
+        } else {
+            out = (antiderivative(x) - antiderivative(lastX)) / diff;
+        }
+
+        lastX = x;
+        return out;
+    }
+
+    void reset() {
+        lastX = 0.0f;
+    }
+};
+
+struct ADAATanhMid {
+private:
+    float lastX = 0.0f;
+    // Constants derived from the partial fraction decomposition of the [5/4] polynomial
+    float c1 = 1.0f / 30.0f;
+    float c2 = 77.0f / 60.0f;
+    float c3 = 46.f/(15.f*std::sqrt(133.f));
+    float root1 = 14.f-std::sqrt(133.f);
+    float root2 = 14.f+std::sqrt(133.f);
+
+    // Antiderivative of the [5/4] Padé tanh_fast_mid
+    float antiderivative(const float x) const {
+        const float absX = std::abs(x);
+
+        if (absX >= 3.6447f) {
+            // Clamped region integral: F(3.6447) + 1.0 * (absX - 3.6447)
+            // F(3.6447) ~ 8.931825. 8.931825 - 3.6447 = 5.2871254
+            return absX + 5.28713327121f;
+        }
+
+        // Padé region integral
+        const float x2 = absX * absX;
+        const float x4 = x2 * x2;
+
+        return c1 * x2
+             + c2 * std::log(x4 + 28.0f * x2 + 63.0f)
+             - c3 * std::log((x2 + root1) / (x2 + root2));
+    }
+
+public:
+    float process(const float x) {
+        float out;
+        const float diff = x - lastX;
+
+        if (std::abs(diff) < 1e-4f) {
+            // Fallback for when delta is too small to avoid division by zero
+            out = tanh_fast_mid((x + lastX) * 0.5f);
         } else {
             out = (antiderivative(x) - antiderivative(lastX)) / diff;
         }

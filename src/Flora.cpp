@@ -1,6 +1,8 @@
 #include "Autinn.hpp"
 #include <cmath>
 
+#include "Autinn-dsp.hpp"
+
 /*
 
     Autinn VCV Rack Plugin
@@ -105,6 +107,12 @@ struct Flora : Module {
 	dsp::Upsampler<oversample8, 16> upsampler8;
 	dsp::Decimator<oversample8, 16> decimator8;
 
+	ADAATanhMid adaa_in_left;
+	ADAATanhMid adaa_a_left;
+	ADAATanhMid adaa_b_left;
+	ADAATanhMid adaa_c_left;
+	ADAATanhMid adaa_d_left;
+
 	// RIGHT
 	
 	double y_a_right = 0.0;
@@ -125,12 +133,12 @@ struct Flora : Module {
 	float W_b_prev_right = 0.0f;
 	float W_c_prev_right = 0.0f;
 	
-	dsp::Upsampler<oversample2, 8> upsampler2_right;
-	dsp::Decimator<oversample2, 8> decimator2_right;
-	dsp::Upsampler<oversample4, 8> upsampler4_right;
-	dsp::Decimator<oversample4, 8> decimator4_right;
-	dsp::Upsampler<oversample8, 8> upsampler8_right;
-	dsp::Decimator<oversample8, 8> decimator8_right;
+	dsp::Upsampler<oversample2, 16> upsampler2_right;
+	dsp::Decimator<oversample2, 16> decimator2_right;
+	dsp::Upsampler<oversample4, 16> upsampler4_right;
+	dsp::Decimator<oversample4, 16> decimator4_right;
+	dsp::Upsampler<oversample8, 16> upsampler8_right;
+	dsp::Decimator<oversample8, 16> decimator8_right;
 
 	
 
@@ -180,6 +188,7 @@ struct Flora : Module {
 		gComp = 0.0f;
 		autoLevel = false;
 		current_oversample = 2;
+		adaa_in_left.reset();adaa_a_left.reset(); adaa_b_left.reset(); adaa_c_left.reset(); adaa_d_left.reset();
 		Module::onReset(e);
 	}
 
@@ -282,16 +291,16 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
-		y_a = y_a_prev+g*(tanh_fast_high( x*inv_Vt )-W_a_prev);
-		W_a = tanh_fast_high( float(y_a*inv_Vt) );
+		y_a = y_a_prev+g*(adaa_in_left.process( x*inv_Vt )-W_a_prev);
+		W_a = adaa_a_left.process( float(y_a*inv_Vt) );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
-		W_b = tanh_fast_high( float(y_b*inv_Vt) );
+		W_b = adaa_b_left.process( float(y_b*inv_Vt) );
 		// 3rd transistor stage:
 		y_c = y_c_prev+g*(W_b-W_c_prev);
-		W_c = tanh_fast_high( float(y_c*inv_Vt) );
+		W_c = adaa_c_left.process( float(y_c*inv_Vt) );
 		// 4th transistor stage:
-		y_d = y_d_prev+g*(W_c-tanh_fast_high( float(y_d_prev*inv_Vt) ));
+		y_d = y_d_prev+g*(W_c-adaa_d_left.process( float(y_d_prev*inv_Vt) ));
 
 		// record stuff for next step
 		y_d_prev_prev = y_d_prev;

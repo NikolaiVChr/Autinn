@@ -363,8 +363,20 @@ inline float tanh_fast_high(float x) {
 	return a / b;
 }
 
+inline float tanh_fast_mid(const float x) {
+	// [5/4] Padé approximant from Lambert's continued fraction
+	const float x_safe = clamp(x, -3.6447f, 3.6447f);
+	const float x2 = x_safe * x_safe;
+
+	// x^5 numerator and x^4 denominator factored to minimize multiplications
+	const float num = x_safe * (945.0f + x2 * (105.0f + x2));
+	const float den = 945.0f + x2 * (420.0f + 15.0f * x2);
+
+	return num / den;
+}
+
 inline float tanh_fast_low(const float x) {
-	// Padé-style approximant
+	// [3/2] Padé-style approximant
 	const float x_safe = clamp(x, -3.0f, 3.0f);
 	const float x2 = x_safe * x_safe;
 	return x_safe * (27.0f + x2) / (27.0f + 9.0f * x2);
