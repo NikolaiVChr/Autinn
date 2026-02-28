@@ -418,3 +418,80 @@ public:
         lastX = 0.0f;
     }
 };
+
+struct ADAATanhMidLUT {
+private:
+    static constexpr int LUT_SIZE = 4096;
+    static constexpr double LUT_MAX = 3.6447;
+    static constexpr double LUT_STEP = LUT_SIZE / LUT_MAX;
+
+    // Static arrays to share the LUT across all instances
+    static double lut[LUT_SIZE + 1];
+    static bool initialized;
+
+    double c1 = 1.0 / 30.0;
+    double c2 = 77.0 / 60.0;
+    double c3 = 49.0 / (15.0 * std::sqrt(133.0));
+    double root1 = 14.0 - std::sqrt(133.0);
+    double root2 = 14.0 + std::sqrt(133.0);
+
+    double lastX = 0.0;
+
+    void initLUT() const {
+        if (initialized) return;
+        for (int i = 0; i <= LUT_SIZE; ++i) {
+            const double absX = i / LUT_STEP;
+            const double x2 = absX * absX;
+            const double x4 = x2 * x2;
+
+            lut[i] = c1 * x2
+                   + c2 * std::log(x4 + 28.0 * x2 + 63.0)
+                   - c3 * std::log((x2 + root1) / (x2 + root2));
+        }
+        initialized = true;
+    }
+
+    static double antiderivative(const double x) {
+        const double absX = std::abs(x);
+
+        // Clamped region
+        if (absX >= LUT_MAX) {
+            return absX + 5.28713327121;
+        }
+
+        // Fast linear interpolation
+        const double floatIndex = absX * LUT_STEP;
+        const int index = (int)floatIndex;
+        const double frac = floatIndex - index;
+
+        return lut[index] + frac * (lut[index + 1] - lut[index]);
+    }
+
+public:
+    ADAATanhMidLUT() {
+        initLUT();
+    }
+
+    float process(const float x_in) {
+        const auto x = static_cast<double>(x_in);
+        double out;
+        const double diff = x - lastX;
+
+        // Tighter threshold for double precision
+        if (std::abs(diff) < 1e-7) {
+            out = tanh_fast_mid(static_cast<float>((x + lastX) * 0.5));
+        } else {
+            out = (antiderivative(x) - antiderivative(lastX)) / diff;
+        }
+
+        lastX = x;
+        return static_cast<float>(out);
+    }
+
+    void reset() {
+        lastX = 0.0;
+    }
+};
+
+double ADAATanhMidLUT::lut[ADAATanhMidLUT::LUT_SIZE + 1];
+bool ADAATanhMidLUT::initialized = false;

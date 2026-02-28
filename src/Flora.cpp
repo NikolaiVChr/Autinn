@@ -107,11 +107,11 @@ struct Flora : Module {
 	dsp::Upsampler<oversample8, 16> upsampler8;
 	dsp::Decimator<oversample8, 16> decimator8;
 
-	ADAATanhMid adaa_in_left;
-	ADAATanhMid adaa_a_left;
-	ADAATanhMid adaa_b_left;
-	ADAATanhMid adaa_c_left;
-	ADAATanhMid adaa_d_left;
+	ADAATanhMidLUT adaa_in_left;
+	ADAATanhMidLUT adaa_a_left;
+	ADAATanhMidLUT adaa_b_left;
+	ADAATanhMidLUT adaa_c_left;
+	ADAATanhMidLUT adaa_d_left;
 
 	// RIGHT
 	
