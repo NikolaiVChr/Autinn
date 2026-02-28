@@ -375,7 +375,7 @@ private:
     // Constants derived from the partial fraction decomposition of the [5/4] polynomial
     float c1 = 1.0f / 30.0f;
     float c2 = 77.0f / 60.0f;
-    float c3 = 46.f/(15.f*std::sqrt(133.f));
+    float c3 = 49.f/(15.f*std::sqrt(133.f));
     float root1 = 14.f-std::sqrt(133.f);
     float root2 = 14.f+std::sqrt(133.f);
 
