@@ -492,3 +492,7 @@ public:
         lastX = 0.0;
     }
 };
+
+// When using it, add these lines to the module file:
+//double ADAATanhMidLUT::lut[ADAATanhMidLUT::LUT_SIZE + 1];
+//bool ADAATanhMidLUT::initialized = false;

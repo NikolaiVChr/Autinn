@@ -3,8 +3,6 @@
 #include "Autinn-dsp.hpp"
 
 
-double ADAATanhMidLUT::lut[ADAATanhMidLUT::LUT_SIZE + 1];
-bool ADAATanhMidLUT::initialized = false;
 
 /*
 
@@ -110,11 +108,6 @@ struct Flora : Module {
 	dsp::Upsampler<oversample8, 16> upsampler8;
 	dsp::Decimator<oversample8, 16> decimator8;
 
-	ADAATanhMidLUT adaa_in_left;
-	ADAATanhMidLUT adaa_a_left;
-	ADAATanhMidLUT adaa_b_left;
-	ADAATanhMidLUT adaa_c_left;
-	ADAATanhMidLUT adaa_d_left;
 
 	// RIGHT
 	
@@ -191,7 +184,6 @@ struct Flora : Module {
 		gComp = 0.0f;
 		autoLevel = false;
 		current_oversample = 2;
-		adaa_in_left.reset();adaa_a_left.reset(); adaa_b_left.reset(); adaa_c_left.reset(); adaa_d_left.reset();
 		Module::onReset(e);
 	}
 
@@ -294,16 +286,16 @@ void Flora::process_left(const ProcessArgs &args, int oversample_protected, floa
 		// -inInter[i]*Gcomp to make passband gain not decrease too much when turning up resonance. This was disabled due to lowered resonance power too much.
 		
 		// 1st transistor stage:
-		y_a = y_a_prev+g*(adaa_in_left.process( x*inv_Vt )-W_a_prev);
-		W_a = adaa_a_left.process( float(y_a*inv_Vt) );
+		y_a = y_a_prev+g*(tanh_fast_high( x*inv_Vt )-W_a_prev);
+		W_a = tanh_fast_high( float(y_a*inv_Vt) );
 		// 2nd transistor stage:
 		y_b = y_b_prev+g*(W_a-W_b_prev);
-		W_b = adaa_b_left.process( float(y_b*inv_Vt) );
+		W_b = tanh_fast_high( float(y_b*inv_Vt) );
 		// 3rd transistor stage:
 		y_c = y_c_prev+g*(W_b-W_c_prev);
-		W_c = adaa_c_left.process( float(y_c*inv_Vt) );
+		W_c = tanh_fast_high( float(y_c*inv_Vt) );
 		// 4th transistor stage:
-		y_d = y_d_prev+g*(W_c-adaa_d_left.process( float(y_d_prev*inv_Vt) ));
+		y_d = y_d_prev+g*(W_c-tanh_fast_high( float(y_d_prev*inv_Vt) ));
 
 		// record stuff for next step
 		y_d_prev_prev = y_d_prev;
