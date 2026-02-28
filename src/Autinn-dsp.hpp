@@ -492,6 +492,3 @@ public:
         lastX = 0.0;
     }
 };
-
-double ADAATanhMidLUT::lut[ADAATanhMidLUT::LUT_SIZE + 1];
-bool ADAATanhMidLUT::initialized = false;

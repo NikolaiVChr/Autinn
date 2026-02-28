@@ -1,7 +1,10 @@
 #include "Autinn.hpp"
 #include <cmath>
-
 #include "Autinn-dsp.hpp"
+
+
+double ADAATanhMidLUT::lut[ADAATanhMidLUT::LUT_SIZE + 1];
+bool ADAATanhMidLUT::initialized = false;
 
 /*
 
