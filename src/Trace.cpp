@@ -257,28 +257,26 @@ struct Trace : Module {
         outputs[X_OUTPUT].setChannels(activeChannels);
         outputs[Y_OUTPUT].setChannels(activeChannels);
 
-        float scale = params[SCALE_PARAM].getValue();
-        if (inputs[CV_SCALE_INPUT].isConnected()) {
-            scale += inputs[CV_SCALE_INPUT].getVoltage() * 0.1f;
-        }
-        scale = clamp(scale, 0.0f, 2.0f);
-
-        float angleRaw = params[ROTATE_PARAM].getValue();
-        if (inputs[CV_ROTATE_INPUT].isConnected()) {
-            angleRaw += inputs[CV_ROTATE_INPUT].getVoltage() * 0.2f;
-        }
-        float angleRads = -angleRaw * (float)M_PI;
-
-        // Calculate trig once per sample
-        float cosT = std::cos(angleRads);
-        float sinT = std::sin(angleRads);
+        float scaleKnob = params[SCALE_PARAM].getValue();
+        float angleKnob = params[ROTATE_PARAM].getValue();
 
         for (int c = 0; c < activeChannels; c++) {
-            const float cv = inputs[CV_PITCH_INPUT].getPolyVoltage(c);
+            const float cv = inputs[CV_PITCH_INPUT].getChannels() > c ? inputs[CV_PITCH_INPUT].getPolyVoltage(c) : inputs[CV_PITCH_INPUT].getVoltage();
             const float freq = dsp::FREQ_C4 * std::exp2f(params[PITCH_PARAM].getValue() + cv);
 
             phase[c] += freq * args.sampleTime;
             phase[c] -= std::floor(phase[c]);
+
+            float rCV = inputs[CV_ROTATE_INPUT].getChannels() > c ? inputs[CV_ROTATE_INPUT].getPolyVoltage(c) : inputs[CV_ROTATE_INPUT].getVoltage();
+            float angleRaw = angleKnob + rCV * 0.2f;
+            float angleRads = -angleRaw * (float)M_PI;
+            // Calculate trig once per sample
+            float cosT = std::cos(angleRads);
+            float sinT = std::sin(angleRads);
+
+            float sCV = inputs[CV_SCALE_INPUT].getChannels() > c ? inputs[CV_SCALE_INPUT].getPolyVoltage(c) : inputs[CV_SCALE_INPUT].getVoltage();
+            float scale = scaleKnob + sCV * 0.1f;
+            scale = clamp(scale, 0.0f, 10.0f);
 
             const float floatIndex = phase[c] * TABLE_SIZE;
             const int index = (int)floatIndex;
@@ -354,11 +352,11 @@ struct TraceWidget : ModuleWidget {
         addParam(pitchKnob);
         auto scaleKnob = createParamCentered<AutinnArcMidKnob>(Vec(col2, 100.0f), module, Trace::SCALE_PARAM);
         scaleKnob->setModulation(Trace::CV_SCALE_INPUT, [](float cv, float val, float att) {
-            return clamp(val + (cv * 0.1f), 0.0f, 2.0f);
+            return clamp(val + (cv * 0.1f), 0.0f, 10.0f);
         });
         addParam(scaleKnob);
 
-        auto rotKnob = createParamCentered<AutinnArcMidKnob>(Vec(col1, 250.0f), module, Trace::ROTATE_PARAM);
+        auto rotKnob = createParamCentered<AutinnArcMidKnob>(Vec(col1, 220.0f), module, Trace::ROTATE_PARAM);
         rotKnob->setModulation(Trace::CV_ROTATE_INPUT, [](float cv, float val, float att) {
             return val + (cv * 0.2f);
         });
@@ -366,7 +364,7 @@ struct TraceWidget : ModuleWidget {
 
         addInput(createInputCentered<InPortAutinn>(Vec(col1, 160.0f), module, Trace::CV_PITCH_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(col2, 160.0f), module, Trace::CV_SCALE_INPUT));
-        addInput(createInputCentered<InPortAutinn>(Vec(col2, 250.0f), module, Trace::CV_ROTATE_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(col2, 220.0f), module, Trace::CV_ROTATE_INPUT));
 
         addOutput(createOutputCentered<OutPortAutinn>(Vec(col1, 300.0f+HALF_PORT), module, Trace::X_OUTPUT));
         addOutput(createOutputCentered<OutPortAutinn>(Vec(col2, 300.0f+HALF_PORT), module, Trace::Y_OUTPUT));
