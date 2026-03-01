@@ -82,7 +82,7 @@ struct Trace : Module {
 
         configInput(CV_PITCH_INPUT, "1V/Oct CV");
         configInput(CV_SCALE_INPUT, "Scale CV");
-        configInput(CV_SCALE_INPUT, "5V/180deg Rotate CV");
+        configInput(CV_ROTATE_INPUT, "5V/180deg Rotate CV");
 
         configOutput(X_OUTPUT, "X Axis");
         configOutput(Y_OUTPUT, "Y Axis");
@@ -267,7 +267,7 @@ struct Trace : Module {
         if (inputs[CV_ROTATE_INPUT].isConnected()) {
             angleRaw += inputs[CV_ROTATE_INPUT].getVoltage() * 0.2f;
         }
-        float angleRads = angleRaw * (float)M_PI;
+        float angleRads = -angleRaw * (float)M_PI;
 
         // Calculate trig once per sample
         float cosT = std::cos(angleRads);
@@ -358,7 +358,7 @@ struct TraceWidget : ModuleWidget {
         });
         addParam(scaleKnob);
 
-        auto rotKnob = createParamCentered<AutinnArcMidKnob>(Vec((col2+col1)*0.5f, 220.0f), module, Trace::ROTATE_PARAM);
+        auto rotKnob = createParamCentered<AutinnArcMidKnob>(Vec(col1, 250.0f), module, Trace::ROTATE_PARAM);
         rotKnob->setModulation(Trace::CV_ROTATE_INPUT, [](float cv, float val, float att) {
             return val + (cv * 0.2f);
         });
@@ -366,7 +366,7 @@ struct TraceWidget : ModuleWidget {
 
         addInput(createInputCentered<InPortAutinn>(Vec(col1, 160.0f), module, Trace::CV_PITCH_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(col2, 160.0f), module, Trace::CV_SCALE_INPUT));
-        addInput(createInputCentered<InPortAutinn>(Vec((col2+col1)*0.5f, 280.0f), module, Trace::CV_ROTATE_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(col2, 250.0f), module, Trace::CV_ROTATE_INPUT));
 
         addOutput(createOutputCentered<OutPortAutinn>(Vec(col1, 300.0f+HALF_PORT), module, Trace::X_OUTPUT));
         addOutput(createOutputCentered<OutPortAutinn>(Vec(col2, 300.0f+HALF_PORT), module, Trace::Y_OUTPUT));
