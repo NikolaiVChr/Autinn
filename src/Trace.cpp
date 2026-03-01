@@ -74,7 +74,7 @@ struct Trace : Module {
 
     Trace() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(PITCH_PARAM, -4.0f, 6.0f, 0.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
+        configParam(PITCH_PARAM, -4.0f, 6.0f, -3.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
         configParam(SCALE_PARAM, 0.0f, 1.2f, 1.0f, "Scale");
 
         configInput(CV_PITCH_INPUT, "1V/Oct CV");
@@ -337,8 +337,8 @@ struct TraceWidget : ModuleWidget {
         addInput(createInputCentered<InPortAutinn>(Vec(col1, 160.0f), module, Trace::CV_PITCH_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(col2, 160.0f), module, Trace::CV_SCALE_INPUT));
 
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(col1, 240.0f), module, Trace::X_OUTPUT));
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(col2, 240.0f), module, Trace::Y_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(col1, 300.0f+HALF_PORT), module, Trace::X_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(col2, 300.0f+HALF_PORT), module, Trace::Y_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
