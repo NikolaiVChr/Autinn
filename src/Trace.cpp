@@ -2,6 +2,7 @@
 #include <nanosvg.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 /*
 
@@ -61,7 +62,7 @@ struct Trace : Module {
         NUM_LIGHTS
     };
 
-    static constexpr int MAX_SHAPES = 2;
+    static constexpr int MAX_SHAPES = 16;
     static constexpr int TABLE_SIZE = 2048;
 
     float xTable[MAX_SHAPES][TABLE_SIZE] = {};
@@ -107,12 +108,25 @@ struct Trace : Module {
         activeChannels = 0;
         float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f;
 
-        for (NSVGshape* shape = image->shapes; shape != nullptr && activeChannels < MAX_SHAPES; shape = shape->next) {
+        for (const NSVGshape* shape = image->shapes; shape != nullptr && activeChannels < MAX_SHAPES; shape = shape->next) {
+
+            // Collect all paths into a vector
+            std::vector<NSVGpath*> sortedPaths;
+            for (NSVGpath* path = shape->paths; path != nullptr; path = path->next) {
+                sortedPaths.push_back(path);
+            }
+
+            // Sort paths from left to right
+            std::sort(sortedPaths.begin(), sortedPaths.end(), [](const NSVGpath* a, const NSVGpath* b) {
+                return a->bounds[0] < b->bounds[0];
+            });
+
             std::vector<CubicBezier> segs;
             rack::math::Vec lastPt(0.f, 0.f), firstPt(0.f, 0.f);
             bool first = true;
 
-            for (NSVGpath* path = shape->paths; path != nullptr; path = path->next) {
+            // Iterate over the sorted vector instead of the linked list
+            for (NSVGpath* path : sortedPaths) {
                 rack::math::Vec pathStart(path->pts[0], path->pts[1]);
 
                 if (!first) {
@@ -125,7 +139,7 @@ struct Trace : Module {
                 }
 
                 for (int i = 0; i < path->npts - 1; i += 3) {
-                    float* p = &path->pts[i * 2];
+                    const float* p = &path->pts[i * 2];
                     segs.push_back({
                         rack::math::Vec(p[0], p[1]), rack::math::Vec(p[2], p[3]),
                         rack::math::Vec(p[4], p[5]), rack::math::Vec(p[6], p[7]), 0.0f
@@ -136,7 +150,7 @@ struct Trace : Module {
 
             if (segs.empty()) continue;
 
-            // Close the loop
+            // Close the loop back to the start
             rack::math::Vec ctrl1(lastPt.x + (firstPt.x - lastPt.x) * 0.33f, lastPt.y + (firstPt.y - lastPt.y) * 0.33f);
             rack::math::Vec ctrl2(lastPt.x + (firstPt.x - lastPt.x) * 0.66f, lastPt.y + (firstPt.y - lastPt.y) * 0.66f);
             segs.push_back({lastPt, ctrl1, ctrl2, firstPt, 0.0f});
@@ -273,10 +287,10 @@ struct TraceWidget : ModuleWidget {
         setModule(module);
         
         setPanel(createPanel(asset::plugin(pluginInstance, "res/TraceModule.svg")));
-        if (box.size.x == 0) box.size = Vec(10 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
+        //if (box.size.x == 0) box.size = Vec(10 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
-        const float col1 = 3.f * RACK_GRID_WIDTH;
-        const float col2 = 7.f * RACK_GRID_WIDTH;
+        const float col1 = 3.f * RACK_GRID_WIDTH*10.f;
+        const float col2 = 7.f * RACK_GRID_WIDTH*10.f;
 
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(col1, 100.0f), module, Trace::PITCH_PARAM));
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(col2, 100.0f), module, Trace::SCALE_PARAM));
