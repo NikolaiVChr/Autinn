@@ -47,11 +47,13 @@ struct Trace : Module {
     enum ParamIds {
         PITCH_PARAM,
         SCALE_PARAM,
+        ROTATE_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
         CV_PITCH_INPUT,
         CV_SCALE_INPUT,
+        CV_ROTATE_INPUT,
         NUM_INPUTS
     };
     enum OutputIds {
@@ -76,9 +78,11 @@ struct Trace : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         configParam(PITCH_PARAM, -4.0f, 2.0f, -3.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
         configParam(SCALE_PARAM, 0.0f, 1.2f, 1.0f, "Scale");
+        configParam(ROTATE_PARAM, -1.0f, 1.0f, 0.0f, "Rotate");
 
         configInput(CV_PITCH_INPUT, "1V/Oct CV");
         configInput(CV_SCALE_INPUT, "Scale CV");
+        configInput(CV_SCALE_INPUT, "5V/360deg Rotate CV");
 
         configOutput(X_OUTPUT, "X Axis");
         configOutput(Y_OUTPUT, "Y Axis");
@@ -165,7 +169,7 @@ struct Trace : Module {
                 if (prev.y < minY) minY = prev.y; if (prev.y > maxY) maxY = prev.y;
 
                 for (int i = 1; i <= 10; i++) {
-                    rack::math::Vec curr = evalBezier(seg.p0, seg.p1, seg.p2, seg.p3, i / 10.0f);
+                    rack::math::Vec curr = evalBezier(seg.p0, seg.p1, seg.p2, seg.p3, float(i) / 10.0f);
                     len += std::hypot(curr.x - prev.x, curr.y - prev.y);
                     if (curr.x < minX) minX = curr.x; if (curr.x > maxX) maxX = curr.x;
                     if (curr.y < minY) minY = curr.y; if (curr.y > maxY) maxY = curr.y;
@@ -179,7 +183,7 @@ struct Trace : Module {
             int segIdx = 0;
             float lengthAccum = 0.0f;
             for (int i = 0; i < TABLE_SIZE; i++) {
-                float targetLen = (i / (float)TABLE_SIZE) * totalLen;
+                float targetLen = (float(i) / (float)TABLE_SIZE) * totalLen;
                 while (segIdx < (int)segs.size() - 1 && lengthAccum + segs[segIdx].length < targetLen) {
                     lengthAccum += segs[segIdx].length;
                     segIdx++;
@@ -259,6 +263,16 @@ struct Trace : Module {
         }
         scale = clamp(scale, 0.0f, 2.0f);
 
+        float angleRaw = params[ROTATE_PARAM].getValue();
+        if (inputs[CV_ROTATE_INPUT].isConnected()) {
+            angleRaw += inputs[CV_ROTATE_INPUT].getVoltage() * 0.2f;
+        }
+        float angleRads = angleRaw * (float)M_PI;
+
+        // Calculate trig once per sample
+        float cosT = std::cos(angleRads);
+        float sinT = std::sin(angleRads);
+
         for (int c = 0; c < activeChannels; c++) {
             const float cv = inputs[CV_PITCH_INPUT].getPolyVoltage(c);
             const float freq = dsp::FREQ_C4 * std::exp2f(params[PITCH_PARAM].getValue() + cv);
@@ -268,14 +282,17 @@ struct Trace : Module {
 
             const float floatIndex = phase[c] * TABLE_SIZE;
             const int index = (int)floatIndex;
-            const float frac = floatIndex - index;
+            const float frac = floatIndex - (float)index;
             const int nextIndex = (index + 1) % TABLE_SIZE;
 
             const float xOut = xTable[c][index] + frac * (xTable[c][nextIndex] - xTable[c][index]);
             const float yOut = yTable[c][index] + frac * (yTable[c][nextIndex] - yTable[c][index]);
 
-            outputs[X_OUTPUT].setVoltage(xOut * scale, c);
-            outputs[Y_OUTPUT].setVoltage(yOut * scale, c);
+            float rotX = xOut * cosT - yOut * sinT;
+            float rotY = xOut * sinT + yOut * cosT;
+
+            outputs[X_OUTPUT].setVoltage(rotX * scale, c);
+            outputs[Y_OUTPUT].setVoltage(rotY * scale, c);
         }
     }
 
@@ -294,7 +311,7 @@ struct Trace : Module {
 };
 
 struct PasteSvgMenuItem : MenuItem {
-    Trace* module;
+    Trace* module{};
     void onAction(const event::Action& e) override {
         // Ask GLFW for the clipboard string using Rack's window pointer
         const char* clip = glfwGetClipboardString(APP->window->win);
@@ -314,7 +331,7 @@ struct PasteSvgMenuItem : MenuItem {
 };
 
 struct ClearSvgMenuItem : MenuItem {
-    Trace* module;
+    Trace* module{};
     void onAction(const event::Action& e) override {
         module->currentSvg = "";
         module->generateFallbackCircle();
@@ -326,7 +343,6 @@ struct TraceWidget : ModuleWidget {
         setModule(module);
         
         setPanel(createPanel(asset::plugin(pluginInstance, "res/TraceModule.svg")));
-        //if (box.size.x == 0) box.size = Vec(10 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
         const float col1 = 3.f * RACK_GRID_WIDTH;
         const float col2 = 7.f * RACK_GRID_WIDTH;
@@ -342,8 +358,15 @@ struct TraceWidget : ModuleWidget {
         });
         addParam(scaleKnob);
 
+        auto rotKnob = createParamCentered<AutinnArcMidKnob>(Vec((col2+col1)*0.5f, 220.0f), module, Trace::ROTATE_PARAM);
+        rotKnob->setModulation(Trace::CV_ROTATE_INPUT, [](float cv, float val, float att) {
+            return val + (cv * 0.2f);
+        });
+        addParam(rotKnob);
+
         addInput(createInputCentered<InPortAutinn>(Vec(col1, 160.0f), module, Trace::CV_PITCH_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(col2, 160.0f), module, Trace::CV_SCALE_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec((col2+col1)*0.5f, 280.0f), module, Trace::CV_SCALE_INPUT));
 
         addOutput(createOutputCentered<OutPortAutinn>(Vec(col1, 300.0f+HALF_PORT), module, Trace::X_OUTPUT));
         addOutput(createOutputCentered<OutPortAutinn>(Vec(col2, 300.0f+HALF_PORT), module, Trace::Y_OUTPUT));
@@ -354,11 +377,11 @@ struct TraceWidget : ModuleWidget {
         assert(module);
 
         menu->addChild(new MenuSeparator());
-        PasteSvgMenuItem* pasteItem = createMenuItem<PasteSvgMenuItem>("Paste SVG from clipboard");
+        auto* pasteItem = createMenuItem<PasteSvgMenuItem>("Paste SVG from clipboard");
         pasteItem->module = module;
         menu->addChild(pasteItem);
 
-        ClearSvgMenuItem* clearItem = createMenuItem<ClearSvgMenuItem>("Clear SVG");
+        auto* clearItem = createMenuItem<ClearSvgMenuItem>("Clear SVG");
         clearItem->module = module;
         menu->addChild(clearItem);
     }
