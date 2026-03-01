@@ -476,12 +476,12 @@ struct AliasDisplay : TransparentWidget {
 
 			// Draw vertical grid lines
 			const float sRate = (module->lastSampleRate > 0) ? module->lastSampleRate : 44100.0f;
-			const float binRes = sRate / float(module->FFT_SIZE);
-			const float startFreq = std::round(module->START_HZ / binRes) * binRes;
+			const float binRes = sRate / float(Alias::FFT_SIZE);
+			const float startFreq = std::round(Alias::START_HZ / binRes) * binRes;
 
 			nvgBeginPath(args.vg);
 			for (int i = 0; i < 3; i++) {
-				const float targetLogP = std::log(module->targetFrequencies[i] / startFreq) / std::log(module->END_HZ / startFreq);
+				const float targetLogP = std::log(module->targetFrequencies[i] / startFreq) / std::log(Alias::END_HZ / startFreq);
 				const float x = graphX + targetLogP * graphWidth;
 
 				nvgMoveTo(args.vg, x, graphY);
@@ -504,8 +504,8 @@ struct AliasDisplay : TransparentWidget {
 			nvgSave(args.vg);
 			nvgScissor(args.vg, graphX, graphY, graphWidth, graphHeight);
 			nvgBeginPath(args.vg);
-			for (int i = 0; i < module->STEPS; i++) {
-				float x = graphX + (i / float(module->STEPS-1)) * graphWidth;
+			for (int i = 0; i < Alias::STEPS; i++) {
+				float x = graphX + (i / float(Alias::STEPS-1)) * graphWidth;
 				
 				// Map -144dB (bottom) to 0dB (top)
 				float normalizedY = (module->ratioCurve[i] - DISPLAY_BOTTOM_DB) / (DISPLAY_TOP_DB - DISPLAY_BOTTOM_DB);

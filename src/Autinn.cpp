@@ -24,8 +24,8 @@
 Plugin *pluginInstance;
 
 
-void init(rack::Plugin *p) {
-	pluginInstance = p;
+void init(rack::Plugin *plugin) {
+	pluginInstance = plugin;
 	// The "slug" is the unique identifier for your pluginInstance and must never change after release, so choose wisely.
 	// It must only contain letters, numbers, and characters "-" and "_". No spaces.
 	// To guarantee uniqueness, it is a good idea to prefix the slug by your name, alias, or company name if available, e.g. "MyCompany-MyPlugin".
@@ -37,40 +37,41 @@ void init(rack::Plugin *p) {
 
 	// alphabetically order:
 
-	p->addModel(modelAmp);
+	plugin->addModel(modelAmp);
 //	p->addModel(modelAura);
-	p->addModel(modelDeadband);
-	p->addModel(modelBass);
-	p->addModel(modelCVConverter);
-	p->addModel(modelDC);
-	p->addModel(modelDigi);
+	plugin->addModel(modelDeadband);
+	plugin->addModel(modelBass);
+	plugin->addModel(modelCVConverter);
+	plugin->addModel(modelDC);
+	plugin->addModel(modelDigi);
 //	p->addModel(modelDirt);
-	p->addModel(modelFlopper);
-	p->addModel(modelFlora);
-	p->addModel(modelFauna);
-	p->addModel(modelJette);
-	p->addModel(modelBoomerang);
-	p->addModel(modelOxcart);
+	plugin->addModel(modelFlopper);
+	plugin->addModel(modelFlora);
+	plugin->addModel(modelFauna);
+	plugin->addModel(modelJette);
+	plugin->addModel(modelBoomerang);
+	plugin->addModel(modelOxcart);
 //	p->addModel(modelRails);
-	p->addModel(modelSaw);
-	p->addModel(modelSjip);
-	p->addModel(modelSquare);
-	p->addModel(modelVibrato);
-	p->addModel(modelVectorDriver);
-	p->addModel(modelZod);
-	p->addModel(modelTriBand);
-	p->addModel(modelMixer6);
-	p->addModel(modelNon);
-	p->addModel(modelFil);
-	p->addModel(modelNap);
-	p->addModel(modelMelody);
-	p->addModel(modelChord);
-	p->addModel(modelKicker);
-	p->addModel(modelSnare);
-	p->addModel(modelCoil);
-	p->addModel(modelGeiger);
-	p->addModel(modelSaw2);
-	p->addModel(modelScope);
-	p->addModel(modelExcavi);
-	p->addModel(modelAlias);
+	plugin->addModel(modelSaw);
+	plugin->addModel(modelSjip);
+	plugin->addModel(modelSquare);
+	plugin->addModel(modelVibrato);
+	plugin->addModel(modelVectorDriver);
+	plugin->addModel(modelZod);
+	plugin->addModel(modelTriBand);
+	plugin->addModel(modelMixer6);
+	plugin->addModel(modelNon);
+	plugin->addModel(modelFil);
+	plugin->addModel(modelNap);
+	plugin->addModel(modelMelody);
+	plugin->addModel(modelChord);
+	plugin->addModel(modelKicker);
+	plugin->addModel(modelSnare);
+	plugin->addModel(modelCoil);
+	plugin->addModel(modelGeiger);
+	plugin->addModel(modelSaw2);
+	plugin->addModel(modelScope);
+	plugin->addModel(modelExcavi);
+	plugin->addModel(modelAlias);
+	plugin->addModel(modelTrace);
 }

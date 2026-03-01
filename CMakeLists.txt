@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-
+set(CMAKE_CXX_STANDARD 11)
 # Check if building with MetaModule SDK
 if(DEFINED METAMODULE_SDK_DIR)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include cstdint")

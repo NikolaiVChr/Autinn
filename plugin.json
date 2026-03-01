@@ -352,6 +352,17 @@
         "Visual",
         "Utility"
       ]
+    },
+    {
+      "slug": "Trace",
+      "name": "Trace",
+      "description": "Lissajous oscillator",
+      "keywords": "oscilloscope scope",
+      "tags": [
+        "Visual",
+        "Utility",
+        "Polyphonic"
+      ]
     }
   ]
 }
