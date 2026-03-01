@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <iomanip>
 
 /*
 
@@ -108,7 +109,7 @@ struct Trace : Module {
         activeChannels = 0;
         float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f;
 
-        for (const NSVGshape* shape = image->shapes; shape != nullptr && activeChannels < MAX_SHAPES; shape = shape->next) {
+        for (NSVGshape* shape = image->shapes; shape != nullptr && activeChannels < MAX_SHAPES; shape = shape->next) {
 
             // Collect all paths into a vector
             std::vector<NSVGpath*> sortedPaths;
@@ -192,6 +193,8 @@ struct Trace : Module {
             activeChannels++;
         }
 
+        currentSvg = createMinimalSvg(image);
+
         nsvgDelete(image);
         free(dataCopy);
 
@@ -214,8 +217,36 @@ struct Trace : Module {
                 yTable[c][i] = -((yTable[c][i] - centerY) / maxRange) * 10.0f;
             }
         }
+    }
 
-        currentSvg = svgData;
+    static std::string createMinimalSvg(NSVGimage* image) {
+        std::stringstream ss;
+        // 3 decimal places is plenty for scope coordinates
+        ss << std::fixed << std::setprecision(3);
+        ss << "<svg xmlns=\"http://www.w3.org/2000/svg\">";
+
+        int active = 0;
+        // Only save the shapes we actually render
+        for (NSVGshape* shape = image->shapes; shape != nullptr && active < MAX_SHAPES; shape = shape->next) {
+            ss << "<path d=\"";
+            for (NSVGpath* path = shape->paths; path != nullptr; path = path->next) {
+                // Move-To command (Start of path)
+                ss << "M" << path->pts[0] << "," << path->pts[1] << " ";
+
+                // Curve-To commands (Cubic Beziers)
+                for (int i = 0; i < path->npts - 1; i += 3) {
+                    float* p = &path->pts[i * 2];
+                    ss << "C" << p[2] << "," << p[3] << " "
+                       << p[4] << "," << p[5] << " "
+                       << p[6] << "," << p[7] << " ";
+                }
+                if (path->closed) ss << "Z ";
+            }
+            ss << "\"/>";
+            active++;
+        }
+        ss << "</svg>";
+        return ss.str();
     }
 
     void process(const ProcessArgs& args) override {
@@ -282,6 +313,14 @@ struct PasteSvgMenuItem : MenuItem {
     }
 };
 
+struct ClearSvgMenuItem : MenuItem {
+    Trace* module;
+    void onAction(const event::Action& e) override {
+        module->currentSvg = "";
+        module->generateFallbackCircle();
+    }
+};
+
 struct TraceWidget : ModuleWidget {
     explicit TraceWidget(Trace* module) {
         setModule(module);
@@ -289,8 +328,8 @@ struct TraceWidget : ModuleWidget {
         setPanel(createPanel(asset::plugin(pluginInstance, "res/TraceModule.svg")));
         //if (box.size.x == 0) box.size = Vec(10 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
-        const float col1 = 3.f * RACK_GRID_WIDTH*10.f;
-        const float col2 = 7.f * RACK_GRID_WIDTH*10.f;
+        const float col1 = 3.f * RACK_GRID_WIDTH;
+        const float col2 = 7.f * RACK_GRID_WIDTH;
 
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(col1, 100.0f), module, Trace::PITCH_PARAM));
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(col2, 100.0f), module, Trace::SCALE_PARAM));
@@ -310,6 +349,10 @@ struct TraceWidget : ModuleWidget {
         PasteSvgMenuItem* pasteItem = createMenuItem<PasteSvgMenuItem>("Paste SVG from clipboard");
         pasteItem->module = module;
         menu->addChild(pasteItem);
+
+        ClearSvgMenuItem* clearItem = createMenuItem<ClearSvgMenuItem>("Clear SVG");
+        clearItem->module = module;
+        menu->addChild(clearItem);
     }
 };
 
