@@ -74,7 +74,7 @@ struct Trace : Module {
 
     Trace() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configParam(PITCH_PARAM, -4.0f, 6.0f, -3.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
+        configParam(PITCH_PARAM, -4.0f, 2.0f, -3.0f, "Frequency", " Hz", 2.0f, dsp::FREQ_C4);
         configParam(SCALE_PARAM, 0.0f, 1.2f, 1.0f, "Scale");
 
         configInput(CV_PITCH_INPUT, "1V/Oct CV");
@@ -331,8 +331,16 @@ struct TraceWidget : ModuleWidget {
         const float col1 = 3.f * RACK_GRID_WIDTH;
         const float col2 = 7.f * RACK_GRID_WIDTH;
 
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(col1, 100.0f), module, Trace::PITCH_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(col2, 100.0f), module, Trace::SCALE_PARAM));
+        auto pitchKnob = createParamCentered<AutinnArcMidKnob>(Vec(col1, 100.0f), module, Trace::PITCH_PARAM);
+        pitchKnob->setModulation(Trace::CV_PITCH_INPUT, [](float cv, float val, float att) {
+            return val + cv;
+        });
+        addParam(pitchKnob);
+        auto scaleKnob = createParamCentered<AutinnArcMidKnob>(Vec(col2, 100.0f), module, Trace::SCALE_PARAM);
+        scaleKnob->setModulation(Trace::CV_SCALE_INPUT, [](float cv, float val, float att) {
+            return clamp(val + (cv * 0.1f), 0.0f, 2.0f);
+        });
+        addParam(scaleKnob);
 
         addInput(createInputCentered<InPortAutinn>(Vec(col1, 160.0f), module, Trace::CV_PITCH_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(col2, 160.0f), module, Trace::CV_SCALE_INPUT));
