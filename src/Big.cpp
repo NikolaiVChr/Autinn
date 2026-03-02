@@ -126,19 +126,26 @@ struct Big : Module {
                 outputs[POLY_OUTPUT].setVoltage(finalPitch, i);
             }
         } else {
+            std::vector<float> tempPitches(16);
+
             for (int i = 0; i < 16; i++) {
                 int pcIndex = i % N;
-
                 float rawPitch = rootPitch + (pcs[pcIndex] / 12.0f) + (i * stride);
 
                 // Wrap strictly into the 9-octave window [-4.0V, +5.0V)
                 float wrappedPitch = std::fmod(rawPitch - (-4.0f), 9.0f);
                 if (wrappedPitch < 0.0f) wrappedPitch += 9.0f;
-                float finalPitch = wrappedPitch - 4.0f;
+                tempPitches[i] = wrappedPitch - 4.0f;
+            }
 
+            // Sort low to high so the channels map cleanly in Au
+            std::sort(tempPitches.begin(), tempPitches.end());
+
+            for (int i = 0; i < 16; i++) {
+                // Apply inversion rotation after sorting
                 int outIdx = (i + inversion) % 16;
-                outputPitches[outIdx] = finalPitch;
-                outputs[POLY_OUTPUT].setVoltage(finalPitch, outIdx);
+                outputPitches[outIdx] = tempPitches[i];
+                outputs[POLY_OUTPUT].setVoltage(tempPitches[i], outIdx);
             }
         }
     }

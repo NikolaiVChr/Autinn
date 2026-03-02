@@ -40,7 +40,7 @@ struct Converge : Module {
         float rootPitch = inputs[CV_SWARM_INPUT].getVoltage();
         
         // Swarm character
-        constexpr float clusterWidth = 2.0f; // Spreads voices +/- 2 octaves
+        constexpr float clusterWidth = 0.5f; // Spreads voices +/- 2 octaves
         constexpr float driftAmount = 0.1f;  // Each voice wanders +/- 0.1 octaves
 
         constexpr float safeFloor = -4.0f; // 16.35 Hz
