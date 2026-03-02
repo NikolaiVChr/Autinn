@@ -52,7 +52,8 @@ struct Big : Module {
 
     int currentType = 0;
     float outputPitches[16] = {};
-    bool clumped = false;
+    bool scrambleChannels = false;
+    int channelMap[16];
 
     Big() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS);
@@ -65,6 +66,43 @@ struct Big : Module {
         configInput(SPREAD_CV, "Spread CV");
         configInput(INV_CV, "Inversion CV");
         configOutput(POLY_OUTPUT, "16-Channel Poly Out");
+
+        for (int i = 0; i < 16; i++) channelMap[i] = i;
+    }
+
+    void reShuffle() {
+        for (int i = 0; i < 16; i++) channelMap[i] = i;
+        if (scrambleChannels) {
+            for (int i = 15; i > 0; i--) {
+                int j = (int)(random::uniform() * (i + 1));
+                std::swap(channelMap[i], channelMap[j]);
+            }
+        }
+    }
+
+    json_t* dataToJson() override {
+        json_t* rootJ = json_object();
+        json_object_set_new(rootJ, "scrambleChannels", json_boolean(scrambleChannels));
+
+        json_t* mapJ = json_array();
+        for (int i = 0; i < 16; i++) {
+            json_array_append_new(mapJ, json_integer(channelMap[i]));
+        }
+        json_object_set_new(rootJ, "channelMap", mapJ);
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override {
+        json_t* scrambleJ = json_object_get(rootJ, "scrambleChannels");
+        if (scrambleJ) scrambleChannels = json_is_true(scrambleJ);
+
+        json_t* mapJ = json_object_get(rootJ, "channelMap");
+        if (mapJ) {
+            for (int i = 0; i < 16; i++) {
+                json_t* itemJ = json_array_get(mapJ, i);
+                if (itemJ) channelMap[i] = json_integer_value(itemJ);
+            }
+        }
     }
 
     void process(const ProcessArgs& args) override {
@@ -91,62 +129,73 @@ struct Big : Module {
             if (!duplicate) pcs.push_back(pc);
         }
         std::sort(pcs.begin(), pcs.end());
-        int N = (int)pcs.size();
 
+        // Generate the massive pool of all valid notes in the [-4V, 5V) window
+        std::vector<float> pool;
+        for (int oct = -8; oct <= 8; oct++) {
+            for (float pc : pcs) {
+                float p = rootPitch + (pc / 12.0f) + oct;
+                if (p >= -4.0f && p < 5.0f) {
+                    pool.push_back(p);
+                }
+            }
+        }
+        std::sort(pool.begin(), pool.end());
 
-        // Convert Spread to a coprime stride (1, 4, or 7)
-        // Strides must be co-prime to 9 to guarantee no octave collisions.
-        int stride = 1;
-        if (spread > 0.33f) stride = 4;
-        if (spread > 0.66f) stride = 7;
+        // Remove exact duplicates (just in case a chord definition has overlaps)
+        pool.erase(std::unique(pool.begin(), pool.end(), [](float a, float b) {
+            return std::abs(a - b) < 0.01f;
+        }), pool.end());
 
+        int M = pool.size();
+        if (M < 16) {
+            // Failsafe: Should never trigger since the smallest chord generates 27 notes in a 9-octave window
+            while (pool.size() < 16) pool.push_back(pool.back() + 1.0f);
+            M = pool.size();
+        }
 
-        // Generate the 16 unique voices
-        // Convert spread to exact octave jumps (1, 2, 3, or 4)
-        int spreadOctaves = 1 + (int)(spread * 3.99f);
+        // Find the index of the note closest to the input Root Pitch
+        int centerIdx = 0;
+        float minDist = 100.0f;
+        for (int i = 0; i < M; i++) {
+            float dist = std::abs(pool[i] - rootPitch);
+            if (dist < minDist) {
+                minDist = dist;
+                centerIdx = i;
+            }
+        }
 
+        // Define 3 Spread Settings (Discrete spans)
+        int span = 16;
+        if (spread > 0.33f && spread <= 0.66f) {
+            span = std::max(16, (int)(16 + (M - 16) / 2.0f)); // Medium spread
+        } else if (spread > 0.66f) {
+            span = M; // Full maximum spread
+        }
+
+        // Calculate starting index to perfectly center the span around the root
+        // Adding Inversion to slide up the scale
+        float startIndex = centerIdx - (span - 1) / 2.0f + inversion;
+
+        if (startIndex < 0.0f) startIndex = 0.0f;
+        if (startIndex + span > M) startIndex = M - span;
+
+        // Pick 16 evenly spaced notes from the defined span
+        std::vector<float> tempPitches(16);
+        float step = (span - 1) / 15.0f;
+
+        for (int i = 0; i < 16; i++) {
+            int idx = std::round(startIndex + i * step);
+            idx = clamp(idx, 0, M - 1);
+            tempPitches[i] = pool[idx];
+        }
+
+        // Apply output mapping (straight or scrambled)
         outputs[POLY_OUTPUT].setChannels(16);
-        if (clumped) {
-            for (int i = 0; i < 16; i++) {
-                // Apply Inversion rotation
-                int idx = (i + inversion) % 16;
-
-                int noteInScale = idx % N;
-                int octaveWrap = idx / N;
-
-                float interval = pcs[noteInScale] / 12.0f;
-                float rawPitch = rootPitch + interval + (octaveWrap * spreadOctaves);
-
-                // Fold out-of-bounds octaves safely into the [-4.0V, 5.0V) window
-                float wrappedPitch = std::fmod(rawPitch - (-4.0f), 9.0f);
-                if (wrappedPitch < 0.0f) wrappedPitch += 9.0f;
-                float finalPitch = wrappedPitch - 4.0f;
-
-                outputPitches[i] = finalPitch;
-                outputs[POLY_OUTPUT].setVoltage(finalPitch, i);
-            }
-        } else {
-            std::vector<float> tempPitches(16);
-
-            for (int i = 0; i < 16; i++) {
-                int pcIndex = i % N;
-                float rawPitch = rootPitch + (pcs[pcIndex] / 12.0f) + (i * stride);
-
-                // Wrap strictly into the 9-octave window [-4.0V, +5.0V)
-                float wrappedPitch = std::fmod(rawPitch - (-4.0f), 9.0f);
-                if (wrappedPitch < 0.0f) wrappedPitch += 9.0f;
-                tempPitches[i] = wrappedPitch - 4.0f;
-            }
-
-            // Sort low to high so the channels map cleanly in Au
-            std::sort(tempPitches.begin(), tempPitches.end());
-
-            for (int i = 0; i < 16; i++) {
-                // Apply inversion rotation after sorting
-                int outIdx = (i + inversion) % 16;
-                outputPitches[outIdx] = tempPitches[i];
-                outputs[POLY_OUTPUT].setVoltage(tempPitches[i], outIdx);
-            }
+        for (int i = 0; i < 16; i++) {
+            int outIdx = scrambleChannels ? channelMap[i] : i;
+            outputPitches[outIdx] = tempPitches[i];
+            outputs[POLY_OUTPUT].setVoltage(tempPitches[i], outIdx);
         }
     }
 };
@@ -192,6 +241,18 @@ struct BigDisplay : TransparentWidget {
     }
 };
 
+struct ScrambleItem : MenuItem {
+    Big* module;
+    void onAction(const event::Action& e) override {
+        module->scrambleChannels = !module->scrambleChannels;
+        module->reShuffle();
+    }
+    void step() override {
+        rightText = module->scrambleChannels ? "✔" : "";
+        MenuItem::step();
+    }
+};
+
 struct BigWidget : ModuleWidget {
     BigWidget(Big* module) {
         setModule(module);
@@ -218,6 +279,17 @@ struct BigWidget : ModuleWidget {
 
         // Output
         addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX, 330), module, Big::POLY_OUTPUT));
+    }
+
+    void appendContextMenu(Menu* menu) override {
+        Big* module = dynamic_cast<Big*>(this->module);
+        if (!module) return;
+
+        menu->addChild(new MenuEntry);
+        ScrambleItem* item = new ScrambleItem;
+        item->text = "Scramble Channel Routing";
+        item->module = module;
+        menu->addChild(item);
     }
 };
 

@@ -71,7 +71,8 @@ struct Converge : Module {
         const float conv = clamp(convRaw, 0.0f, 1.0f);
         
         // Easing: fast from 0, slows down near 1
-        const float easeConv = 1.0f - std::pow(1.0f - conv, 3.0f);
+        // S-curve: Slow start, fast middle crossover, slow lock
+        const float easeConv = conv * conv * (3.0f - 2.0f * conv);
 
         const int targetChannels = std::max(1, inputs[CHORD_INPUT].getChannels());
 
