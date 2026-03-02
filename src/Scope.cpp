@@ -49,7 +49,7 @@ static constexpr float STROKE_WAVE = 0.8f;
 static constexpr float STROKE_WAVE_POLY = 0.7f;
 static constexpr float PX_WAVE = 0.5f;
 static constexpr float PX_WAVE_POLY = 1.0f;
-static constexpr float STROKE_SCANLINE = 1.0f;
+static constexpr float STROKE_SCANLINE = 0.8f;
 static constexpr float STROKE_XY = 1.0f;
 static constexpr float STROKE_TRIGGER = 0.8f;
 static constexpr float STROKE_TRIGGER_ALPHA = 0.75f;
@@ -69,7 +69,7 @@ static const NVGcolor color1 = nvgRGBA(255, 55, 55, ALPHA_WAVE);   // Red
 static const NVGcolor color2 = nvgRGBA(50, 255, 50, ALPHA_WAVE);    // Green
 static const NVGcolor color3 = nvgRGBA(50, 150, 255, ALPHA_WAVE);  // Blue
 static const NVGcolor colorExt = nvgRGBA(255, 255, 255, 255);// white
-static const NVGcolor colorScanLine = nvgRGBA(255, 255, 255, 90);// faint white
+static const NVGcolor colorScanLine = nvgRGBA(255, 255, 255, 60);// faint white
 static const NVGcolor colorXY1 = nvgRGBA(100, 255, 200, ALPHA_XY);//cyan
 static const NVGcolor colorXY2 = nvgRGBA(255, 100, 255, ALPHA_XY);//magenta
 static const NVGcolor colorBaseline = nvgRGBA(255, 255, 255, 100);// faint white
@@ -1433,23 +1433,37 @@ struct ScopeDisplay : OpaqueWidget {
 		NVGcolor ghostColor = getColor(ch);
 		ghostColor.a = 0.3f;
 
+		float scanline_x = -100.0f;
+
 		for (int p = 0; p < activePoly; p++) {
 			if (p != trigP && (viewMask & (1 << p))) {
 				if (module->buffer[ch][p] == nullptr) continue;
-				drawWaveform(args, ch, ghostColor, STROKE_WAVE_POLY, p, PX_WAVE_POLY);
+				float sx = drawWaveform(args, ch, ghostColor, STROKE_WAVE_POLY, p, PX_WAVE_POLY);
+				if (sx > scanline_x) scanline_x = sx;
 			}
 		}
 
 		if (viewMask & (1 << trigP)) {
 			if (module->buffer[ch][trigP] != nullptr) {
-				drawWaveform(args, ch, color, STROKE_WAVE, trigP, PX_WAVE);
+				float sx = drawWaveform(args, ch, color, STROKE_WAVE, trigP, PX_WAVE);
+				if (sx > scanline_x) scanline_x = sx;
 			}
+		}
+
+		if (scanline_x > -1.0f) {
+			// scanline
+			nvgBeginPath(args.vg);
+			nvgStrokeColor(args.vg, colorScanLine); // Faint white
+			nvgStrokeWidth(args.vg, STROKE_SCANLINE);
+			nvgMoveTo(args.vg, scanline_x, 0);
+			nvgLineTo(args.vg, scanline_x, box.size.y);
+			nvgStroke(args.vg);
 		}
 	}
 
-	void drawWaveform(const DrawArgs& args, int ch, NVGcolor color, float strokeWidth, int poly, float px_step) const {
+	float drawWaveform(const DrawArgs& args, int ch, NVGcolor color, float strokeWidth, int poly, float px_step) const {
 		float scale = module->scale[ch];
-		if (scale < -0.5f) return;
+		if (scale < -0.5f) return -100.0f;
 		float offset = module->offset[ch];
 		float timePerDiv_s = module->getTimeDiv();
 
@@ -1457,7 +1471,7 @@ struct ScopeDisplay : OpaqueWidget {
 		const float totalTime_s = DIVS_HORIZ * timePerDiv_s;
 		const float samplesToDraw = totalTime_s * module->sampleRate;
 
-		if (samplesToDraw < 2.0f) return;
+		if (samplesToDraw < 2.0f) return -100.0f;
 
 		int idxWrite = module->writeIndex.load();
 		int idxTrigger = module->triggerIndex.load();
@@ -1490,6 +1504,13 @@ struct ScopeDisplay : OpaqueWidget {
 			if (iteratorStep < 1) iteratorStep = 1;
 		}
 
+		bool isRolling = !idxValid && !frozen && trigMode == TRIG_MODE_AUTO;
+		// If we are waiting for a trigger in NORM/SOLO mode, keep the screen completely blank
+		if (!idxValid && !isRolling && !frozen) {
+			// blank in NORM and SINGLE until trigger found
+			return -100.0f;
+		}
+
 		int idxAnchor = idxTrigger;
 
 		int drawLimit_px = int(width_px)+1;
@@ -1506,7 +1527,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 			if (drawLimit_px > int(width_px)+1) drawLimit_px = int(width_px)+1;
 			if (drawLimit_px < 0) drawLimit_px = 0;
-		} else if (!idxValid && !frozen && trigMode == TRIG_MODE_AUTO) {
+		} else if (isRolling) {
 			// Calculate where the screen starts relative to the write head
 
 			// Cap the lookback to BUFFER_SIZE.
@@ -1771,12 +1792,9 @@ struct ScopeDisplay : OpaqueWidget {
 		nvgStroke(args.vg);
 		if (recording && float(drawLimit_px) <= width_px && !holdoffActive) {
 			// scanline
-			nvgBeginPath(args.vg);
-			nvgStrokeColor(args.vg, colorScanLine); // Faint white
-			nvgStrokeWidth(args.vg, STROKE_SCANLINE);
-			nvgMoveTo(args.vg, (float)drawLimit_px*px_step+WAVE_PX_OFFSET, 0);
-			nvgLineTo(args.vg, (float)drawLimit_px*px_step+WAVE_PX_OFFSET, box.size.y);
-			nvgStroke(args.vg);
+			return (float)drawLimit_px*px_step+WAVE_PX_OFFSET;
+		} else {
+			return -100.0f;
 		}
 	}
 
