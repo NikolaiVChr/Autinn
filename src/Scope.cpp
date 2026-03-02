@@ -190,6 +190,7 @@ struct Scope : Module {
 	float blinkPhase = 0.0f;
 	float autoTimeKnob = AUTO_TIME_KNOB_OFF;
 	float trigFoundTimer = 0.0f; // Remaining time for trigger light and stats TRIGGER to be shown.
+	float startupTimer = 0.1f;   // Swallow false triggers when Rack first starts
 	std::atomic<bool> bufferFilled = {false}; // We wrapped the buffers at least once, so they has no garbage.
 	DCBlocker dcBlockers[4][16];
 	float lastSampleTime = 1.0f/44100.0f;
@@ -352,6 +353,8 @@ struct Scope : Module {
 		blinkPhase = 0.0f;
 		autoTimeKnob = AUTO_TIME_KNOB_OFF;
 		trigFoundTimer = 0.0f;
+
+		startupTimer = 0.1f;
 
 		autoTimeMode = false;
 		trigSource = 0; // 0-3: Channel, 4: Ext
@@ -653,6 +656,12 @@ struct Scope : Module {
 		bool schmittState = trigSchmitt.process(signal, threshold, threshold+hysteresis);
 
 		bool edgeFound = trigPulse.process(schmittState);
+
+		// Swallow fake initial edges while the module warms up
+		if (startupTimer > 0.0f) {
+			startupTimer -= args.sampleTime;
+			edgeFound = false;
+		}
 
 		if (edgeFound) {
 			if (!frozen) {
