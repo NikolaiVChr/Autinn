@@ -276,10 +276,10 @@ struct BigWidget : ModuleWidget {
         addInput(createInputCentered<InPortAutinn>(Vec(60, 240), module, Big::SPREAD_CV));
         addInput(createInputCentered<InPortAutinn>(Vec(90, 240), module, Big::INV_CV));
 
-        addInput(createInputCentered<InPortAutinn>(Vec(40, 300+HALF_PORT), module, Big::ROOT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(30, 300+HALF_PORT), module, Big::ROOT_INPUT));
 
         // Output
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(80, 300+HALF_PORT), module, Big::POLY_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(90, 300+HALF_PORT), module, Big::POLY_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
