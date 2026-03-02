@@ -545,3 +545,4 @@ extern Model *modelScope;
 extern Model *modelExcavi;
 extern Model *modelAlias;
 extern Model *modelTrace;
+extern Model *modelAu;

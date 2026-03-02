@@ -365,6 +365,15 @@
         "Utility",
         "Polyphonic"
       ]
+    },
+    {
+      "slug": "Au",
+      "name": "Au",
+      "description": "Polyphonic chord converger",
+      "keywords": "",
+      "tags": [
+        "Polyphonic"
+      ]
     }
   ]
 }

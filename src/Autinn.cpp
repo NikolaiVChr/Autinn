@@ -74,4 +74,5 @@ void init(rack::Plugin *plugin) {
 	plugin->addModel(modelExcavi);
 	plugin->addModel(modelAlias);
 	plugin->addModel(modelTrace);
+	plugin->addModel(modelAu);
 }

@@ -91,7 +91,7 @@ public:
         float y = x_delayed + c * (y_delayed - x);
 
         // Denormal protection
-        if (std::abs(y) < 1e-15f) y = 0.f;
+        y += 1e-18f;
 
         // Write to buffers
         x_hist[writeHead] = x;
