@@ -18,7 +18,6 @@ struct Converge : Module {
         NUM_LIGHTS
     };
 
-    float phase[16] = {};
     float walkValue[16] = {};
     float walkTarget[16] = {};
 
@@ -30,6 +29,11 @@ struct Converge : Module {
         configInput(CONVERGE_CV, "Converge Envelope (0-10V)");
         configOutput(POLY_OUTPUT, "16-Channel Poly 1V/Oct");
         configBypass(CHORD_INPUT, POLY_OUTPUT);
+
+        // Seed initial targets for the random walk
+        for (int i = 0; i < 16; i++) {
+            walkTarget[i] = (random::uniform() * 2.0f) - 1.0f;
+        }
     }
 
     void process(const ProcessArgs& args) override {
@@ -63,11 +67,16 @@ struct Converge : Module {
 
         for (int c = 0; c < 16; c++) {
             // Slow random walk
-            if (std::abs(walkTarget[c] - walkValue[c]) < 0.001f) {
-                walkTarget[c] = (random::uniform() * 2.0f) - 1.0f;
+            // Constant-rate linear drift (moves 0.2 Volts per second)
+            const float driftSlew = 0.2f * args.sampleTime;
+
+            if (walkValue[c] < walkTarget[c]) {
+                walkValue[c] += driftSlew;
+                if (walkValue[c] >= walkTarget[c]) walkTarget[c] = (random::uniform() * 2.0f) - 1.0f;
+            } else {
+                walkValue[c] -= driftSlew;
+                if (walkValue[c] <= walkTarget[c]) walkTarget[c] = (random::uniform() * 2.0f) - 1.0f;
             }
-            // Slew the value towards the target for smooth wandering
-            walkValue[c] += (walkTarget[c] - walkValue[c]) * 0.5f * args.sampleTime;
 
             // Swarm pitch
             const float baseOffset = ((c / 15.0f) * 2.0f - 1.0f) * clusterWidth;

@@ -1,6 +1,7 @@
 #include "Autinn.hpp"
 #include <vector>
 #include <string>
+#include <algorithm>
 
 struct Big : Module {
     enum ParamIds {
@@ -66,40 +67,56 @@ struct Big : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        float root = inputs[ROOT_INPUT].getVoltage();
-        
-        float typeRaw = params[TYPE_PARAM].getValue() + inputs[TYPE_CV].getVoltage()*2.0f;
+        float rootPitch = inputs[ROOT_INPUT].getVoltage();
+
+        float typeRaw = params[TYPE_PARAM].getValue() + inputs[TYPE_CV].getVoltage();
         currentType = clamp((int)typeRaw, 0, 19);
 
         float spread = clamp(params[SPREAD_PARAM].getValue() + inputs[SPREAD_CV].getVoltage() / 10.f, 0.f, 1.f);
-        int inversion = (int)(params[INV_PARAM].getValue() + inputs[INV_CV].getVoltage()*8.0f/5.0f) % 16;
+        int inversion = (int)(params[INV_PARAM].getValue() + inputs[INV_CV].getVoltage()) % 16;
 
         const auto& scale = chordTable[currentType].intervals;
-        int scaleSize = (int)scale.size();
 
-        outputs[POLY_OUTPUT].setChannels(16);
-
-        constexpr float safeFloor = -4.0f;
-        constexpr float safeCeiling = 6.0f;
-
-        for (int i = 0; i < 16; i++) {
-            int idx = (i + inversion) % 16;
-            int noteInScale = idx % scaleSize;
-            int octaveWrap = idx / scaleSize;
-
-            float interval = scale[noteInScale] / 12.f;
-            int spreadOctaves = 1 + (int)(spread * 3.99f);
-
-            float pitch = root + interval + (octaveWrap * spreadOctaves);
-
-            if (pitch > safeCeiling) {
-                pitch -= std::ceil(pitch - safeCeiling);
-            } else if (pitch < safeFloor) {
-                pitch += std::ceil(safeFloor - pitch);
+        // Extract strictly unique pitch classes
+        std::vector<float> pcs;
+        for (float interval : scale) {
+            float pc = std::fmod(interval, 12.0f);
+            bool duplicate = false;
+            for (float existing : pcs) {
+                if (std::abs(existing - pc) < 0.1f) {
+                    duplicate = true; break;
+                }
             }
+            if (!duplicate) pcs.push_back(pc);
+        }
+        std::sort(pcs.begin(), pcs.end());
+        int N = (int)pcs.size();
 
-            outputPitches[i] = pitch;
-            outputs[POLY_OUTPUT].setVoltage(outputPitches[i], i);
+        // Convert Spread to a coprime stride (1, 3, or 7)
+        // Strides must be co-prime to 10 to guarantee no octave collisions.
+        int stride = 1;
+        if (spread > 0.33f) stride = 3;
+        if (spread > 0.66f) stride = 7;
+
+        // Generate the 16 unique voices
+        outputs[POLY_OUTPUT].setChannels(16);
+        for (int i = 0; i < 16; i++) {
+
+            int pcIndex = i % N;
+            int pickNumber = i / N;
+
+            // Calculate raw continuous pitch, stepping up by stride octaves
+            float rawPitch = rootPitch + (pcs[pcIndex] / 12.0f) + (pickNumber * stride);
+
+            // Wrap strictly into the 10-octave window [-4.0V, +6.0V)
+            float wrappedPitch = std::fmod(rawPitch - (-4.0f), 10.0f);
+            if (wrappedPitch < 0.0f) wrappedPitch += 10.0f; // Handle C++ negative fmod
+            float finalPitch = wrappedPitch - 4.0f;
+
+            // Apply Inversion rotation
+            int outIdx = (i + inversion) % 16;
+            outputPitches[outIdx] = finalPitch;
+            outputs[POLY_OUTPUT].setVoltage(finalPitch, outIdx);
         }
     }
 };
