@@ -381,7 +381,7 @@
       "name": "Big",
       "description": "16 voice polyphonic chord generator",
       "keywords": "",
-      "hidden": false,
+      "hidden": true,
       "tags": [
         "Polyphonic"
       ]
