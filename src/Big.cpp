@@ -79,13 +79,24 @@ struct Big : Module {
 
         outputs[POLY_OUTPUT].setChannels(16);
 
+        constexpr float safeFloor = -4.0f;
+        constexpr float safeCeiling = 6.0f;
+
         for (int i = 0; i < 16; i++) {
             int idx = (i + inversion) % 16;
             int noteInScale = idx % scaleSize;
             int octaveWrap = idx / scaleSize;
 
             float interval = scale[noteInScale] / 12.f;
-            float octaveOffset = (float)octaveWrap * (1.0f + (spread * 3.0f));
+            int spreadOctaves = 1 + (int)(spread * 3.99f);
+
+            float pitch = root + interval + (octaveWrap * spreadOctaves);
+
+            if (pitch > safeCeiling) {
+                pitch -= std::ceil(pitch - safeCeiling);
+            } else if (pitch < safeFloor) {
+                pitch += std::ceil(safeFloor - pitch);
+            }
 
             outputPitches[i] = root + interval + octaveOffset;
             outputs[POLY_OUTPUT].setVoltage(outputPitches[i], i);
