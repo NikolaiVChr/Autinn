@@ -54,7 +54,7 @@ struct Big : Module {
 
     Big() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS);
-        configParam(TYPE_PARAM, 0.f, 19.f, 0.f, "Chord Type");
+        configSwitch(TYPE_PARAM, 0.f, 19.f, 0.f, "Chord Type",{"Power","Major","Minor","Penta","Maj9","Min9","MinMaj9","Mu Major","Lydian+","Sus2/4","Quartal","Hendrix","Dream","Aug7","Whole","Diminish","Stravin","Cluster","Ghost","The End"});
         configParam(SPREAD_PARAM, 0.f, 1.f, 0.2f, "Spread");
         configParam(INV_PARAM, 0.f, 15.f, 0.f, "Inversion");
 
@@ -121,10 +121,10 @@ struct BigDisplay : TransparentWidget {
 
         // 16-voice Heatmap
         for (int i = 0; i < 16; i++) {
-            // Map -2V to 8V range to the display width
+            // Map -4V to 6V range to the display width
             float p = module->outputPitches[i];
-            float x = ((p + 2.f) / 10.f) * box.size.x;
-            x = clamp(x, 2.f, box.size.x - 2.f);
+            float x = ((p + 4.f) / 10.f) * (box.size.x-4.0f);
+            x = clamp(x+2.0f, 2.f, box.size.x - 2.f);
 
             nvgBeginPath(args.vg);
             nvgRect(args.vg, x - 1.f, 25.f, 2.f, 10.f);
