@@ -25,31 +25,6 @@ using namespace rack::dsp;
 
 **/
 
-/**
- * PolyBLEP: Polynomial Band-Limited Step
- * Smooths the sharp discontinuity of sawtooth-ish osc to remove aliasing of the sharp drop.
- *
- * Much faster than minBLEP, and kinda decent.
- *
- * @param t phase (0..1)
- * @param dt phase increment per sample
- * @return
- */
-inline float polyBLEP(float t, const float dt) {
-    if (t < dt) {
-        // 0 < t < dt: Beginning of cycle (the rise)
-        t /= dt;
-        return t+t - t*t - 1.0f;
-    }
-	if (t > 1.0f - dt) {
-        // 1 - dt < t < 1: End of cycle (the drop)
-        t = (t - 1.0f) / dt;
-        return t*t + t+t + 1.0f;
-    }
-    // Middle of cycle: No correction needed
-    return 0.0f;
-}
-
 /** 1st order all-pass filter for dispersion */
 struct AllPassFilter {
 private:
@@ -137,29 +112,30 @@ public:
  */
 struct DCBlocker {
 private:
-    float y_1 = 0.f;
-    float R = 0.999f;
-    const float PI2 = float(2.0 * M_PI);
+    // must use doubles as R can get very close to 1.0, so when doing (1.0f-R) it can give zero when it should not.
+    double y_1 = 0.0;
+    double R = 0.999;
+    const double PI2 = 2.0 * M_PI;
 public:
     float cutoff_hz = 7.0f;// call setSampleTime() after modifying this
 
     void setSampleTime(const float sampleTime) {
         // call only when sample rate changes
-        const float rc = 1.0f / (PI2 * cutoff_hz);
+        const double rc = 1.0 / (PI2 * cutoff_hz);
         R = rc / (rc + sampleTime);
     }
 
     float process(const float x) {
         // 1-pole HP: y[n] = x[n] - x[n-1] + R * y[n-1]    old
         // 1-pole HP: y[n] = R * (x[n] - x[n-1] + y[n-1])  current
-        float y = (x * (1.0f - R)) + R * y_1 + 1e-18f;
-        if (!std::isfinite(y)) y = 0.0f;
+        double y = (x * (1.0 - R)) + R * y_1 + 1e-18;
+        if (!std::isfinite(y)) y = 0.0;
         y_1 = y;
-        return x - y;
+        return float(x - y);
     }
 
     void reset() {
-        y_1 = 0.0f;
+        y_1 = 0.0;
     }
 };
 
@@ -175,11 +151,15 @@ private:
     float a1 = 0.f, a2 = 0.f;
     const float PI = float(M_PI);
 public:
-    float cutoff_hz = 20000.0f; // call setSampleTime() after modifying this
+    /** Call setSampleTime() after modifying this.
+     *  Do not set it lower than 1000 Hz without upgrading filter to use doubles.
+     */
+    float cutoff_hz = 20000.0f;
 
     void setSampleTime(const float sampleTime) {
         const float fs = 1.0f / sampleTime;
-        const float w0 = 2.0f * PI * cutoff_hz / fs;
+        const float safeCutoff = std::min(cutoff_hz, fs * 0.49f);
+        const float w0 = 2.0f * PI * safeCutoff / fs;
         const float cos_w0 = std::cos(w0);
 
         // Q = 1/sqrt(2) (0.707) for a Butterworth response
