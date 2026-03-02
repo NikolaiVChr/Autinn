@@ -100,9 +100,10 @@ struct Converge : Module {
 
             // +/- 4 cents of spread to turn duplicate voltages into a thick supersaw
             const float microDetune = (c - 7.5f) * 0.0005f;
+            int detuneBool = 0;
 
             // Interpolate: 0 = Swarm, 1 = Target
-            const float currentPitch = swarmPitch * (1.0f - easeConv) + (targetPitch + microDetune) * easeConv;
+            const float currentPitch = swarmPitch * (1.0f - easeConv) + (targetPitch + microDetune * detuneBool) * easeConv;
 
             outputs[POLY_OUTPUT].setVoltage(currentPitch, c);
         }

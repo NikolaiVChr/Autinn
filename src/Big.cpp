@@ -52,6 +52,7 @@ struct Big : Module {
 
     int currentType = 0;
     float outputPitches[16] = {};
+    bool clumped = false;
 
     Big() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS);
@@ -92,53 +93,54 @@ struct Big : Module {
         std::sort(pcs.begin(), pcs.end());
         int N = (int)pcs.size();
 
-        /*
+
         // Convert Spread to a coprime stride (1, 4, or 7)
         // Strides must be co-prime to 9 to guarantee no octave collisions.
         int stride = 1;
         if (spread > 0.33f) stride = 4;
         if (spread > 0.66f) stride = 7;
-        */
+
 
         // Generate the 16 unique voices
         // Convert spread to exact octave jumps (1, 2, 3, or 4)
         int spreadOctaves = 1 + (int)(spread * 3.99f);
 
         outputs[POLY_OUTPUT].setChannels(16);
-        for (int i = 0; i < 16; i++) {
-            // Apply Inversion rotation
-            int idx = (i + inversion) % 16;
+        if (clumped) {
+            for (int i = 0; i < 16; i++) {
+                // Apply Inversion rotation
+                int idx = (i + inversion) % 16;
 
-            int noteInScale = idx % N;
-            int octaveWrap = idx / N;
+                int noteInScale = idx % N;
+                int octaveWrap = idx / N;
 
-            float interval = pcs[noteInScale] / 12.0f;
-            float rawPitch = rootPitch + interval + (octaveWrap * spreadOctaves);
+                float interval = pcs[noteInScale] / 12.0f;
+                float rawPitch = rootPitch + interval + (octaveWrap * spreadOctaves);
 
-            // Fold out-of-bounds octaves safely into the [-4.0V, 5.0V) window
-            float wrappedPitch = std::fmod(rawPitch - (-4.0f), 9.0f);
-            if (wrappedPitch < 0.0f) wrappedPitch += 9.0f;
-            float finalPitch = wrappedPitch - 4.0f;
+                // Fold out-of-bounds octaves safely into the [-4.0V, 5.0V) window
+                float wrappedPitch = std::fmod(rawPitch - (-4.0f), 9.0f);
+                if (wrappedPitch < 0.0f) wrappedPitch += 9.0f;
+                float finalPitch = wrappedPitch - 4.0f;
 
-            outputPitches[i] = finalPitch;
-            outputs[POLY_OUTPUT].setVoltage(finalPitch, i);
+                outputPitches[i] = finalPitch;
+                outputs[POLY_OUTPUT].setVoltage(finalPitch, i);
+            }
+        } else {
+            for (int i = 0; i < 16; i++) {
+                int pcIndex = i % N;
+
+                float rawPitch = rootPitch + (pcs[pcIndex] / 12.0f) + (i * stride);
+
+                // Wrap strictly into the 9-octave window [-4.0V, +5.0V)
+                float wrappedPitch = std::fmod(rawPitch - (-4.0f), 9.0f);
+                if (wrappedPitch < 0.0f) wrappedPitch += 9.0f;
+                float finalPitch = wrappedPitch - 4.0f;
+
+                int outIdx = (i + inversion) % 16;
+                outputPitches[outIdx] = finalPitch;
+                outputs[POLY_OUTPUT].setVoltage(finalPitch, outIdx);
+            }
         }
-        /*
-        for (int i = 0; i < 16; i++) {
-            int pcIndex = i % N;
-
-            float rawPitch = rootPitch + (pcs[pcIndex] / 12.0f) + (i * stride);
-
-            // Wrap strictly into the 9-octave window [-4.0V, +5.0V)
-            float wrappedPitch = std::fmod(rawPitch - (-4.0f), 9.0f);
-            if (wrappedPitch < 0.0f) wrappedPitch += 9.0f;
-            float finalPitch = wrappedPitch - 4.0f;
-
-            int outIdx = (i + inversion) % 16;
-            outputPitches[outIdx] = finalPitch;
-            outputs[POLY_OUTPUT].setVoltage(finalPitch, outIdx);
-        }
-        */
     }
 };
 
