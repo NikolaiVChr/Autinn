@@ -55,8 +55,15 @@ struct Converge : Module {
         }
 
         // 0.0 = Root swarm, 1.0 = Target chord
-        const float convRaw = inputs[CONVERGE_CV].getVoltage() / 10.0f;
+        float convRaw = inputs[CONVERGE_CV].getVoltage() / 10.0f;
+
+        // Snap to perfect 1.0 if the envelope is over 8V
+        if (convRaw > 0.8f) convRaw = 1.0f;
+
+        // Snap to perfect 1.0 to guarantee chord lock
         const float conv = clamp(convRaw, 0.0f, 1.0f);
+        // Snap to perfect 0.0 to kill exponential ADSR tails
+        if (convRaw < 0.025f) convRaw = 0.0f;
         
         // Easing: fast from 0, slows down near 1
         const float easeConv = 1.0f - std::pow(1.0f - conv, 3.0f);

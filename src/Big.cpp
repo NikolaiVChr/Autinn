@@ -92,11 +92,13 @@ struct Big : Module {
         std::sort(pcs.begin(), pcs.end());
         int N = (int)pcs.size();
 
+        /*
         // Convert Spread to a coprime stride (1, 4, or 7)
         // Strides must be co-prime to 9 to guarantee no octave collisions.
         int stride = 1;
         if (spread > 0.33f) stride = 4;
         if (spread > 0.66f) stride = 7;
+        */
 
         // Generate the 16 unique voices
         // Convert spread to exact octave jumps (1, 2, 3, or 4)
