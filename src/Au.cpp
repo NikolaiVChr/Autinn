@@ -5,7 +5,7 @@ struct Converge : Module {
         NUM_PARAMS
     };
     enum InputIds {
-        ROOT_INPUT,
+        CV_SWARM_INPUT,
         CHORD_INPUT,
         CONVERGE_CV,
         NUM_INPUTS
@@ -24,7 +24,7 @@ struct Converge : Module {
     Converge() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
-        configInput(ROOT_INPUT, "Root 1V/Oct");
+        configInput(CV_SWARM_INPUT, "Swarm 1V/Oct");
         configInput(CHORD_INPUT, "Poly Target Chord 1V/Oct");
         configInput(CONVERGE_CV, "Converge Envelope (0-10V)");
         configOutput(POLY_OUTPUT, "16-Channel Poly 1V/Oct");
@@ -37,7 +37,7 @@ struct Converge : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        float rootPitch = inputs[ROOT_INPUT].getVoltage();
+        float rootPitch = inputs[CV_SWARM_INPUT].getVoltage();
         
         // Swarm character
         constexpr float clusterWidth = 2.0f; // Spreads voices +/- 2 octaves
@@ -54,16 +54,21 @@ struct Converge : Module {
             rootPitch -= std::ceil(highestPossiblePitch - safeCeiling);
         }
 
+        float envVolts = inputs[CONVERGE_CV].getVoltage();
+
         // 0.0 = Root swarm, 1.0 = Target chord
-        float convRaw = inputs[CONVERGE_CV].getVoltage() / 10.0f;
+        float convRaw = 1.0f;
 
-        // Snap to perfect 1.0 if the envelope is over 8V
-        if (convRaw > 0.8f) convRaw = 1.0f;
+        // Inverted behavior: 0V = Chord (Converged), 8V+ = Swarm (Chaos)
+        if (envVolts >= 9.0f) {
+            convRaw = 0.0f; // Perfect chaos for 8V-10V envelopes
+        } else if (envVolts <= 0.1f) {
+            convRaw = 1.0f; // Perfect lock (and kills ADSR exponential tails)
+        } else {
+            convRaw = 1.0f - (envVolts / 9.0f); // Smooth inversion
+        }
 
-        // Snap to perfect 1.0 to guarantee chord lock
         const float conv = clamp(convRaw, 0.0f, 1.0f);
-        // Snap to perfect 0.0 to kill exponential ADSR tails
-        if (convRaw < 0.025f) convRaw = 0.0f;
         
         // Easing: fast from 0, slows down near 1
         const float easeConv = 1.0f - std::pow(1.0f - conv, 3.0f);
@@ -113,7 +118,7 @@ struct ConvergeWidget : ModuleWidget {
         constexpr float centerX = 15.0f;
 
         addInput(createInputCentered<InPortAutinn>(Vec(centerX, 100.0f), module, Converge::CONVERGE_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(centerX, 160.0f), module, Converge::ROOT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(centerX, 160.0f), module, Converge::CV_SWARM_INPUT));
         addInput(createInputCentered<InPortAutinn>(Vec(centerX, 220.0f), module, Converge::CHORD_INPUT));
 
         addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX, 300.0f+HALF_PORT), module, Converge::POLY_OUTPUT));
