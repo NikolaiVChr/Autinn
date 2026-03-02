@@ -1494,6 +1494,11 @@ struct ScopeDisplay : OpaqueWidget {
 
 		int drawLimit_px = int(width_px)+1;
 		const bool holdoffActive = module->holdoffTime_s > 0.0f;
+
+		// Snapshot the exact amount of safe data we can draw this frame
+		int rollingLookback = (int)samplesToDraw;
+		if (rollingLookback > BUFFER_SIZE) rollingLookback = BUFFER_SIZE;
+
 		if (recording) { //  || holdoffActive is not needed, as all data is new when holdoff is active
 			// we only draw enough pixels to reach writeIndex from trigger
 			double validPixels = (double)sSinceTrig / samplesPerPixel;
@@ -1503,7 +1508,11 @@ struct ScopeDisplay : OpaqueWidget {
 			if (drawLimit_px < 0) drawLimit_px = 0;
 		} else if (!idxValid && !frozen && trigMode == TRIG_MODE_AUTO) {
 			// Calculate where the screen starts relative to the write head
-			idxAnchor = (idxWrite - int(samplesToDraw)) & BUFFER_MASK;
+
+			// Cap the lookback to BUFFER_SIZE.
+			// If screen < buffer, it anchors to the right edge.
+			// If screen > buffer, it anchors mid-screen and leaves the right side blank.
+			idxAnchor = (idxWrite - rollingLookback) & BUFFER_MASK;
 		}
 
 		// update the quality setting?
@@ -1560,9 +1569,11 @@ struct ScopeDisplay : OpaqueWidget {
 				}
 
 				int sampleOffset = (int)(curr_px * samplesPerPixel);
-				if (sampleOffset >= BUFFER_SIZE) {
-					// whole buffer does not fit on screen
-					// we stop drawing.
+
+				// Thread-safe bounds check based on our snapshot
+				if (!recording && trigMode == TRIG_MODE_AUTO) {
+					if (sampleOffset >= rollingLookback) break;
+				} else if (sampleOffset >= BUFFER_SIZE) {
 					break;
 				}
 				int readIndex = (startIdx + sampleOffset) & BUFFER_MASK;
@@ -1583,6 +1594,7 @@ struct ScopeDisplay : OpaqueWidget {
 				int iterEnd = (int)((curr_px + 1) * samplesPerPixel);
 				if (iterEnd <= iterStart) iterEnd = iterStart + 1;
 
+				/*
 				if (!recording && trigMode == TRIG_MODE_AUTO) {
 					// rolling in AUTO
 					int readIdx = (startIdx + iterEnd) & BUFFER_MASK;
@@ -1600,6 +1612,7 @@ struct ScopeDisplay : OpaqueWidget {
 						break;
 					}
 				}
+				*/
 
 				float minV = 100.0f;
 				float maxV = -100.0f;
@@ -1665,11 +1678,14 @@ struct ScopeDisplay : OpaqueWidget {
 			for (float curr_px = WAVE_START_PX*stepWidth; curr_px <= width_px + stepWidth; curr_px += stepWidth) {
 
 				int sampleOffset = (int)std::round(curr_px * samplesPerPixel);
-				if (sampleOffset >= BUFFER_SIZE) {
-					// whole buffer does not fit on screen
-					// we stop drawing.
+				// Thread-safe bounds check based on our snapshot
+				if (!recording && trigMode == TRIG_MODE_AUTO) {
+					if (sampleOffset >= rollingLookback) break;
+				} else if (sampleOffset >= BUFFER_SIZE) {
 					break;
 				}
+
+				bool isNewData = true;
 
 				// This eliminates scanline jitter.
 				// left: new
@@ -1714,6 +1730,7 @@ struct ScopeDisplay : OpaqueWidget {
 					}
 				}
 
+				/*
 				if (!recording && trigMode == TRIG_MODE_AUTO) {
 					// rolling in AUTO
 
@@ -1730,6 +1747,7 @@ struct ScopeDisplay : OpaqueWidget {
 						break;
 					}
 				}
+				*/
 
 				const float v = module->buffer[ch][poly][readIndex];
 				float y = volt2PxVert(v, offset, scale);
