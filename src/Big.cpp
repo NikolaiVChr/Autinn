@@ -92,32 +92,51 @@ struct Big : Module {
         std::sort(pcs.begin(), pcs.end());
         int N = (int)pcs.size();
 
-        // Convert Spread to a coprime stride (1, 3, or 7)
-        // Strides must be co-prime to 10 to guarantee no octave collisions.
+        // Convert Spread to a coprime stride (1, 4, or 7)
+        // Strides must be co-prime to 9 to guarantee no octave collisions.
         int stride = 1;
-        if (spread > 0.33f) stride = 3;
+        if (spread > 0.33f) stride = 4;
         if (spread > 0.66f) stride = 7;
 
         // Generate the 16 unique voices
+        // Convert spread to exact octave jumps (1, 2, 3, or 4)
+        int spreadOctaves = 1 + (int)(spread * 3.99f);
+
         outputs[POLY_OUTPUT].setChannels(16);
         for (int i = 0; i < 16; i++) {
+            // Apply Inversion rotation
+            int idx = (i + inversion) % 16;
 
-            int pcIndex = i % N;
-            int pickNumber = i / N;
+            int noteInScale = idx % N;
+            int octaveWrap = idx / N;
 
-            // Calculate raw continuous pitch, stepping up by stride octaves
-            float rawPitch = rootPitch + (pcs[pcIndex] / 12.0f) + (i * stride);
+            float interval = pcs[noteInScale] / 12.0f;
+            float rawPitch = rootPitch + interval + (octaveWrap * spreadOctaves);
 
-            // Wrap strictly into the 10-octave window [-4.0V, +6.0V)
-            float wrappedPitch = std::fmod(rawPitch - (-4.0f), 10.0f);
-            if (wrappedPitch < 0.0f) wrappedPitch += 10.0f; // Handle C++ negative fmod
+            // Fold out-of-bounds octaves safely into the [-4.0V, 5.0V) window
+            float wrappedPitch = std::fmod(rawPitch - (-4.0f), 9.0f);
+            if (wrappedPitch < 0.0f) wrappedPitch += 9.0f;
             float finalPitch = wrappedPitch - 4.0f;
 
-            // Apply Inversion rotation
+            outputPitches[i] = finalPitch;
+            outputs[POLY_OUTPUT].setVoltage(finalPitch, i);
+        }
+        /*
+        for (int i = 0; i < 16; i++) {
+            int pcIndex = i % N;
+
+            float rawPitch = rootPitch + (pcs[pcIndex] / 12.0f) + (i * stride);
+
+            // Wrap strictly into the 9-octave window [-4.0V, +5.0V)
+            float wrappedPitch = std::fmod(rawPitch - (-4.0f), 9.0f);
+            if (wrappedPitch < 0.0f) wrappedPitch += 9.0f;
+            float finalPitch = wrappedPitch - 4.0f;
+
             int outIdx = (i + inversion) % 16;
             outputPitches[outIdx] = finalPitch;
             outputs[POLY_OUTPUT].setVoltage(finalPitch, outIdx);
         }
+        */
     }
 };
 
@@ -149,10 +168,10 @@ struct BigDisplay : TransparentWidget {
 
         // 16-voice Heatmap
         for (int i = 0; i < 16; i++) {
-            // Map -4V to 6V range to the display width
+            // Map -4V to 5V range (9 octaves) to the display width
             float p = module->outputPitches[i];
-            float x = ((p + 4.f) / 10.f) * (box.size.x-4.0f);
-            x = clamp(x+2.0f, 2.f, box.size.x - 2.f);
+            float x = ((p + 4.f) / 9.f) * (box.size.x - 4.0f);
+            x = clamp(x + 2.0f, 2.f, box.size.x - 2.f);
 
             nvgBeginPath(args.vg);
             nvgRect(args.vg, x - 1.f, 25.f, 2.f, 10.f);

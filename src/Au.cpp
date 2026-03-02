@@ -44,7 +44,7 @@ struct Converge : Module {
         constexpr float driftAmount = 0.1f;  // Each voice wanders +/- 0.1 octaves
 
         constexpr float safeFloor = -4.0f; // 16.35 Hz
-        constexpr float safeCeiling = 6.0f; // 16.7K Hz
+        constexpr float safeCeiling = 5.0f; // 16.7K Hz
         float lowestPossiblePitch = rootPitch - clusterWidth - driftAmount;
         float highestPossiblePitch = rootPitch + clusterWidth + driftAmount;
         if (lowestPossiblePitch < safeFloor) {
@@ -86,8 +86,11 @@ struct Converge : Module {
             const int targetIdx = (targetChannels - 1) - (c % targetChannels);
             const float targetPitch = inputs[CHORD_INPUT].getPolyVoltage(targetIdx);
 
+            // +/- 4 cents of spread to turn duplicate voltages into a thick supersaw
+            const float microDetune = (c - 7.5f) * 0.0005f;
+
             // Interpolate: 0 = Swarm, 1 = Target
-            const float currentPitch = swarmPitch * (1.0f - easeConv) + targetPitch * easeConv;
+            const float currentPitch = swarmPitch * (1.0f - easeConv) + (targetPitch + microDetune) * easeConv;
 
             outputs[POLY_OUTPUT].setVoltage(currentPitch, c);
         }
