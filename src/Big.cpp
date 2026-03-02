@@ -268,17 +268,18 @@ struct BigWidget : ModuleWidget {
 
         // Knobs
         addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(centerX, 130), module, Big::TYPE_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(40, 190), module, Big::SPREAD_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(80, 190), module, Big::INV_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(30, 190), module, Big::SPREAD_PARAM));
+        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(90, 190), module, Big::INV_PARAM));
 
         // CV
         addInput(createInputCentered<InPortAutinn>(Vec(30, 240), module, Big::TYPE_CV));
         addInput(createInputCentered<InPortAutinn>(Vec(60, 240), module, Big::SPREAD_CV));
         addInput(createInputCentered<InPortAutinn>(Vec(90, 240), module, Big::INV_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(centerX, 300+HALF_PORT), module, Big::ROOT_INPUT));
+
+        addInput(createInputCentered<InPortAutinn>(Vec(40, 300+HALF_PORT), module, Big::ROOT_INPUT));
 
         // Output
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(centerX, 330), module, Big::POLY_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(80, 300+HALF_PORT), module, Big::POLY_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
