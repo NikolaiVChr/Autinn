@@ -106,7 +106,7 @@ struct Big : Module {
             int pickNumber = i / N;
 
             // Calculate raw continuous pitch, stepping up by stride octaves
-            float rawPitch = rootPitch + (pcs[pcIndex] / 12.0f) + (pickNumber * stride);
+            float rawPitch = rootPitch + (pcs[pcIndex] / 12.0f) + (i * stride);
 
             // Wrap strictly into the 10-octave window [-4.0V, +6.0V)
             float wrappedPitch = std::fmod(rawPitch - (-4.0f), 10.0f);
