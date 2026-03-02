@@ -1685,8 +1685,6 @@ struct ScopeDisplay : OpaqueWidget {
 					break;
 				}
 
-				bool isNewData = true;
-
 				// This eliminates scanline jitter.
 				// left: new
 				// right: old
