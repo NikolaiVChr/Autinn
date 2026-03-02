@@ -98,7 +98,7 @@ struct Big : Module {
                 pitch += std::ceil(safeFloor - pitch);
             }
 
-            outputPitches[i] = root + interval + octaveOffset;
+            outputPitches[i] = pitch;
             outputs[POLY_OUTPUT].setVoltage(outputPitches[i], i);
         }
     }
