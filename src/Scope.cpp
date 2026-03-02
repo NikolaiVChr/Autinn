@@ -12,7 +12,7 @@ static constexpr float DIVS_HORIZ = 20.0f;// total horiz divs (approx effective 
 static constexpr float DIVS_VERT_INV = 1.0f/DIVS_VERT;
 static constexpr float DIVS_HORIZ_INV = 1.0f/DIVS_HORIZ;
 static constexpr float TRIG_AUTO_MIN_TIMEOUT = 0.04f;    // seconds
-static constexpr float TRIG_AUTO_MAX_TIMEOUT = 20.0f;    // seconds (was 0.2 before poly)
+static constexpr float TRIG_AUTO_MAX_TIMEOUT = 20.5f;    // seconds (was 0.2 before poly)
 static constexpr double AUTO_TIME_PERIOD_MAX = 10.0; // seconds
 static constexpr double AUTO_TIME_PERIOD_MIN = 0.000025; // seconds, 40kHz
 constexpr int TRIG_SOURCE_EXT = 4;
@@ -1493,15 +1493,6 @@ struct ScopeDisplay : OpaqueWidget {
 		int idxAnchor = idxTrigger;
 
 		int drawLimit_px = int(width_px)+1;
-
-		int start_px = int(WAVE_START_PX);
-		if (!recording && !frozen && trigMode == TRIG_MODE_AUTO && samplesToDraw > BUFFER_SIZE) {
-			// We are rolling, but the screen is wider than our buffer memory.
-			// Shift the start pixel to the right so we only draw the history we actually possess.
-			start_px = int(width_px - (BUFFER_SIZE / samplesPerPixel));
-			if (start_px < int(WAVE_START_PX)) start_px = int(WAVE_START_PX);
-		}
-
 		const bool holdoffActive = module->holdoffTime_s > 0.0f;
 		if (recording) { //  || holdoffActive is not needed, as all data is new when holdoff is active
 			// we only draw enough pixels to reach writeIndex from trigger
@@ -1549,7 +1540,7 @@ struct ScopeDisplay : OpaqueWidget {
 			nvgLineJoin(args.vg, LINEJOIN_WAVE_ZOOM_OUT);
 			nvgStrokeWidth(args.vg, strokeWidth);
 			bool wasNewData = true;
-			for (int curr_px = start_px; curr_px <= int(width_px)+1; curr_px += 1) {
+			for (int curr_px = int(WAVE_START_PX); curr_px <= int(width_px)+1; curr_px += 1) {
 				// left: new
 				// right: old
 				// extreme right: ahead of bufferhead
@@ -1605,7 +1596,7 @@ struct ScopeDisplay : OpaqueWidget {
 
 					// If we are too close to the write head from the wrong side
 					// stop drawing.
-					if (distToHead > BUFFER_SIZE - 4000) {
+					if (distToHead > BUFFER_SIZE - (int)(samplesPerPixel + 4000)) {
 						break;
 					}
 				}
