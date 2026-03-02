@@ -38,7 +38,18 @@ struct Converge : Module {
         // Swarm character
         constexpr float clusterWidth = 2.0f; // Spreads voices +/- 2 octaves
         constexpr float driftAmount = 0.1f;  // Each voice wanders +/- 0.1 octaves
-        
+
+        constexpr float safeFloor = -4.0f; // 16.35 Hz
+        constexpr float safeCeiling = 6.0f; // 16.7K Hz
+        float lowestPossiblePitch = rootPitch - clusterWidth - driftAmount;
+        float highestPossiblePitch = rootPitch + clusterWidth + driftAmount;
+        if (lowestPossiblePitch < safeFloor) {
+            rootPitch += std::ceil(safeFloor - lowestPossiblePitch);
+        }
+        else if (highestPossiblePitch > safeCeiling) {
+            rootPitch -= std::ceil(highestPossiblePitch - safeCeiling);
+        }
+
         // 0.0 = Root swarm, 1.0 = Target chord
         const float convRaw = inputs[CONVERGE_CV].getVoltage() / 10.0f;
         const float conv = clamp(convRaw, 0.0f, 1.0f);

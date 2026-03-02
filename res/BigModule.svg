@@ -2,9 +2,9 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="60"
+   width="120"
    height="380"
-   viewBox="0 0 15.875001 100.54167"
+   viewBox="0 0 31.750002 100.54167"
    version="1.1"
    id="svg8"
    inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
@@ -90,13 +90,13 @@
      id="layer1"
      transform="translate(0,-196.45832)">
     <path
-       style="opacity:1;vector-effect:none;fill:#202020;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.396875;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal"
-       d="M 0,196.45831 H 15.875001 V 296.99999 H 0 Z"
+       style="opacity:1;vector-effect:none;fill:#202020;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.561266;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal"
+       d="M 0,196.45831 H 31.750001 V 296.99999 H 0 Z"
        id="rect817"
        inkscape:connector-curvature="0" />
     <path
        style="fill:none;stroke:#5e110a;stroke-width:4.23333;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-       d="m 0,192.48957 c 5.3016654,6.8287 8.3183354,19.14448 7.9375004,27.78125 -0.361719,8.20324 9.7172076,25.14778 3.9687506,31.75 -2.3500014,2.69903 -4.8240371,6.70579 -3.9687506,23.81251 C 8.4545513,286.17494 3.407323,297.80547 0,307.58333"
+       d="m 7.9375004,192.48957 c 5.3016656,6.8287 8.3183356,19.14448 7.9375006,27.78125 -0.361719,8.20324 9.717207,25.14778 3.96875,31.75 -2.350001,2.69903 -4.824037,6.70579 -3.96875,23.81251 0.517051,10.34161 -4.530178,21.97214 -7.9375006,31.75"
        id="path4533"
        sodipodi:nodetypes="csssc" />
     <g
