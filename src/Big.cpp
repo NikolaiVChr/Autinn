@@ -305,7 +305,7 @@ struct BigWidget : ModuleWidget {
         // Knobs
         const auto typeKnob = createParamCentered<AutinnArcMidKnob>(Vec(centerX, 130.f), module, Big::TYPE_PARAM);
         typeKnob->setModulation(Big::TYPE_CV, [](const float cv,const  float val, float att) {
-            return clamp(val + cv*2.0f, 0.0f, 19.0f);
+            return (float)clamp(int(val + cv*2.0f), 0, 19);
         });
         addParam(typeKnob);
         const auto spreadKnob = createParamCentered<AutinnArcMidKnob>(Vec(30.f, 190.f), module, Big::SPREAD_PARAM);
