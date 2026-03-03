@@ -238,10 +238,8 @@ struct Myria : Module {
 
 struct BigDisplay : TransparentWidget {
     Myria* module;
-    std::shared_ptr<Font> font;
 
     BigDisplay() : module(nullptr) {
-        font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
     }
 
     void draw(const DrawArgs& args) override {
@@ -252,6 +250,8 @@ struct BigDisplay : TransparentWidget {
         nvgFill(args.vg);
 
         if (!module) return;
+
+        const std::shared_ptr<Font> font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
 
         // Draw Chord Name
         if (font) {

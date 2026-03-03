@@ -522,11 +522,11 @@ extern Model *modelAmp;
 extern Model *modelDC;
 extern Model *modelSjip;
 extern Model *modelBass;
-extern Model *modelSquare;
-extern Model *modelSaw;
+extern Model *modelSquare; //deprecated
+extern Model *modelSaw; //deprecated
 extern Model *modelBoomerang;
 extern Model *modelVibrato;
-extern Model *modelVectorDriver; //deprecated
+extern Model *modelVectorDriver;
 extern Model *modelCVConverter;
 extern Model *modelZod;
 extern Model *modelTriBand;
