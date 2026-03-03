@@ -542,19 +542,19 @@ struct Scope : Module {
 
 		float in = 0.0f;
 
-		bool isFrozen = frozen.load();
+		const bool isFrozen = frozen.load(std::memory_order_relaxed);
 		if (!isFrozen) {
 			period_s += args.sampleTime;
 		}
 
 		for (int c = 0; c < 4; c++) {
-			const int activeChannels = std::max(1, polyCount[c].load());
-			const bool isTrigChannel = (trigSource == c);
-			const bool isAC = acCoupled[c].load();
+			const int activeChannels = std::max(1, polyCount[c].load(std::memory_order_relaxed));
+			const bool isTrigChannel = (trigSource.load(std::memory_order_relaxed) == c);
+			const bool isAC = acCoupled[c].load(std::memory_order_relaxed);
 
 			int activeTrig = -1;
 			if (isTrigChannel) {
-				activeTrig = polyTrig[c].load();
+				activeTrig = polyTrig[c].load(std::memory_order_relaxed);
 			}
 
 			for (int polyCh = 0; polyCh < activeChannels; polyCh++) {
@@ -566,7 +566,7 @@ struct Scope : Module {
 
 				if (!isFrozen) {
 					if (buffer[c][polyCh] != nullptr) {
-						buffer[c][polyCh][writeIndex] = val;
+						buffer[c][polyCh][writeIndex.load(std::memory_order_relaxed)] = val;
 					}
 				}
 
@@ -576,19 +576,25 @@ struct Scope : Module {
 			}
 		}
 
-		if (!isFrozen) {
-			//writeIndex.store((writeIndex + 1) & BUFFER_MASK);
-			//if (writeIndex == 0) bufferFilled = true;
-
-			// std::memory_order_relaxed avoids a heavy CPU sync fence here
-			writeIndex.store((writeIndex.load(std::memory_order_relaxed) + 1) & BUFFER_MASK, std::memory_order_relaxed);
-			if (writeIndex.load(std::memory_order_relaxed) == 0) bufferFilled.store(true);
-		}
-
 		const bool edgeFound = triggerDetect(args, in);
 
 		if (!frozen) {
 			triggerResponse(args, edgeFound);
+		}
+
+		if (!isFrozen) {
+			// std::memory_order_relaxed avoids a heavy CPU sync fence here
+			const int currentWrite = (writeIndex.load(std::memory_order_relaxed)+1) & BUFFER_MASK;
+			writeIndex.store(currentWrite,std::memory_order_relaxed);
+			if (currentWrite == 0) bufferFilled.store(true);
+
+			if (triggerValid.load(std::memory_order_relaxed) && currentWrite == triggerIndex.load(std::memory_order_relaxed)) {
+				triggerValid.store(false);
+			}
+
+			if (prev_triggerValid.load(std::memory_order_relaxed) && currentWrite == lastTriggerIndex.load(std::memory_order_relaxed)) {
+				prev_triggerValid.store(false);
+			}
 		}
 
 		blinkPhase += args.sampleTime * BLINK_HZ * 0.5f;
@@ -628,14 +634,14 @@ struct Scope : Module {
 			trigSig = inputs[CV_TRIG_EXT_INPUT].getVoltage();
 		}
 
-		float threshold = thresholdKnob;
+		float threshold = thresholdKnob.load(std::memory_order_relaxed);
 
 		// Holdoff
-		if (holdoffTime_s > 0.0f) {
+		if (holdoffTime_s.load(std::memory_order_relaxed) > 0.0f) {
 			// its fine that this counts down while being frozen, as unfreezing will reset it anyway.
-			holdoffTime_s.store(holdoffTime_s.load() - args.sampleTime);
+			holdoffTime_s.store(holdoffTime_s.load(std::memory_order_relaxed) - args.sampleTime, std::memory_order_relaxed);
 		}
-		const bool holdoff_active = holdoffTime_s > 0.0f;
+		const bool holdoff_active = holdoffTime_s.load(std::memory_order_relaxed) > 0.0f;
 
 		if (trigFoundTimer > 0.0f) {
 			trigFoundTimer -= args.sampleTime;
@@ -648,10 +654,10 @@ struct Scope : Module {
 		if (trigEdge == TRIG_EDGE_FALL) {
 			signal = -signal;
 			//hysteresis = -hysteresis;
-			threshold2 = threshold-hysteresis;
+			threshold2.store(threshold-hysteresis, std::memory_order_relaxed);
 			threshold = -threshold;
 		} else {
-			threshold2 = threshold+hysteresis;
+			threshold2.store(threshold+hysteresis, std::memory_order_relaxed);
 		}
 		bool schmittState = trigSchmitt.process(signal, threshold, threshold+hysteresis);
 
@@ -730,17 +736,18 @@ struct Scope : Module {
 
 		bool holdoff_active = holdoffTime_s > 0.0f;
 
-		if (recording) {
+		if (recording.load(std::memory_order_relaxed)) {
 			// Recording
 			// We have triggered, now we fill the buffer for the rest of the display
-			++samplesSinceTrigger;
+			samplesSinceTrigger.fetch_add(1, std::memory_order_relaxed);
 
 			if (samplesSinceTrigger >= samplesToRecord) {
 				// buffer full
-				recording = false;
+				recording.store(false);
 
 				// Set holdoff
-				holdoffTime_s.store(holdoffKnob.load() > 0.00011f?holdoffKnob.load():0.0f);
+				float hKnob = holdoffKnob.load(std::memory_order_relaxed);
+				holdoffTime_s.store(hKnob > 0.00011f?hKnob:0.0f, std::memory_order_relaxed);
 
 				if (trigMode == TRIG_MODE_SOLO || freezePending) {
 					frozen = true;
@@ -752,15 +759,14 @@ struct Scope : Module {
 			if (!holdoff_active) {
 				if (edgeFound) {
 					// switch to recording
-					lastTriggerIndex.store(triggerIndex);
-					prev_triggerValid.store(triggerValid);
-					triggerIndex.store(writeIndex);
+					lastTriggerIndex.store(triggerIndex.load(std::memory_order_relaxed));
+					prev_triggerValid.store(triggerValid.load(std::memory_order_relaxed));
+					triggerIndex.store(writeIndex.load(std::memory_order_relaxed));
 					triggerValid.store(true);
-					samplesSinceTrigger.store(0);
+					samplesSinceTrigger.store(0, std::memory_order_relaxed);
 					recording.store(true);
 					autoTrigTimer_s = 0.0f;
 				}
-
 
 				autoTrigTimer_s += args.sampleTime;
 				// If no trigger for screen time, force update
@@ -789,15 +795,15 @@ struct Scope : Module {
 
 					if (trigMode == TRIG_MODE_AUTO || trigMode == TRIG_MODE_XY) {
 						// Force rolling trigger
-						lastTriggerIndex.store(triggerIndex);
-						triggerIndex = (writeIndex - samplesToRecord) & BUFFER_MASK;//only used for freezing.
-						recording = false;
-						triggerValid = false;
-						prev_triggerValid = false;
-						samplesSinceTrigger = 0;
+						lastTriggerIndex.store(triggerIndex.load(std::memory_order_relaxed));
+						triggerIndex.store((writeIndex.load(std::memory_order_relaxed) - samplesToRecord) & BUFFER_MASK);//only used for freezing.
+						recording.store(false);
+						triggerValid.store(false);
+						prev_triggerValid.store(false);
+						samplesSinceTrigger.store(0, std::memory_order_relaxed);
 
 						if (freezePending) {
-							frozen = true;
+							frozen.store(true);
 							freezePending = false;
 						}
 					}
