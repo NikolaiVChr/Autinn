@@ -75,5 +75,5 @@ void init(rack::Plugin *plugin) {
 	plugin->addModel(modelAlias);
 	plugin->addModel(modelTrace);
 	plugin->addModel(modelAu);
-	plugin->addModel(modelBig);
+	plugin->addModel(modelMyria);
 }

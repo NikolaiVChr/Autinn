@@ -29,7 +29,7 @@
       "slug": "Bass",
       "name": "Bass",
       "description": "Bass and Acid synth",
-      "keywords": "acid",
+      "keywords": "acid 303",
       "tags": [
         "Filter",
         "Physical modeling"
@@ -378,7 +378,7 @@
     },
     {
       "slug": "Big",
-      "name": "Big",
+      "name": "Myria",
       "description": "16 voice polyphonic chord generator",
       "keywords": "",
       "hidden": false,

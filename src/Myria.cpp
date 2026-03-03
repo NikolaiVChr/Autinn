@@ -3,7 +3,7 @@
 #include <string>
 #include <algorithm>
 
-struct Big : Module {
+struct Myria : Module {
     enum ParamIds {
         TYPE_PARAM,
         SPREAD_PARAM,
@@ -67,7 +67,7 @@ struct Big : Module {
     };
     PrecomputedChord precomputedChords[20];
 
-    Big() {
+    Myria() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS);
         configSwitch(TYPE_PARAM, 0.f, 19.f, 0.f, "Chord Type",{"Power","Major","Minor","Penta","Maj9","Min9","MinMaj9","Mu Major","Lydian+","Sus2/4","Quartal","Hendrix","Dream","Aug7","Whole","Diminish","Stravin","Cluster","Ghost","The End"});
         configParam<Param3Digits>(SPREAD_PARAM, 0.f, 1.f, 0.2f, "Spread");
@@ -237,7 +237,7 @@ struct Big : Module {
 };
 
 struct BigDisplay : TransparentWidget {
-    Big* module;
+    Myria* module;
     std::shared_ptr<Font> font;
 
     BigDisplay() : module(nullptr) {
@@ -278,7 +278,7 @@ struct BigDisplay : TransparentWidget {
 };
 
 struct ScrambleItem : MenuItem {
-    Big* module;
+    Myria* module;
     void onAction(const event::Action& e) override {
         module->scrambleChannels = !module->scrambleChannels;
         module->reShuffle();
@@ -290,7 +290,7 @@ struct ScrambleItem : MenuItem {
 };
 
 struct BigWidget : ModuleWidget {
-    explicit BigWidget(Big* module) {
+    explicit BigWidget(Myria* module) {
         setModule(module);
         setPanel(createPanel(asset::plugin(pluginInstance, "res/BigModule.svg")));
 
@@ -303,35 +303,35 @@ struct BigWidget : ModuleWidget {
         constexpr float centerX = 60.f;
 
         // Knobs
-        const auto typeKnob = createParamCentered<AutinnArcMidKnob>(Vec(centerX, 130.f), module, Big::TYPE_PARAM);
-        typeKnob->setModulation(Big::TYPE_CV, [](const float cv,const  float val, float att) {
+        const auto typeKnob = createParamCentered<AutinnArcMidKnob>(Vec(centerX, 130.f), module, Myria::TYPE_PARAM);
+        typeKnob->setModulation(Myria::TYPE_CV, [](const float cv,const  float val, float att) {
             return (float)clamp(int(val + cv*2.0f), 0, 19);
         });
         addParam(typeKnob);
-        const auto spreadKnob = createParamCentered<AutinnArcMidKnob>(Vec(30.f, 190.f), module, Big::SPREAD_PARAM);
-        spreadKnob->setModulation(Big::SPREAD_CV, [](const float cv, const float val, float att) {
+        const auto spreadKnob = createParamCentered<AutinnArcMidKnob>(Vec(30.f, 190.f), module, Myria::SPREAD_PARAM);
+        spreadKnob->setModulation(Myria::SPREAD_CV, [](const float cv, const float val, float att) {
             return clamp(val + (cv * 0.1f), 0.0f, 1.0f);
         });
         addParam(spreadKnob);
-        const auto invKnob = createParamCentered<AutinnArcMidKnob>(Vec(90.f, 190.f), module, Big::INV_PARAM);
-        invKnob->setModulation(Big::INV_CV, [](const float cv, const float val, float att) {
+        const auto invKnob = createParamCentered<AutinnArcMidKnob>(Vec(90.f, 190.f), module, Myria::INV_PARAM);
+        invKnob->setModulation(Myria::INV_CV, [](const float cv, const float val, float att) {
             return (int)(std::round(val) + cv*1.5f) % 16;
         });
         addParam(invKnob);
 
         // CV
-        addInput(createInputCentered<InPortAutinn>(Vec(30.f, 240.f), module, Big::TYPE_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(60.f, 240.f), module, Big::SPREAD_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(90.f, 240.f), module, Big::INV_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(30.f, 240.f), module, Myria::TYPE_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(60.f, 240.f), module, Myria::SPREAD_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(90.f, 240.f), module, Myria::INV_CV));
 
-        addInput(createInputCentered<InPortAutinn>(Vec(30.f, 300.f+HALF_PORT), module, Big::ROOT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(30.f, 300.f+HALF_PORT), module, Myria::ROOT_INPUT));
 
         // Output
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(90.f, 300.f+HALF_PORT), module, Big::POLY_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(90.f, 300.f+HALF_PORT), module, Myria::POLY_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
-        Big* module = dynamic_cast<Big*>(this->module);
+        Myria* module = dynamic_cast<Myria*>(this->module);
         if (!module) return;
 
         menu->addChild(new MenuEntry);
@@ -342,4 +342,4 @@ struct BigWidget : ModuleWidget {
     }
 };
 
-Model* modelBig = createModel<Big, BigWidget>("Big");
+Model* modelMyria = createModel<Myria, BigWidget>("Big");
