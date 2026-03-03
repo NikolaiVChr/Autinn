@@ -55,11 +55,23 @@ struct Big : Module {
     bool scrambleChannels = false;
     int channelMap[16];
 
+    float lastRootPitch = -1000.f;
+    int lastType = -1;
+    float lastSpread = -1000.f;
+    int lastInversion = -1;
+    bool lastScrambleChannels = false;
+
+    struct PrecomputedChord {
+        float pcs[12];
+        int numPcs;
+    };
+    PrecomputedChord precomputedChords[20];
+
     Big() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS);
         configSwitch(TYPE_PARAM, 0.f, 19.f, 0.f, "Chord Type",{"Power","Major","Minor","Penta","Maj9","Min9","MinMaj9","Mu Major","Lydian+","Sus2/4","Quartal","Hendrix","Dream","Aug7","Whole","Diminish","Stravin","Cluster","Ghost","The End"});
         configParam(SPREAD_PARAM, 0.f, 1.f, 0.2f, "Spread");
-        configParam(INV_PARAM, 0.f, 15.f, 0.f, "Inversion");
+        configParam(INV_PARAM, 0.f, 15.f, 0.f, "Inversion")->snapEnabled=true;
 
         configInput(ROOT_INPUT, "Root 1V/Oct");
         configInput(TYPE_CV, "Type CV");
@@ -68,6 +80,29 @@ struct Big : Module {
         configOutput(POLY_OUTPUT, "16-Channel Poly Out");
 
         for (int i = 0; i < 16; i++) channelMap[i] = i;
+
+        for (int c = 0; c < 20; c++) {
+            std::vector<float> tempPcs;
+            for (float interval : chordTable[c].intervals) {
+                float pc = std::fmod(interval, 12.0f);
+                bool duplicate = false;
+                for (float existing : tempPcs) {
+                    if (std::abs(existing - pc) < 0.1f) {
+                        duplicate = true; break;
+                    }
+                }
+                if (!duplicate) tempPcs.push_back(pc);
+            }
+            std::sort(tempPcs.begin(), tempPcs.end());
+            precomputedChords[c].numPcs = tempPcs.size();
+            for(int i = 0; i < tempPcs.size(); i++) {
+                precomputedChords[c].pcs[i] = tempPcs[i];
+            }
+        }
+    }
+    void onReset(const ResetEvent& e) override {
+        scrambleChannels = false;
+        Module::onReset(e);
     }
 
     void reShuffle() {
@@ -106,83 +141,85 @@ struct Big : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        float rootPitch = inputs[ROOT_INPUT].getVoltage();
+        const float rootPitch = inputs[ROOT_INPUT].getVoltage();
 
-        float typeRaw = params[TYPE_PARAM].getValue() + inputs[TYPE_CV].getVoltage();
-        currentType = clamp((int)typeRaw, 0, 19);
+        const float typeRaw = params[TYPE_PARAM].getValue() + inputs[TYPE_CV].getVoltage()*2.0f;
+        const int newType = clamp((int)typeRaw, 0, 19);
 
-        float spread = clamp(params[SPREAD_PARAM].getValue() + inputs[SPREAD_CV].getVoltage() / 10.f, 0.f, 1.f);
-        int inversion = (int)(params[INV_PARAM].getValue() + inputs[INV_CV].getVoltage()) % 16;
+        const float spread = clamp(params[SPREAD_PARAM].getValue() + inputs[SPREAD_CV].getVoltage() * 0.1f, 0.f, 1.f);
+        const int inversion = (int)(std::round(params[INV_PARAM].getValue()) + inputs[INV_CV].getVoltage()*1.5f) % 16;
 
-        const auto& scale = chordTable[currentType].intervals;
+        if (std::abs(rootPitch - lastRootPitch) < 1e-5f &&
+                newType == lastType &&
+                std::abs(spread - lastSpread) < 1e-5f &&
+                inversion == lastInversion &&
+                scrambleChannels == lastScrambleChannels) {
 
-        // Extract strictly unique pitch classes
-        std::vector<float> pcs;
-        for (float interval : scale) {
-            float pc = std::fmod(interval, 12.0f);
-            bool duplicate = false;
-            for (float existing : pcs) {
-                if (std::abs(existing - pc) < 0.1f) {
-                    duplicate = true; break;
-                }
+            outputs[POLY_OUTPUT].setChannels(16);
+            for (int i = 0; i < 16; i++) {
+                outputs[POLY_OUTPUT].setVoltage(outputPitches[i], i);
             }
-            if (!duplicate) pcs.push_back(pc);
+            return;
         }
-        std::sort(pcs.begin(), pcs.end());
 
-        // Generate the massive pool of all valid notes in the [-4V, 5V) window
-        std::vector<float> pool;
+        lastRootPitch = rootPitch;
+        lastType = newType;
+        lastSpread = spread;
+        lastInversion = inversion;
+        lastScrambleChannels = scrambleChannels;
+        currentType = newType;
+
+        const auto& chord = precomputedChords[currentType];
+
+        // Use a fixed stack array instead of std::vector
+        float pool[256];
+        int M = 0;
+
+        // Generate the massive pool. Because octaves and pcs are both ascending,
+        // the pool is naturally sorted. No std::sort required.
         for (int oct = -8; oct <= 8; oct++) {
-            for (float pc : pcs) {
-                float p = rootPitch + (pc / 12.0f) + oct;
+            for (int i = 0; i < chord.numPcs; i++) {
+                const float p = rootPitch + (chord.pcs[i] / 12.0f) + oct;
                 if (p >= -4.0f && p < 5.0f) {
-                    pool.push_back(p);
+                    pool[M++] = p;
                 }
             }
         }
-        std::sort(pool.begin(), pool.end());
 
-        // Remove exact duplicates (just in case a chord definition has overlaps)
-        pool.erase(std::unique(pool.begin(), pool.end(), [](float a, float b) {
-            return std::abs(a - b) < 0.01f;
-        }), pool.end());
-
-        int M = pool.size();
         if (M < 16) {
-            // Failsafe: Should never trigger since the smallest chord generates 27 notes in a 9-octave window
-            while (pool.size() < 16) pool.push_back(pool.back() + 1.0f);
-            M = pool.size();
+            while (M < 16) {
+                pool[M] = pool[M - 1] + 1.0f;
+                M++;
+            }
         }
 
         // Find the index of the note closest to the input Root Pitch
         int centerIdx = 0;
         float minDist = 100.0f;
         for (int i = 0; i < M; i++) {
-            float dist = std::abs(pool[i] - rootPitch);
+            const float dist = std::abs(pool[i] - rootPitch);
             if (dist < minDist) {
                 minDist = dist;
                 centerIdx = i;
             }
         }
 
-        // Define 3 Spread Settings (Discrete spans)
+        // Define 3 Spread Settings
         int span = 16;
         if (spread > 0.33f && spread <= 0.66f) {
-            span = std::max(16, (int)(16 + (M - 16) / 2.0f)); // Medium spread
+            span = std::max(16, (int)(16 + (M - 16) / 2.0f));
         } else if (spread > 0.66f) {
-            span = M; // Full maximum spread
+            span = M;
         }
 
-        // Calculate starting index to perfectly center the span around the root
-        // Adding Inversion to slide up the scale
+        // Calculate starting index
         float startIndex = centerIdx - (span - 1) / 2.0f + inversion;
-
         if (startIndex < 0.0f) startIndex = 0.0f;
         if (startIndex + span > M) startIndex = M - span;
 
-        // Pick 16 evenly spaced notes from the defined span
-        std::vector<float> tempPitches(16);
-        float step = (span - 1) / 15.0f;
+        // Pick 16 evenly spaced notes
+        float tempPitches[16];
+        const float step = (span - 1) / 15.0f;
 
         for (int i = 0; i < 16; i++) {
             int idx = std::round(startIndex + i * step);
@@ -190,7 +227,6 @@ struct Big : Module {
             tempPitches[i] = pool[idx];
         }
 
-        // Apply output mapping (straight or scrambled)
         outputs[POLY_OUTPUT].setChannels(16);
         for (int i = 0; i < 16; i++) {
             int outIdx = scrambleChannels ? channelMap[i] : i;
@@ -229,7 +265,7 @@ struct BigDisplay : TransparentWidget {
         // 16-voice Heatmap
         for (int i = 0; i < 16; i++) {
             // Map -4V to 5V range (9 octaves) to the display width
-            float p = module->outputPitches[i];
+            const float p = module->outputPitches[i];
             float x = ((p + 4.f) / 9.f) * (box.size.x - 4.0f);
             x = clamp(x + 2.0f, 2.f, box.size.x - 2.f);
 
@@ -254,32 +290,44 @@ struct ScrambleItem : MenuItem {
 };
 
 struct BigWidget : ModuleWidget {
-    BigWidget(Big* module) {
+    explicit BigWidget(Big* module) {
         setModule(module);
         setPanel(createPanel(asset::plugin(pluginInstance, "res/BigModule.svg")));
 
         // Display
-        BigDisplay* display = createWidget<BigDisplay>(Vec(5, 50));
-        display->box.size = Vec(110, 40);
+        BigDisplay* display = createWidget<BigDisplay>(Vec(5.f, 50.f));
+        display->box.size = Vec(110.f, 40.f);
         display->module = module;
         addChild(display);
 
-        float centerX = 60.f;
+        const float centerX = 60.f;
 
         // Knobs
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(centerX, 130), module, Big::TYPE_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(30, 190), module, Big::SPREAD_PARAM));
-        addParam(createParamCentered<RoundMediumAutinnKnob>(Vec(90, 190), module, Big::INV_PARAM));
+        const auto typeKnob = createParamCentered<AutinnArcMidKnob>(Vec(centerX, 130.f), module, Big::TYPE_PARAM);
+        typeKnob->setModulation(Big::TYPE_CV, [](const float cv,const  float val, float att) {
+            return clamp(val + cv*2.0f, 0.0f, 19.0f);
+        });
+        addParam(typeKnob);
+        const auto spreadKnob = createParamCentered<AutinnArcMidKnob>(Vec(30.f, 190.f), module, Big::SPREAD_PARAM);
+        spreadKnob->setModulation(Big::SPREAD_CV, [](const float cv, const float val, float att) {
+            return clamp(val + (cv * 0.1f), 0.0f, 1.0f);
+        });
+        addParam(spreadKnob);
+        const auto invKnob = createParamCentered<AutinnArcMidKnob>(Vec(90.f, 190.f), module, Big::INV_PARAM);
+        invKnob->setModulation(Big::INV_CV, [](const float cv, const float val, float att) {
+            return (int)(std::round(val) + cv*1.5f) % 16;
+        });
+        addParam(invKnob);
 
         // CV
-        addInput(createInputCentered<InPortAutinn>(Vec(30, 240), module, Big::TYPE_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(60, 240), module, Big::SPREAD_CV));
-        addInput(createInputCentered<InPortAutinn>(Vec(90, 240), module, Big::INV_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(30.f, 240.f), module, Big::TYPE_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(60.f, 240.f), module, Big::SPREAD_CV));
+        addInput(createInputCentered<InPortAutinn>(Vec(90.f, 240.f), module, Big::INV_CV));
 
-        addInput(createInputCentered<InPortAutinn>(Vec(30, 300+HALF_PORT), module, Big::ROOT_INPUT));
+        addInput(createInputCentered<InPortAutinn>(Vec(30.f, 300.f+HALF_PORT), module, Big::ROOT_INPUT));
 
         // Output
-        addOutput(createOutputCentered<OutPortAutinn>(Vec(90, 300+HALF_PORT), module, Big::POLY_OUTPUT));
+        addOutput(createOutputCentered<OutPortAutinn>(Vec(90.f, 300.f+HALF_PORT), module, Big::POLY_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {

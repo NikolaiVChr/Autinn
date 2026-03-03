@@ -371,7 +371,7 @@
       "name": "Au",
       "description": "Polyphonic chord converger",
       "keywords": "",
-      "hidden": true,
+      "hidden": false,
       "tags": [
         "Polyphonic"
       ]
@@ -381,7 +381,7 @@
       "name": "Big",
       "description": "16 voice polyphonic chord generator",
       "keywords": "",
-      "hidden": true,
+      "hidden": false,
       "tags": [
         "Polyphonic"
       ]
