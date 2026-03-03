@@ -70,7 +70,7 @@ struct Big : Module {
     Big() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS);
         configSwitch(TYPE_PARAM, 0.f, 19.f, 0.f, "Chord Type",{"Power","Major","Minor","Penta","Maj9","Min9","MinMaj9","Mu Major","Lydian+","Sus2/4","Quartal","Hendrix","Dream","Aug7","Whole","Diminish","Stravin","Cluster","Ghost","The End"});
-        configParam(SPREAD_PARAM, 0.f, 1.f, 0.2f, "Spread");
+        configParam<Param3Digits>(SPREAD_PARAM, 0.f, 1.f, 0.2f, "Spread");
         configParam(INV_PARAM, 0.f, 15.f, 0.f, "Inversion")->snapEnabled=true;
 
         configInput(ROOT_INPUT, "Root 1V/Oct");
@@ -300,7 +300,7 @@ struct BigWidget : ModuleWidget {
         display->module = module;
         addChild(display);
 
-        const float centerX = 60.f;
+        constexpr float centerX = 60.f;
 
         // Knobs
         const auto typeKnob = createParamCentered<AutinnArcMidKnob>(Vec(centerX, 130.f), module, Big::TYPE_PARAM);
