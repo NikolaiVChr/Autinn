@@ -162,7 +162,7 @@ struct Alias : Module {
 		for (int i = 0; i < 3; i++) {
 			const float target = targetFrequencies[i];
 			const float targetLogP = std::log(target / startFreq) / std::log(endFreq / startFreq);
-			const int targetStep = std::round(targetLogP * (STEPS - 1));
+			const int targetStep = int(std::round(targetLogP * (STEPS - 1)));
 
 			if (step == targetStep) {
 				idealFreq = target;
@@ -232,7 +232,7 @@ struct Alias : Module {
 			bool crossedZero = false;
 			if (sweepPhase >= 1.0f) {
 				sweepPhase -= 1.0f;
-				crossedZero = true; // The wave wrapped perfectly around 0!
+				crossedZero = true; // The wave wrapped around 0
 			}
 
 			// state
@@ -252,9 +252,16 @@ struct Alias : Module {
 			} else if (currentState == RECORD) {
 				// Record the stable signal
 				audioBuffer[bufferIndex] = inputs[RETURN_INPUT].getVoltage() * 0.2f;
+
+				constexpr bool NAIVETEST = true;
+				if (mode && NAIVETEST) {
+					// make a naive saw for testing large amount of aliasing
+					audioBuffer[bufferIndex] = (sweepPhase*2.0f)-1.0f;
+				}
+
 				bufferIndex++;
 
-				// When buffer is full, do the math!
+				// When buffer is full, do the fft
 				if (bufferIndex >= FFT_SIZE) {
 					// remove DC offset, this must be done before FFT
 
@@ -359,7 +366,7 @@ struct Alias : Module {
 					for (int i = 0; i < 3; i++) {
 						const float target = targetFrequencies[i];
 						const float targetLogP = std::log(target / startFreq) / std::log(END_HZ / startFreq);
-						const int targetStep = std::round(targetLogP * (STEPS - 1));
+						const int targetStep = int(std::round(targetLogP * (STEPS - 1)));
 
 						if (currentStep >= targetStep - 1 && currentStep <= targetStep + 1) {
 							// If this is the first time entering the window, or if we found a worse dB
