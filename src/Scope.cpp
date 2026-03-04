@@ -1339,7 +1339,7 @@ struct ScopeDisplay : OpaqueWidget {
 				nvgFillColor(args.vg, colorMenuUnpatched);
 				nvgText(args.vg, center, trigY, "TRIG: ---", nullptr);
 			} else {
-				nvgFillColor(args.vg, colorMenuGrayLight);
+				nvgFillColor(args.vg, patched ? colorMenuActiveText : colorMenuGrayLight);
 				char trigText[32];
 				if (activePoly == 1) snprintf(trigText, sizeof(trigText), "TRIG: - 1 -");
 				else snprintf(trigText, sizeof(trigText), "TRIG: < %d >", trigCh + 1);
