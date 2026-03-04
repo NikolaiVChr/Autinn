@@ -253,7 +253,7 @@ struct Alias : Module {
 				// Record the stable signal
 				audioBuffer[bufferIndex] = inputs[RETURN_INPUT].getVoltage() * 0.2f;
 
-				constexpr bool NAIVETEST = true;
+				constexpr bool NAIVETEST = false;
 				if (mode && NAIVETEST) {
 					// make a naive saw for testing large amount of aliasing
 					audioBuffer[bufferIndex] = (sweepPhase*2.0f)-1.0f;
